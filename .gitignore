@@ -69,3 +69,12 @@ lambda-publish/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# User Scratchpad (Temporary/Draft files)
+scratchpad/
+scratchpad/*
+!scratchpad/.gitkeep
+
+# ide Files
+trunk/
+trunk/*

@@ -1,9 +1,0 @@
-{
-  "profile": "",
-  "region": "us-east-1",
-  "configuration": "Release",
-  "function-runtime": "dotnet8",
-  "function-memory-size": 256,
-  "function-timeout": 30,
-  "function-handler": "PoC.Lambda::PoC.Lambda.Function::FunctionHandler"
-}

@@ -1,5 +1,3 @@
-using PoC.Shared.Models;
-
 namespace PoC.Shared.Events;
 
 public class PriceUpdatedEvent : IEvent

@@ -1,9 +1,0 @@
-{
-  "requestContext": {
-    "http": {
-      "method": "POST",
-      "path": "/populate"
-    }
-  },
-  "body": "{\"target\": \"materials\", \"count\": 500}"
-}

@@ -1,27 +1,154 @@
-# .editorconfig
+# Antigravity Project - .editorconfig
+# Based on Microsoft Code Analysis & Style Rules
+# Reference: https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/code-style-rule-options
+
 root = true
 
+# ==============================================================================
+# 1. CORE FORMATTING
+# ==============================================================================
 [*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
 indent_style = space
 indent_size = 4
-charset = utf-8
 trim_trailing_whitespace = true
-insert_final_newline = true
 
+[*.{cs,json,xml,yml}]
+indent_size = 4
+
+# ==============================================================================
+# 2. C# CODING CONVENTIONS (CLEAN CODE)
+# ==============================================================================
 [*.cs]
-# Regra: Namespaces com escopo de arquivo (C# 10+)
+
+# --- ORGANIZATIONAL ---
+# Rule: Use file-scoped namespaces (Reduces nesting level - .NET 6+)
 csharp_style_namespace_declarations = file_scoped:warning
 
-# Regra: Usar var apenas quando o tipo é evidente
+# Rule: Place 'System' directives first (Consistency)
+dotnet_sort_system_directives_first = true:warning
+
+# Rule: Separate import directive groups (Readability)
+dotnet_separate_import_directive_groups = false:suggestion
+
+# --- LANGUAGE FEATURES ---
+# Rule: Use 'var' when type is apparent (e.g., var x = new List<int>()) - Reduces noise
 csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_elsewhere = true:silent
 
-# Regra: Nullable reference types
-dotnet_diagnostic.CS8600.severity = error # Conversão de literal nulo ou possível valor nulo em tipo não anulável
-dotnet_diagnostic.CS8602.severity = error # Desreferência de uma referência possivelmente nula
+# Rule: Use 'new()' (Target-typed new) - Cleaner syntax
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
 
-# Regra: Naming Conventions (Async suffix)
-dotnet_naming_rule.async_methods_must_end_with_async.severity = suggestion
+# Rule: Pattern matching (Use 'is' instead of casts)
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+
+# --- EXPRESSION BODIES (KISS) ---
+# Rule: Use expression bodies for one-liners (Methods, Properties, Constructors)
+csharp_style_expression_bodied_methods = true:silent
+csharp_style_expression_bodied_constructors = false:silent
+csharp_style_expression_bodied_operators = true:silent
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_expression_bodied_indexers = true:silent
+csharp_style_expression_bodied_accessors = true:silent
+
+# --- NULLABILITY (CRITICAL) ---
+# Rule: Enforce Null Checking
+# This integrates with the <Nullable>enable</Nullable> in .csproj
+dotnet_diagnostic.CS8600.severity = error # Converting null literal or possible null value to non-nullable type.
+dotnet_diagnostic.CS8602.severity = error # Dereference of a possibly null reference.
+dotnet_diagnostic.CS8603.severity = error # Possible null reference return.
+dotnet_diagnostic.CS8604.severity = error # Possible null reference argument.
+dotnet_diagnostic.CS8618.severity = error # Non-nullable field must contain a non-null value when exiting constructor.
+
+# ==============================================================================
+# 3. YAGNI & HYGIENE (STRICT)
+# ==============================================================================
+
+# Rule: Remove unused usings (Dirty code)
+dotnet_diagnostic.IDE0005.severity = error
+
+# Rule: Remove unused variables (Dead code)
+dotnet_diagnostic.IDE0059.severity = error
+
+# Rule: Remove unnecessary parentheses (Noise)
+dotnet_diagnostic.IDE0047.severity = warning
+
+# Rule: Make fields readonly if possible (Immutability)
+dotnet_diagnostic.IDE0044.severity = warning
+
+# ==============================================================================
+# 4. NAMING CONVENTIONS
+# ==============================================================================
+
+# --- ASYNC METHODS ---
+# Rule: Async methods must end with "Async"
+dotnet_naming_rule.async_methods_must_end_with_async.severity = warning
 dotnet_naming_symbols.async_methods.applicable_kinds = method
 dotnet_naming_symbols.async_methods.applicable_accessibilities = *
 dotnet_naming_style.async_methods_must_end_with_async.required_suffix = Async
 dotnet_naming_style.async_methods_must_end_with_async.capitalization = pascal_case
+
+# --- INTERFACES ---
+# Rule: Interfaces must start with 'I'
+dotnet_naming_rule.interface_should_be_begins_with_i.severity = warning
+dotnet_naming_symbols.interface.applicable_kinds = interface
+dotnet_naming_symbols.interface.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_style.interface_should_be_begins_with_i.required_prefix = I
+dotnet_naming_style.interface_should_be_begins_with_i.capitalization = pascal_case
+
+# --- PRIVATE FIELDS ---
+# Rule: Private fields should be _camelCase (Standard .NET convention)
+dotnet_naming_rule.private_members_with_underscore.severity = suggestion
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.prefix_underscore.capitalization = camel_case
+dotnet_naming_style.prefix_underscore.required_prefix = _
+
+# ==============================================================================
+# 5. UNIT TESTS (xUnit Standard)
+# ==============================================================================
+[*.Tests.cs]
+# Allow underscores in test method names (e.g., Should_ReturnTrue_When_Valid)
+dotnet_naming_rule.test_methods_naming.severity = none
+# StyleCop Rules
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1633.severity = none
+dotnet_diagnostic.SA1101.severity = none
+dotnet_diagnostic.SA1503.severity = none
+dotnet_diagnostic.SA1413.severity = none
+dotnet_diagnostic.SA1200.severity = none
+dotnet_diagnostic.SA1602.severity = none
+dotnet_diagnostic.SA1208.severity = none
+dotnet_diagnostic.SA1028.severity = none
+
+
+[*.cs]
+# StyleCop Rules (Global)
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1633.severity = none
+dotnet_diagnostic.SA1101.severity = none
+dotnet_diagnostic.SA1503.severity = none
+dotnet_diagnostic.SA1413.severity = none
+dotnet_diagnostic.SA1200.severity = none
+dotnet_diagnostic.SA1602.severity = none
+dotnet_diagnostic.SA1208.severity = none
+dotnet_diagnostic.SA1028.severity = none
+
+
+dotnet_diagnostic.SA1516.severity = none
+dotnet_diagnostic.SA1649.severity = none
+dotnet_diagnostic.SA1309.severity = none
+dotnet_diagnostic.SA1402.severity = none
+dotnet_diagnostic.SA1201.severity = none
+dotnet_diagnostic.S3878.severity = none
+dotnet_diagnostic.SA1515.severity = none
+
+
+dotnet_diagnostic.SA1502.severity = none
+dotnet_diagnostic.SA1009.severity = none
+dotnet_diagnostic.S2094.severity = none
+

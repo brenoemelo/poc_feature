@@ -1,17 +1,17 @@
+using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
+using PoC.Shared.Events;
 using PoC.Shared.Models;
 using PoC.Shared.Services;
-using PoC.Shared.Events;
-using System.Text.Json;
 
 namespace PoC.Populator;
 
 public class PopulatorWorkerFunction
 {
-    private readonly AmazonSimpleNotificationServiceClient _snsClient;
+    private readonly IAmazonSimpleNotificationService _snsClient;
     private readonly IPopulationStrategy _strategy;
     private readonly string _topicArn;
 
@@ -37,7 +37,16 @@ public class PopulatorWorkerFunction
         _topicArn = Environment.GetEnvironmentVariable("SNS_TOPIC_ARN") ?? "arn:aws:sns:us-east-1:000000000000:material-events";
     }
 
+    public PopulatorWorkerFunction(IAmazonSimpleNotificationService snsClient, IPopulationStrategy strategy, string topicArn)
+    {
+        _snsClient = snsClient;
+        _strategy = strategy;
+        _topicArn = topicArn;
+    }
+
+#pragma warning disable VSTHRD200
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
+#pragma warning restore VSTHRD200
     {
         foreach (var message in ev.Records)
         {

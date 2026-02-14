@@ -21,43 +21,38 @@ Every line of code must adhere to these principles. Violations are considered im
 ### 3.1. Code Quality & Design
 * **Clean Code:** Code must be self-explanatory.
 * **SOLID Principles:** Strictly enforce SRP and DIP.
-* **YAGNI (You Aren't Gonna Need It):** Do not implement features or abstractions based on "what if". Implement only what is necessary for current requirements.
-* **KISS (Keep It Simple, Stupid):** Complexity is a bug. Keep it simple.
+* **YAGNI:** Do not implement features "for the future".
+* **KISS:** Complexity is a bug. Keep it simple.
+* **Comments Policy:**
+    * **The "No Comment" Goal:** Code must speak for itself. If you feel the need to write a comment to explain *what* the code does, the code is too complex. **Refactor it instead of commenting.**
+    * **Value Only:** Comments are permitted **ONLY** to explain the *Why* behind a non-obvious decision (e.g., specific business constraint, complex algorithm optimization, or hack).
+    * **No Noise:** Avoid basic comments like `// Loop through items`. These are forbidden.
 
 ### 3.2. Validation & Error Handling
 * **No Exceptions for Control Flow:** Do not use `try/catch` for business logic validation.
 * **FluentValidation:** Use `FluentValidation` libraries in the Application layer.
-* **Result Pattern:** Methods should return a `Result<T>` wrapper indicating Success or Failure, rather than throwing exceptions.
+* **Result Pattern:** Methods should return a `Result<T>` wrapper indicating Success or Failure.
 * **API Errors:** All HTTP APIs must return **RFC 7807 ProblemDetails** for 400-500 errors.
 
 ## 4. Microservices Strategy & Boundaries
 
 ### 4.1. When to Create a New Service
-Do not create a new service just for the sake of it. Follow these boundaries:
-* **Business Capability:** Services should align with business domains (e.g., `OrderService`, `PaymentService`), NOT technical layers (e.g., `DataService`, `ValidationService`).
+* **Business Capability:** Services should align with business domains, NOT technical layers.
 * **Independence:** A service must be deployable, scalable, and testable in isolation.
-* **Coupling Rule:** If two services strictly require each other to be online to function, they should likely be merged into one.
+* **Coupling Rule:** If two services strictly require each other to be online to function, they should likely be merged.
 
-### 4.2. Data Sovereignty (The Golden Rule)
-* **Shared Nothing:** Each microservice owns its own data and database.
+### 4.2. Data Sovereignty
+* **Shared Nothing:** Each microservice owns its own data.
 * **No Direct Access:** Service A **MUST NEVER** read/write directly to Service B's database.
-* **Data Sharing:** If Service A needs data from Service B, it must:
-    1. Call Service B's API (Synchronous - use sparingly).
-    2. Subscribe to Service B's Events and replicate the necessary data locally (Event Carried State Transfer - Preferred).
 
 ### 4.3. Communication Patterns
-* **Async First (Smart Endpoints, Dumb Pipes):**
-    * Use **SNS/SQS** for all state-changing operations between services.
-    * Producer (SNS) emits an event (`OrderPlaced`).
-    * Consumer (SQS) reacts to the event (`InventoryService` reduces stock).
-* **Synchronous (HTTP/gRPC):**
-    * Use only for **Queries** or explicitly blocking operations where the user needs an immediate answer.
-    * **Resilience:** All HTTP calls between services must be wrapped in **Polly Policies** (Retry, Circuit Breaker, Timeout).
+* **Async First:** Use SNS/SQS for state-changing operations.
+* **Synchronous:** Use HTTP/gRPC sparingly (Queries only), wrapped in **Polly Policies**.
 
 ## 5. Internal Service Architecture (.NET 8)
 
 ### 5.1. Project Structure (Clean Architecture)
-* **src/Core (Domain):** Entities, Interfaces, Value Objects. *Zero dependencies.*
+* **src/Core (Domain):** Entities, Interfaces. *Zero dependencies.*
 * **src/Application:** Use Cases, Validators, DTOs.
 * **src/Infrastructure:** DynamoDB implementation, AWS SDK wrappers.
 * **src/API (Presentation):** Controllers, Middleware.
@@ -65,82 +60,43 @@ Do not create a new service just for the sake of it. Follow these boundaries:
 ### 5.2. C# Coding Style
 * Use **Records** for DTOs, Commands, and Events.
 * Use `file-scoped namespaces`.
-* Avoid `null`. Utilize *Nullable Reference Types* and treat warnings as errors.
+* Avoid `null`. Utilize *Nullable Reference Types*.
 
 ## 6. Data Persistence (DynamoDB)
 * **Single Responsibility:** Repositories handle data access only.
-* **Optimistic Locking:** Use Version Numbers to prevent data overwrites in concurrent scenarios.
-* **Performance:** Prefer `Query` operations. Avoid `Scan` at all costs.
+* **Optimistic Locking:** Use Version Numbers.
+* **Performance:** Prefer `Query`. Avoid `Scan`.
 
 ## 7. Logging & Observability Standards
-Logging is not for debugging on your machine; it is for understanding system behavior in production.
-
-* **Structured Logging:** Text-based logs are forbidden. All logs must be structured JSON using **Serilog**.
-    * *Bad:* `Log.Info("User " + userId + " created order " + orderId);`
-    * *Good:* `Log.Info("User {UserId} created Order {OrderId}", userId, orderId);`
+* **Structured Logging:** Logs must be structured JSON using **Serilog**.
 * **Correlation ID:** Every log entry must include a `TraceId` or `CorrelationId`.
-    * **HTTP:** Middleware must extract or generate this ID.
-    * **SQS/SNS:** The ID must be passed in message attributes and manually attached to the logging context in the consumer.
-* **Log Levels:**
-    * *Debug:* Detailed flows (enabled only when troubleshooting).
-    * *Information:* High-level flow events.
-    * *Warning:* Unexpected but handled issues.
-    * *Error:* Exceptions or unhandled states requiring human intervention.
-* **Security (Redaction):** **STRICTLY FORBIDDEN** to log PII (Personally Identifiable Information), passwords, tokens, or secrets.
+* **Security:** **STRICTLY FORBIDDEN** to log PII or secrets.
 
 ## 8. Version Control & Commits
-* **Conventional Commits:** We follow the Conventional Commits specification.
-    * `feat(shopping-cart): add item limit`
-    * `fix(payment): resolve currency conversion bug`
-    * `chore: update nuget packages`
-* **Branching:** Use Trunk Based Development or Short-lived Feature Branches.
+* **Conventional Commits:** Follow the standard (e.g., `feat(cart): add item limit`).
+* **Branching:** Trunk Based Development or Short-lived Feature Branches.
 
 ## 9. Documentation Standards
-Documentation is treated as code. It lives in the repository and must be updated in the same Pull Request as the code changes.
-
-### 9.1. Knowledge Base (Obsidian)
-The `/docs` folder is an Obsidian Vault.
-* **Format:** All documentation must be in Markdown (`.md`).
-* **Linking:** Use **WikiLinks** (`[[Concept Name]]`) to connect related documents. Avoid absolute paths.
-* **Structure:**
-    * `/docs/adr`: Architecture Decision Records (Why we chose X over Y).
-    * `/docs/guides`: Developer onboarding and "How-to" guides.
-    * `/docs/concepts`: Explanations of business domains (Ubiquitous Language).
-* **Audience:** Developers. Keep it technical, concise, and focused on "How" and "Why".
-
-### 9.2. API Documentation
-* **OpenAPI (Swagger):**
-    * Must be auto-generated from code annotations.
-    * XML Comments (`/// <summary>`) are **mandatory** for all Controllers and DTOs to ensure the Swagger UI is descriptive.
-* **Insomnia:**
-    * An `insomnia_collection.json` (or similar workspace file) must be maintained in the root or `/docs` folder.
-    * **Rule:** If you add or modify an endpoint, you **MUST** update the Insomnia export in the same PR.
+Documentation is treated as code.
+* **Knowledge Base:** Use Obsidian-friendly Markdown in `/docs`.
+* **API:** Keep OpenAPI (Swagger) and Insomnia Collections updated in every PR.
 
 ## 10. Automated Enforcement
-* **Architecture Tests:** Use `NetArchTest` to enforce layer dependencies (e.g., "Domain cannot reference Infrastructure"). These tests must run in the CI pipeline.
-* **Format:** Use `.editorconfig` to enforce coding styles automatically on save.
+* **Architecture Tests:** Use `NetArchTest` to enforce layer dependencies.
+* **Format:** Use `.editorconfig` to enforce coding styles automatically.
 
 ## 11. End-to-End (E2E) Testing Strategy
-The purpose of E2E tests is to verify the running application from the perspective of an external consumer (Black Box Testing).
+* **Stack:** xUnit + RestSharp + FluentAssertions.
+* **Scope:** Black Box Testing of running endpoints.
+* **Environment:** Must use external configuration (`appsettings.test.json`). No Mocks allowed.
 
-* **Technology Stack:** Tests must be written in C# using **xUnit**, **RestSharp**, and **FluentAssertions**.
-* **Separation:** E2E tests reside in the `tests/PoC.E2E` project, separate from Unit and Integration tests.
-* **Environment Agnostic:** Tests must not have hardcoded URLs. Use `appsettings.test.json` or Environment Variables to configure the `BaseUrl`.
-* **No Mocking:** E2E tests interact with the **real** deployed infrastructure (API + DynamoDB + SQS). Mocks are strictly forbidden here.
-* **Safe Data:**
-    * **Read-Only Tests:** Safe to run anytime.
-    * **Write Tests:** Must generate their own unique test data (randomized IDs/names) to avoid colliding with real data.
-    * **Teardown:** Ideally, tests should clean up the data they created via API calls (DELETE), though in a chaotic environment, data is assumed "dirty".
-* **Health Checks:** Every microservice must have a `/health` endpoint covered by an E2E test.
-
----
-**Pull Request Review Checklist:**
-- [ ] Is the language strictly English?
-- [ ] Does this change belong in this Microservice?
-- [ ] Is data sovereignty respected?
-- [ ] Are logs structured (Serilog) and free of PII?
-- [ ] Is the `CorrelationId` properly propagated?
-- [ ] Is the code Idempotent?
-- [ ] **Is the Documentation (Obsidian/ADR) updated?**
-- [ ] **Is the Insomnia collection updated with new endpoints?**
-- [ ] Are Architecture Tests passing?
+## 12. Repository Hygiene & Scratchpad Protocol
+* **The Scratchpad (`/scratchpad`):**
+    * **Purpose:** This folder is the **ONLY** allowed place for temporary files, draft notes, JSON dumps, intermediate architecture diagrams, or raw LLM outputs.
+    * **Git Rule:** The `/scratchpad` folder must be included in `.gitignore`. Files inside it are never committed.
+* **AI Instruction:**
+    * If you (the AI) need to create a file to plan a task, store a long stack trace, or draft a complex refactor: **Create it inside `scratchpad/`**.
+    * **NEVER** create temporary files in the root, `src/`, or `tests/` directories.
+* **Cleanup:**
+    * While `scratchpad/` is ignored, developers are encouraged to clean it periodically.
+    * If a file in `scratchpad/` becomes valuable documentation, move it to `/docs` and format it properly.

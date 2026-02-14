@@ -1,0 +1,3 @@
+[Filesystem Behavior]
+- ALWAYS use the `scratchpad/` directory for any file that is not intended for production code (e.g., plans, logs, draft code, diffs).
+- NEVER pollute the root directory with temporary files.

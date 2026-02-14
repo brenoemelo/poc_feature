@@ -23,9 +23,9 @@ QUEUE_ARN=$(awslocal sqs get-queue-attributes --queue-url $QUEUE_URL --attribute
 
 awslocal sns subscribe --topic-arn $TOPIC_ARN --protocol sqs --notification-endpoint $QUEUE_ARN
 
-# Criar Tabela DynamoDB
+# Criar Tabela DynamoDB para Materiais
 awslocal dynamodb create-table \
-    --table-name poc-table \
+    --table-name materials-table \
     --attribute-definitions AttributeName=Id,AttributeType=S \
     --key-schema AttributeName=Id,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
