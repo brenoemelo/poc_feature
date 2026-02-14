@@ -30,4 +30,14 @@ awslocal dynamodb create-table \
     --key-schema AttributeName=Id,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
 
+# Criar Tabela DynamoDB para Preços de Componentes (Costing Engine)
+awslocal dynamodb create-table \
+    --table-name costing-prices-table \
+    --attribute-definitions AttributeName=ComponentName,AttributeType=S \
+    --key-schema AttributeName=ComponentName,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
+# Criar Bucket S3 para Materiais (evita erro NoSuchBucket)
+awslocal s3 mb s3://materials
+
 echo "Resources initialized!"

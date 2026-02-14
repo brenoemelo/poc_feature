@@ -1,0 +1,312 @@
+openapi: 3.0.3
+info:
+  title: Material Formulation API
+  description: API for managing and querying material formulations for the POC.
+  version: 1.0.0
+servers:
+  - url: http://localhost:4566/restapis/lambda/local/outputs/v1
+    description: LocalStack Gateway
+
+paths:
+  /materials:
+    get:
+      summary: List all materials
+      description: Returns a list of all material formulations stored in the system.
+      responses:
+        200:
+          description: A list of materials.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaterialFormulation'
+        500:
+          $ref: '#/components/responses/ServerError'
+    post:
+      summary: Create a new material formulation
+      description: Stores a new material formulation in the DynamoDB table.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialFormulation'
+      responses:
+        201:
+          description: Material created successfully.
+        400:
+          description: Invalid input.
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /materials/{material_id}:
+    get:
+      summary: Get a material by ID
+      parameters:
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Material formulation details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialFormulation'
+        404:
+          description: Material not found.
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /populate:
+    post:
+      summary: Populates the database with random data
+      description: Triggers an asynchronous job to generate and insert random material formulations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PopulationRequest'
+      responses:
+        202:
+          description: Population job accepted.
+        400:
+          description: Invalid request or count exceeds limit.
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /prices:
+    put:
+      summary: Upsert a component price
+      description: Creates or updates the price for a component in the costing catalog.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComponentPriceRequest'
+      responses:
+        200:
+          description: Price updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComponentPriceResponse'
+        400:
+          $ref: '#/components/responses/ValidationError'
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /calculate-cost:
+    post:
+      summary: Calculate material cost
+      description: Calculates the total cost and breakdown for a material formulation based on component prices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostCalculationRequest'
+      responses:
+        200:
+          description: Cost calculation successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostCalculationResponse'
+        400:
+          $ref: '#/components/responses/ValidationError'
+        500:
+          $ref: '#/components/responses/ServerError'
+
+
+components:
+  schemas:
+    PopulationRequest:
+      type: object
+      properties:
+        target:
+          type: string
+          default: materials
+        count:
+          type: integer
+          maximum: 100000
+          example: 1000
+    MaterialFormulation:
+      type: object
+      required:
+        - material_id
+        - name
+      properties:
+        material_id:
+          type: string
+          example: composite-x-100
+        name:
+          type: string
+          example: High-Strength Polymer Blend
+        density:
+          type: object
+          properties:
+            value:
+              type: number
+            unit:
+              type: string
+        formulation:
+          type: array
+          items:
+            type: object
+            properties:
+              component:
+                type: string
+              percentage:
+                type: number
+              type:
+                type: string
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+
+    ComponentPriceRequest:
+      type: object
+      required:
+        - component_name
+        - unit_price
+        - unit
+        - currency
+      properties:
+        component_name:
+          type: string
+          example: Polycarbonate
+        unit_price:
+          type: number
+          format: decimal
+          example: 12.50
+        unit:
+          type: string
+          example: kg
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: USD
+
+    ComponentPriceResponse:
+      type: object
+      properties:
+        component_name:
+          type: string
+        unit_price:
+          type: number
+          format: decimal
+        unit:
+          type: string
+        currency:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+
+    CostCalculationRequest:
+      type: object
+      required:
+        - material_id
+        - formulation
+      properties:
+        material_id:
+          type: string
+          example: composite-x-100
+        formulation:
+          type: array
+          items:
+            type: object
+            required:
+              - component
+              - percentage
+            properties:
+              component:
+                type: string
+                example: Polycarbonate
+              percentage:
+                type: number
+                example: 60.0
+        desired_margin_percent:
+          type: number
+          format: decimal
+          example: 25.0
+
+    CostCalculationResponse:
+      type: object
+      properties:
+        material_id:
+          type: string
+        total_cost:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              component:
+                type: string
+              percentage:
+                type: number
+              unit_price:
+                type: number
+                format: decimal
+              contribution_cost:
+                type: number
+                format: decimal
+        margin:
+          type: object
+          nullable: true
+          properties:
+            desired_margin_percent:
+              type: number
+              format: decimal
+            suggested_selling_price:
+              type: number
+              format: decimal
+            estimated_gross_profit:
+              type: number
+              format: decimal
+
+  responses:
+    ServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              detail:
+                type: string
+
+    ValidationError:
+      description: Validation error (RFC 7807 ProblemDetails).
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              type:
+                type: string
+                example: about:blank
+              title:
+                type: string
+                example: Validation failed
+              status:
+                type: integer
+                example: 400
+              detail:
+                type: string
+                example: Formulation percentages must sum to 100%

@@ -1,0 +1,29 @@
+{
+  "material_id": "composite-x-100",
+  "name": "High-Strength Polymer Blend",
+  "density": {
+    "value": 1.25,
+    "unit": "g/cm3"
+  },
+  "formulation": [
+    {
+      "component": "Polycarbonate",
+      "percentage": 60.0,
+      "type": "Base Polymer"
+    },
+    {
+      "component": "Glass Fiber",
+      "percentage": 30.0,
+      "type": "Reinforcement"
+    },
+    {
+      "component": "Flame Retardant A",
+      "percentage": 10.0,
+      "type": "Additive"
+    }
+  ],
+  "properties": {
+    "tensile_strength": "120 MPa",
+    "melting_point": "250C"
+  }
+}

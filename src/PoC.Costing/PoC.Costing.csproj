@@ -14,8 +14,7 @@
     <PackageReference Include="Amazon.Lambda.Core" Version="2.5.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.4" />
     <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.7.1" />
-    <PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.1" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.300.51" />
-    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
   </ItemGroup>
 </Project>

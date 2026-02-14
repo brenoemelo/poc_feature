@@ -1,0 +1,27 @@
+# .editorconfig
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+# Regra: Namespaces com escopo de arquivo (C# 10+)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Regra: Usar var apenas quando o tipo é evidente
+csharp_style_var_when_type_is_apparent = true:suggestion
+
+# Regra: Nullable reference types
+dotnet_diagnostic.CS8600.severity = error # Conversão de literal nulo ou possível valor nulo em tipo não anulável
+dotnet_diagnostic.CS8602.severity = error # Desreferência de uma referência possivelmente nula
+
+# Regra: Naming Conventions (Async suffix)
+dotnet_naming_rule.async_methods_must_end_with_async.severity = suggestion
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.applicable_accessibilities = *
+dotnet_naming_style.async_methods_must_end_with_async.required_suffix = Async
+dotnet_naming_style.async_methods_must_end_with_async.capitalization = pascal_case

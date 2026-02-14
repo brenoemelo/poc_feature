@@ -1,0 +1,207 @@
+{
+	"_type": "export",
+	"__export_format": 4,
+	"__export_date": "2026-02-14T15:35:00.000Z",
+	"__export_source": "insomnia.desktop.app:v2023.5.8",
+	"resources": [
+		{
+			"_id": "wrk_1",
+			"parentId": null,
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"name": "PoC AWS Simulator",
+			"description": "",
+			"scope": "collection",
+			"_type": "workspace"
+		},
+		{
+			"_id": "env_1",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"name": "Base Environment",
+			"data": {
+				"base_url": "http://55medlo33b9rpdiu481tasasw3vg1s7m.lambda-url.us-east-1.localhost.localstack.cloud:4566"
+			},
+			"dataPropertyOrder": {
+				"&": [
+					"base_url"
+				]
+			},
+			"color": null,
+			"isPrivate": false,
+			"metaSortKey": 1700000000000,
+			"_type": "environment"
+		},
+		{
+			"_id": "req_1",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/materials",
+			"name": "List Materials",
+			"description": "",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {},
+			"metaSortKey": -1700000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_2",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/materials/composite-x-100",
+			"name": "Get Material by ID",
+			"description": "",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {},
+			"metaSortKey": -1600000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_3",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/materials",
+			"name": "Create Material",
+			"description": "",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"material_id\": \"composite-x-100\",\n  \"name\": \"High-Strength Polymer Blend\",\n  \"density\": {\n    \"value\": 1.25,\n    \"unit\": \"g/cm3\"\n  },\n  \"formulation\": [\n    {\n      \"component\": \"Polycarbonate\",\n      \"percentage\": 60.0,\n      \"type\": \"Base Polymer\"\n    },\n    {\n      \"component\": \"Glass Fiber\",\n      \"percentage\": 30.0,\n      \"type\": \"Reinforcement\"\n    },\n    {\n      \"component\": \"Flame Retardant A\",\n      \"percentage\": 10.0,\n      \"type\": \"Additive\"\n    }\n  ],\n  \"properties\": {\n    \"tensile_strength\": \"120 MPa\",\n    \"melting_point\": \"250C\"\n  }\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1500000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_4",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/populate",
+			"name": "Populate Data",
+			"description": "",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"target\": \"materials\",\n  \"count\": 1000\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1400000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_5",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/prices",
+			"name": "Upsert Component Price",
+			"description": "",
+			"method": "PUT",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"component_name\": \"Polycarbonate\",\n  \"unit_price\": 12.50,\n  \"unit\": \"kg\",\n  \"currency\": \"USD\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1300000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_6",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/calculate-cost",
+			"name": "Calculate Material Cost",
+			"description": "",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"material_id\": \"composite-x-100\",\n  \"formulation\": [\n    {\n      \"component\": \"Polycarbonate\",\n      \"percentage\": 60.0\n    },\n    {\n      \"component\": \"Glass Fiber\",\n      \"percentage\": 30.0\n    },\n    {\n      \"component\": \"Flame Retardant A\",\n      \"percentage\": 10.0\n    }\n  ],\n  \"desired_margin_percent\": 25.0\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1200000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		}
+	]
+}
