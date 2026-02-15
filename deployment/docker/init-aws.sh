@@ -40,7 +40,7 @@ awslocal dynamodb create-table \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
 
 # Criar Bucket S3 para Materiais (evita erro NoSuchBucket)
-awslocal s3 mb s3://materials
+awslocal s3 mb s3://poc-materials-data
 
 echo "Resources initialized!"
 

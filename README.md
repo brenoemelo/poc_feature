@@ -81,16 +81,22 @@ dotnet test
 
 ### 4. Deploy to LocalStack
 
-Use the provided scripts to deploy the API Gateway and all microservices:
+You can deploy all services at once using the master script:
+
+```powershell
+./deployment/localstack/deploy-all.ps1
+```
+
+Or deploy services individually:
 
 ```powershell
 # 1. Deploy API Gateway
-./deploy-gateway.ps1
+./deployment/localstack/gateway.ps1
 
 # 2. Deploy Services
-./deploy-localstack.ps1           # PoC.Materials
-./deploy-localstack-costing.ps1   # PoC.Costing
-./deploy-localstack-populator.ps1 # PoC.Populator
+./deployment/localstack/materials.ps1   # PoC.Materials
+./deployment/localstack/costing.ps1     # PoC.Costing
+./deployment/localstack/populator.ps1   # PoC.Populator
 ```
 
 ### 5. Verify Deployment
@@ -113,11 +119,12 @@ Run the automated API test script:
   - Confirm that the `poc_feature-localstack-1` container is running
 
 - **Deploy Infrastructure and Services**
-  - Run `./deploy-gateway.ps1` to create the API Gateway.
-  - Run the service scripts:
-    - `./deploy-localstack.ps1` (Materials)
-    - `./deploy-localstack-costing.ps1` (Costing)
-    - `./deploy-localstack-populator.ps1` (Populator)
+  - **Option A (Recommended)**: Run `./deployment/localstack/deploy-all.ps1` to deploy everything.
+  - **Option B (Manual)**:
+    - Run `./deployment/localstack/gateway.ps1` (Gateway)
+    - Run `./deployment/localstack/materials.ps1` (Materials)
+    - Run `./deployment/localstack/costing.ps1` (Costing)
+    - Run `./deployment/localstack/populator.ps1` (Populator)
 
 - **Test APIs**
   - Run `./test_all_apis.ps1` to validate all endpoints.
@@ -128,9 +135,9 @@ Run the automated API test script:
   - Run `dotnet test tests/PoC.E2E/PoC.E2E.csproj`
 
 - **Troubleshooting Tips**
-  - 500 on Gateway: Verify if deployment scripts were executed in the correct order (Gateway first).
+  - 500 on Gateway: Verify if deployment scripts were executed successfully.
   - 500 on startup: Ensure `TargetFramework=net8.0` and publish target is `linux-x64`
-  - Empty DynamoDB: The init script ([init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh)) creates tables; validate `materials-table`
+  - Empty DynamoDB: The init script ([init-aws.sh](file:///d:/Projetos/poc_feature/deployment/docker/init-aws.sh)) creates tables; validate `materials-table`
 
 > **Note:** It is possible to run the service as a local Lambda via Function URL (recommended) or as a .NET process, provided dependencies point to the LocalStack endpoint.
 

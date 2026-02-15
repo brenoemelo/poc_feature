@@ -177,7 +177,7 @@ If you have the LocalStack Web Dashboard enabled/installed, you can visit:
 
 ## Common Troubleshooting
 
-- **Function not found**: Ensure you ran the `deploy-localstack.ps1` scripts.
+- **Function not found**: Ensure you ran the deployment scripts (`deployment/localstack/deploy-all.ps1`).
 - **403 Forbidden on Function URL**: Ensure the function has a resource-based policy allowing `lambda:InvokeFunctionUrl` from principal `*`. Check with `get-policy` command.
 - **Connection refused**: Ensure the Docker container is running (`docker ps`).
 - **Logs empty**: Trigger the function via an API call or event first.

@@ -47,31 +47,49 @@ dotnet test src/PoC.ArchitectureTests
 All tests should pass before proceeding.
 
 ## 5) Deploy Services to LocalStack (Windows/PowerShell)
- 
- The project uses **API Gateway** as the single entry point. You must deploy the Gateway first, then the services.
- 
- 1. **Deploy API Gateway**:
-    ```powershell
-    ./deploy-gateway.ps1
-    ```
-    This sets up the unified API at `http://localhost:4566/restapis/<api-id>/prod/_user_request_/`.
- 
- 2. **Deploy Microservices**:
-    ```powershell
-    ./deploy-localstack.ps1           # Deploys PoC.Materials
-    ./deploy-localstack-costing.ps1   # Deploys PoC.Costing
-    ./deploy-localstack-populator.ps1 # Deploys PoC.Populator
-    ```
- 
- Each script publishes the .NET application, creates the Lambda function, and updates the API Gateway integration.
- 
- ## 6) Test the API
- 
- Use the provided PowerShell script to verify all endpoints automatically:
- 
- ```powershell
- ./test_all_apis.ps1
- ```
+
+The project uses **API Gateway** as the single entry point. You can deploy everything at once using the master script.
+
+### Option A: Deploy All Services (Recommended)
+
+Run the master deployment script to deploy API Gateway and all microservices in the correct order:
+
+```powershell
+./deployment/localstack/deploy-all.ps1
+```
+
+This script will:
+1. Deploy **PoC.Materials**
+2. Deploy **PoC.Costing**
+3. Deploy **PoC.Populator**
+4. Deploy **API Gateway**
+
+### Option B: Deploy Individually
+
+If you need to deploy specific services, use the individual scripts in `deployment/localstack/`:
+
+1. **Deploy API Gateway** (Must be deployed to route requests):
+   ```powershell
+   ./deployment/localstack/gateway.ps1
+   ```
+   This sets up the unified API at `http://localhost:4566/restapis/<api-id>/prod/_user_request_/`.
+
+2. **Deploy Microservices**:
+   ```powershell
+   ./deployment/localstack/materials.ps1   # Deploys PoC.Materials
+   ./deployment/localstack/costing.ps1     # Deploys PoC.Costing
+   ./deployment/localstack/populator.ps1   # Deploys PoC.Populator
+   ```
+
+Each script publishes the .NET application, creates the Lambda function (removing any existing one to ensure a clean state), and updates the API Gateway integration.
+
+## 6) Test the API
+
+Use the provided PowerShell script to verify all endpoints automatically:
+
+```powershell
+./test_all_apis.ps1
+```
  
  This script:
  - Detects the API Gateway ID
@@ -95,15 +113,15 @@ All tests should pass before proceeding.
 - You can find the correct URL in the output of `./test_all_apis.ps1` or `./deploy-gateway.ps1`.
  
  ## Troubleshooting
- 
- - **500 Internal Server Error**:
-   - Check Lambda logs using the commands in [Deployment Health Check](deployment-health.md).
-   - Ensure `deploy-gateway.ps1` was run *before* the service deployment scripts if you are setting up for the first time.
- - **403 Forbidden**:
-   - Ensure you are using the **API Gateway URL** and NOT the Lambda Function URL.
-   - Run `./deploy-gateway.ps1` again to ensure permissions are set correctly.
- - **DynamoDB concurrency errors**:
-   - The system uses Optimistic Locking. If you see concurrency errors, retry the operation with the latest version of the entity.
+
+- **500 Internal Server Error**:
+  - Check Lambda logs using the commands in [Deployment Health Check](deployment-health.md).
+  - Ensure the API Gateway script (`deployment/localstack/gateway.ps1`) was run successfully.
+- **403 Forbidden**:
+  - Ensure you are using the **API Gateway URL** and NOT the Lambda Function URL.
+  - Run `./deployment/localstack/gateway.ps1` again to ensure permissions are set correctly.
+- **DynamoDB concurrency errors**:
+  - The system uses Optimistic Locking. If you see concurrency errors, retry the operation with the latest version of the entity.
  
  ## Clean Up
  

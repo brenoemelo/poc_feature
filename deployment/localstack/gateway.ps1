@@ -1,0 +1,122 @@
+
+# -----------------------------------------------------------------------------
+# API Gateway Deployment Script
+# Configures LocalStack API Gateway and links it to Lambda functions.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Parameters & Configuration
+# -----------------------------------------------------------------------------
+param(
+    [string]$EndpointUrl = "http://localhost:4566",
+    [string]$Region = "us-east-1"
+)
+
+# Load shared utilities
+. "$PSScriptRoot\utils.ps1"
+
+# Initialize environment and safety checks
+Initialize-Environment -EndpointUrl $EndpointUrl -Region $Region
+Assert-AwsConnection
+Assert-NotProduction
+
+# Resolve paths relative to repo root
+$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+$OpenApiFile = Join-Path $RepoRoot "docs/openapi.yaml"
+$TestScriptPath = Join-Path $RepoRoot "test_all_apis.ps1"
+
+# -----------------------------------------------------------------------------
+# API Gateway Deployment
+# -----------------------------------------------------------------------------
+$apiName = "Material-Formulation-API"
+$StaticApiId = "material-api" # Static ID to ensure stable URLs
+Write-Log "Deploying API Gateway: $apiName (ID: $StaticApiId)" "Info"
+
+# 1. Ensure API exists with Static ID
+Write-Log "Ensuring API exists with static ID..." "Info"
+$apiExists = $false
+$api = Invoke-Aws -Service "apigateway" -Command "get-rest-api" -Arguments @("--rest-api-id", $StaticApiId) -IgnoreError $true -JsonOutput $true
+
+if ($api -and $api.id -eq $StaticApiId) {
+    $apiExists = $true
+    Write-Log "Found existing REST API: $StaticApiId" "Info"
+}
+
+if (-not $apiExists) {
+    Write-Log "Creating new REST API with static ID..." "Info"
+    # Create API with custom ID using tags (LocalStack specific feature)
+    Invoke-Aws -Service "apigateway" -Command "create-rest-api" -Arguments @(
+        "--name", $apiName,
+        "--tags", "_custom_id_=$StaticApiId"
+    ) -JsonOutput $true | Out-Null
+    Write-Log "Created API shell with ID: $StaticApiId" "Success"
+}
+
+# 2. Update API Definition (OpenAPI)
+Write-Log "Updating REST API definition from OpenAPI file..." "Info"
+Invoke-Aws -Service "apigateway" -Command "put-rest-api" -Arguments @(
+    "--rest-api-id", $StaticApiId,
+    "--mode", "overwrite",
+    "--body", "fileb://$OpenApiFile"
+) -JsonOutput $true | Out-Null
+
+$apiId = $StaticApiId
+
+if (-not $apiId) {
+    throw "Failed to obtain API ID."
+}
+
+# 3. Deploy to Stage
+Write-Log "Deploying API to 'prod' stage..." "Info"
+Invoke-Aws -Service "apigateway" -Command "create-deployment" -Arguments @(
+    "--rest-api-id", $apiId,
+    "--stage-name", "prod"
+) -JsonOutput $true | Out-Null
+
+# 4. Add Lambda Permissions
+$functions = @("PoC-Materials", "PoC-Costing", "PoC-Populator")
+foreach ($func in $functions) {
+    Write-Log "Configuring permissions for $func..." "Info"
+    
+    # Remove existing permission if any (ignore error)
+    Invoke-Aws -Service "lambda" -Command "remove-permission" -Arguments @(
+        "--function-name", $func,
+        "--statement-id", "apigateway-invoke-$func"
+    ) -IgnoreError $true | Out-Null
+    
+    # Add permission
+    Invoke-Aws -Service "lambda" -Command "add-permission" -Arguments @(
+        "--function-name", $func,
+        "--statement-id", "apigateway-invoke-$func",
+        "--action", "lambda:InvokeFunction",
+        "--principal", "apigateway.amazonaws.com",
+        "--source-arn", "arn:aws:execute-api:us-east-1:000000000000:$apiId/*/*/*"
+    ) -IgnoreError $true | Out-Null
+}
+
+# 5. Update Environment File
+$EnvFile = Join-Path $RepoRoot ".env.local"
+$ApiUrl = "http://localhost:4566/restapis/$apiId/prod/_user_request_"
+
+$EnvContent = @(
+    "API_GATEWAY_ID=$apiId",
+    "API_BASE_URL=$ApiUrl"
+)
+Set-Content -Path $EnvFile -Value $EnvContent
+Write-Log "Updated environment configuration in $EnvFile" "Success"
+
+Write-Log "REST API Deployed Successfully!" "Success"
+Write-Log "Base URL: $ApiUrl" "Success"
+
+# 6. Update Test Script
+if (Test-Path $TestScriptPath) {
+    Write-Log "Updating test script with new API ID..." "Info"
+    $content = Get-Content $TestScriptPath
+    $replacement = '$ApiId = "' + $apiId + '"'
+    # Use Regex to ensure only the first assignment is replaced if multiple exist
+    $newContent = $content -replace '(?m)^\$ApiId = ".*"', $replacement
+    Set-Content $TestScriptPath $newContent
+    Write-Log "Updated $TestScriptPath with API ID: $apiId" "Success"
+} else {
+    Write-Log "Test script not found at $TestScriptPath" "Warning"
+}

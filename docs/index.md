@@ -43,10 +43,7 @@ All services follow the **Data Sovereignty** principle and communicate via **SNS
 docker-compose up -d
 
 # Deploy Infrastructure & Services
-./deploy-gateway.ps1
-./deploy-localstack.ps1
-./deploy-localstack-costing.ps1
-./deploy-localstack-populator.ps1
+./deployment/localstack/deploy-all.ps1
 
 # Run API Tests
 ./test_all_apis.ps1
