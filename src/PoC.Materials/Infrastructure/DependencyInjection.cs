@@ -1,6 +1,8 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
-using PoC.Materials.Repositories;
+using Amazon.Runtime;
+using PoC.Materials.Domain.Interfaces;
+using PoC.Materials.Infrastructure.Persistence;
 
 namespace PoC.Materials.Infrastructure;
 
@@ -22,7 +24,10 @@ public static class DependencyInjection
                     ServiceURL = serviceUrl,
                     AuthenticationRegion = configuration.GetValue<string>("AWS:Region") ?? "us-east-1"
                 };
-                return new AmazonDynamoDBClient(config);
+                var accessKey = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID") ?? "test";
+                var secretKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY") ?? "test";
+                var credentials = new BasicAWSCredentials(accessKey, secretKey);
+                return new AmazonDynamoDBClient(credentials, config);
             });
         }
         else

@@ -1,9 +1,10 @@
 using FluentValidation;
-using PoC.Materials.Repositories;
+using PoC.Materials.Domain.Interfaces;
+using PoC.Shared.Common;
 using PoC.Shared.Models;
 using PoC.Shared.Validation;
 
-namespace PoC.Materials.Endpoints;
+namespace PoC.Materials.API.Endpoints;
 
 public static class MaterialsEndpoints
 {
@@ -22,6 +23,11 @@ public static class MaterialsEndpoints
              .WithName("CreateMaterial")
              .Produces<MaterialFormulation>(StatusCodes.Status201Created)
              .Produces(StatusCodes.Status400BadRequest);
+ 
+        group.MapDelete("/{id}", DeleteMaterialAsync)
+             .WithName("DeleteMaterial")
+             .Produces(StatusCodes.Status204NoContent)
+             .Produces(StatusCodes.Status404NotFound);
 
         return group;
     }
@@ -31,8 +37,11 @@ public static class MaterialsEndpoints
         ILogger<Program> logger)
     {
         logger.LogInformation("[MaterialQuery] Listing all materials");
-        var materials = await repository.GetAllAsync();
-        return Results.Ok(materials);
+        var result = await repository.GetAllAsync();
+        
+        return result.IsSuccess 
+            ? Results.Ok(result.Value) 
+            : result.ToProblem();
     }
 
     private static async Task<IResult> GetMaterialByIdAsync(
@@ -41,14 +50,11 @@ public static class MaterialsEndpoints
         ILogger<Program> logger)
     {
         logger.LogInformation("[MaterialQuery] Getting material {MaterialId}", id);
-        var material = await repository.GetByIdAsync(id);
+        var result = await repository.GetByIdAsync(id);
 
-        return material is not null
-            ? Results.Ok(material)
-            : Results.Problem(
-                title: "Material not found",
-                detail: $"Material with ID '{id}' does not exist",
-                statusCode: StatusCodes.Status404NotFound);
+        return result.IsSuccess
+            ? Results.Ok(result.Value)
+            : result.ToProblem();
     }
 
     private static async Task<IResult> CreateMaterialAsync(
@@ -73,9 +79,61 @@ public static class MaterialsEndpoints
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        await repository.SaveAsync(input);
+        var result = await repository.SaveAsync(input);
+        
+        if (result.IsFailure)
+        {
+             return result.ToProblem();
+        }
+
         logger.LogInformation("[MaterialCreation] Successfully saved material {MaterialId}", input.MaterialId);
 
         return Results.Created($"/materials/{input.MaterialId}", input);
+    }
+ 
+    private static async Task<IResult> DeleteMaterialAsync(
+        string id,
+        IMaterialRepository repository,
+        ILogger<Program> logger)
+    {
+        logger.LogInformation("[MaterialDeletion] Deletion requested for {MaterialId}", id);
+ 
+        var existingResult = await repository.GetByIdAsync(id);
+        if (existingResult.IsFailure)
+        {
+            logger.LogWarning("[MaterialDeletion] Material {MaterialId} not found", id);
+            return existingResult.ToProblem();
+        }
+
+        var deleteResult = await repository.DeleteAsync(id);
+        if (deleteResult.IsFailure)
+        {
+             return deleteResult.ToProblem();
+        }
+
+        return Results.NoContent();
+    }
+
+    private static IResult ToProblem(this Result result)
+    {
+        if (result.IsSuccess)
+        {
+            throw new InvalidOperationException("Cannot convert success result to problem.");
+        }
+
+        var error = result.Error;
+
+        if (error == Error.NotFound)
+        {
+            return Results.Problem(
+                title: "Resource not found",
+                detail: error.Description,
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Results.Problem(
+            title: "An error occurred",
+            detail: error.Description,
+            statusCode: StatusCodes.Status500InternalServerError);
     }
 }

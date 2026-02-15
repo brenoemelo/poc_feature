@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
-using PoC.Materials.Repositories;
+using PoC.Materials.Domain.Interfaces;
 using PoC.Shared.Events;
 
 namespace PoC.Materials.Functions;
@@ -64,7 +64,12 @@ public class MaterialIngestionFunction(IMaterialRepository repository)
         context.Logger.LogInformation(
             $"[MaterialIngestion] Ingesting material: {materialEvent.Material.Name} ({materialEvent.Material.MaterialId})");
 
-        await repository.SaveAsync(materialEvent.Material);
+        var result = await repository.SaveAsync(materialEvent.Material);
+
+        if (result.IsFailure)
+        {
+             throw new InvalidOperationException($"Failed to ingest material: {result.Error.Code} - {result.Error.Description}");
+        }
 
         context.Logger.LogInformation(
             $"[MaterialIngestion] Successfully ingested material {materialEvent.Material.MaterialId}");

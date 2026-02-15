@@ -80,6 +80,34 @@
 			"_type": "request"
 		},
 		{
+			"_id": "req_2_del",
+			"parentId": "wrk_1",
+			"modified": 1700000000000,
+			"created": 1700000000000,
+			"url": "{{ base_url }}/materials/{{ material_id }}",
+			"name": "Delete Material by ID",
+			"description": "",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [
+				{
+					"name": "material_id",
+					"value": "composite-x-100"
+				}
+			],
+			"headers": [],
+			"authentication": {},
+			"metaSortKey": -1550000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
 			"_id": "req_3",
 			"parentId": "wrk_1",
 			"modified": 1700000000000,

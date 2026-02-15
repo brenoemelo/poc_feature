@@ -1,9 +1,19 @@
 using FluentValidation;
-using PoC.Costing.Endpoints;
+using PoC.Costing.API.Endpoints;
 using PoC.Costing.Infrastructure;
 using PoC.Shared.Validators;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console(new CompactJsonFormatter());
+});
 
 // AWS Lambda Hosting
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);

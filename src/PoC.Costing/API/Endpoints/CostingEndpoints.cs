@@ -1,9 +1,11 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using PoC.Costing.Repositories;
+using PoC.Costing.Domain.Interfaces;
+using PoC.Shared.Common;
 using PoC.Shared.Models;
+using PoC.Shared.Validation;
 
-namespace PoC.Costing.Endpoints;
+namespace PoC.Costing.API.Endpoints;
 
 public static class CostingEndpoints
 {
@@ -27,14 +29,19 @@ public static class CostingEndpoints
         var validationResult = await validator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
-            return Results.BadRequest(new { message = "Validation failed", errors = string.Join("; ", errors) });
+            var problemDetails = validationResult.ToProblemDetails();
+            return Results.Problem(
+                title: problemDetails.Title,
+                detail: string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)),
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         logger.LogInformation("Upserting price for component: {ComponentName}", request.ComponentName);
-        await repository.UpsertPriceAsync(request);
+        var result = await repository.UpsertPriceAsync(request);
 
-        return Results.Ok(new { message = "Price updated successfully" });
+        return result.IsSuccess
+            ? Results.Ok(new { message = "Price updated successfully" })
+            : result.ToProblem();
     }
 
     private static async Task<IResult> CalculateCostAsync(
@@ -46,14 +53,24 @@ public static class CostingEndpoints
         var validationResult = await validator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
-            return Results.BadRequest(new { message = "Validation failed", errors = string.Join("; ", errors) });
+            var problemDetails = validationResult.ToProblemDetails();
+            return Results.Problem(
+                title: problemDetails.Title,
+                detail: string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)),
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         logger.LogInformation("Calculating cost for material: {MaterialId}", request.MaterialId);
 
         var componentNames = request.Formulation.Select(f => f.Component).Distinct().ToList();
-        var prices = await repository.GetPricesAsync(componentNames);
+        var pricesResult = await repository.GetPricesAsync(componentNames);
+        
+        if (pricesResult.IsFailure)
+        {
+            return pricesResult.ToProblem();
+        }
+
+        var prices = pricesResult.Value;
 
         var missingComponents = componentNames.Where(c => !prices.ContainsKey(c)).ToList();
         if (missingComponents.Count != 0)
@@ -98,25 +115,48 @@ public static class CostingEndpoints
             
             if (marginFactor >= 1)
             {
-                 return Results.BadRequest(new { message = "Invalid margin", detail = "Margin must be less than 100%" });
+                return Results.BadRequest(new { message = "Margin must be less than 100%" });
             }
 
             var sellingPrice = totalCost / (1 - marginFactor);
-            var profit = sellingPrice - totalCost;
+            var grossProfit = sellingPrice - totalCost;
 
             marginAnalysis = new MarginAnalysis(
-                margin,
-                sellingPrice,
-                profit);
+                request.DesiredMarginPercent.Value,
+                Math.Round(sellingPrice, 2),
+                Math.Round(grossProfit, 2));
         }
 
         var response = new CostCalculationResponse(
             request.MaterialId,
-            totalCost,
+            Math.Round(totalCost, 2),
             currency,
             breakdown,
             marginAnalysis);
 
         return Results.Ok(response);
+    }
+
+    private static IResult ToProblem(this Result result)
+    {
+        if (result.IsSuccess)
+        {
+            throw new InvalidOperationException("Cannot convert success result to problem.");
+        }
+
+        var error = result.Error;
+
+        if (error == Error.NotFound)
+        {
+            return Results.Problem(
+                title: "Resource not found",
+                detail: error.Description,
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Results.Problem(
+            title: "An error occurred",
+            detail: error.Description,
+            statusCode: StatusCodes.Status500InternalServerError);
     }
 }

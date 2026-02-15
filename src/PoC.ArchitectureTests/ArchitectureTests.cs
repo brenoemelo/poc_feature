@@ -27,6 +27,43 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void Materials_Domain_Should_Not_Depend_On_Infrastructure()
+    {
+        var result = Types.InAssembly(typeof(PoC.Materials.AssemblyMarker).Assembly)
+            .That()
+            .ResideInNamespace("PoC.Materials.Domain")
+            .ShouldNot()
+            .HaveDependencyOn("PoC.Materials.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, "Materials Domain should not depend on Infrastructure.");
+    }
+
+    [Fact]
+    public void Costing_Domain_Should_Not_Depend_On_Infrastructure()
+    {
+        var result = Types.InAssembly(typeof(PoC.Costing.AssemblyMarker).Assembly)
+            .That()
+            .ResideInNamespace("PoC.Costing.Domain")
+            .ShouldNot()
+            .HaveDependencyOn("PoC.Costing.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, "Costing Domain should not depend on Infrastructure.");
+    }
+
+    [Fact]
+    public void Populator_Should_Not_Depend_On_Materials()
+    {
+        var result = Types.InAssembly(typeof(PoC.Populator.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("PoC.Materials")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, "PoC.Populator should not depend on PoC.Materials.");
+    }
+
+    [Fact]
     public void Materials_Functions_Should_Follow_Naming_Convention()
     {
         var result = Types.InAssembly(typeof(PoC.Materials.AssemblyMarker).Assembly)

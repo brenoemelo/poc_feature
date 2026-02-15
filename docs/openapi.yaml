@@ -4,8 +4,8 @@ info:
   description: API for managing and querying material formulations for the POC.
   version: 1.0.0
 servers:
-  - url: http://localhost:4566/restapis/lambda/local/outputs/v1
-    description: LocalStack Gateway
+  - url: http://lambda-url.example.com/
+    description: Lambda Function URL (replace with your deployed URL)
 
 paths:
   /materials:
@@ -56,6 +56,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaterialFormulation'
+        404:
+          description: Material not found.
+        500:
+          $ref: '#/components/responses/ServerError'
+    delete:
+      summary: Delete a material by ID (hard delete)
+      parameters:
+        - name: material_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Material deleted successfully.
         404:
           description: Material not found.
         500:

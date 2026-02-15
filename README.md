@@ -82,6 +82,41 @@ dotnet test
 
 Follow the detailed steps in [Setup Guide](docs/guides/setup-local-environment.md).
 
+## 🧭 Como Executar Localmente (Passo a Passo)
+
+- Pré-requisitos
+  - Instalar .NET SDK 8.0
+  - Instalar Docker Desktop e habilitar Docker Compose
+  - Clonar o repositório para `d:\Projetos\poc_feature`
+
+- Subir infraestrutura local (LocalStack)
+  - Rodar `docker-compose up -d` na raiz do projeto
+  - Confirmar que o container `poc_feature-localstack-1` está em execução
+
+- Publicar e criar a Lambda de Materiais
+  - Executar o script [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1)
+  - Esse script:
+    - Publica [PoC.Materials.csproj](file:///d:/Projetos/poc_feature/src/PoC.Materials/PoC.Materials.csproj) para Linux (`-r linux-x64`)
+    - Cria/atualiza a função Lambda `PoC-Materials`
+    - Cria a Function URL pública (AuthType NONE)
+  - Ao final, copie a URL exibida (ex.: `http://xxxxx.lambda-url.us-east-1.localhost.localstack.cloud:4566/`)
+
+- Testar a API manualmente
+  - Lista de materiais: `GET {FunctionUrl}/materials`
+  - Buscar por ID: `GET {FunctionUrl}/materials/{id}`
+  - Criar material: `POST {FunctionUrl}/materials` com JSON do DTO
+
+- Configurar testes E2E
+  - Atualize o BaseUrl em [appsettings.test.json](file:///d:/Projetos/poc_feature/tests/PoC.E2E/appsettings.test.json) com a Function URL gerada
+  - Execute `dotnet test tests/PoC.E2E/PoC.E2E.csproj`
+
+- Dicas de troubleshooting
+  - 403 na URL: redeploy com [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1) para recriar a Function URL
+  - 500 na inicialização: garanta `TargetFramework=net8.0` e publicação para `linux-x64`
+  - DynamoDB vazio: o script de init ([init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh)) cria tabelas; valide `materials-table`
+
+> Observação: É possível executar o serviço como Lambda local via Function URL (recomendado) ou como processo .NET, desde que as dependências estejam apontando para o endpoint do LocalStack.
+
 ## 📦 Project Structure
 
 ```

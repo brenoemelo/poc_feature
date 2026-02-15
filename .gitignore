@@ -31,6 +31,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+deploy/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -78,3 +79,10 @@ scratchpad/*
 # ide Files
 trunk/
 trunk/*
+publish/
+*.zip
+.idea/
+coverage/
+tmp/
+.env
+.env.*

@@ -1,10 +1,20 @@
 using FluentValidation;
-using PoC.Materials.Endpoints;
+using PoC.Materials.API.Endpoints;
 using PoC.Materials.Infrastructure;
 using PoC.Shared.Validators;
+using Serilog;
+using Serilog.Formatting.Compact;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console(new CompactJsonFormatter());
+});
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 

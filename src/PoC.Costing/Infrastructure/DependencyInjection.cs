@@ -1,6 +1,7 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
-using PoC.Costing.Repositories;
+using PoC.Costing.Domain.Interfaces;
+using PoC.Costing.Infrastructure.Persistence;
 
 namespace PoC.Costing.Infrastructure;
 

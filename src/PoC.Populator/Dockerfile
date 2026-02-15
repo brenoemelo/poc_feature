@@ -13,4 +13,4 @@ RUN dotnet publish "src/PoC.Populator/PoC.Populator.csproj" -c Release -o /app/p
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /var/task
 COPY --from=publish /app/publish .
-CMD ["PoC.Populator::PoC.Populator.PopulatorApiFunction::FunctionHandler"]
+CMD ["PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler"]

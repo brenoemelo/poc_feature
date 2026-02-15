@@ -1,4 +1,4 @@
-# Antigravity Project - Architecture & Coding Guidelines
+# PoC Project - Architecture & Coding Guidelines
 
 ## 1. Overview & Tech Stack
 This project follows an **Event-Driven Microservices Architecture** built upon the .NET 8 ecosystem.
@@ -25,7 +25,7 @@ Every line of code must adhere to these principles. Violations are considered im
 * **KISS:** Complexity is a bug. Keep it simple.
 * **Comments Policy:**
     * **The "No Comment" Goal:** Code must speak for itself. If you feel the need to write a comment to explain *what* the code does, the code is too complex. **Refactor it instead of commenting.**
-    * **Value Only:** Comments are permitted **ONLY** to explain the *Why* behind a non-obvious decision (e.g., specific business constraint, complex algorithm optimization, or hack).
+    * **Value Only:** Comments are permitted **ONLY** to explain the *Why* behind a non-obvious decision.
     * **No Noise:** Avoid basic comments like `// Loop through items`. These are forbidden.
 
 ### 3.2. Validation & Error Handling
@@ -92,11 +92,6 @@ Documentation is treated as code.
 
 ## 12. Repository Hygiene & Scratchpad Protocol
 * **The Scratchpad (`/scratchpad`):**
-    * **Purpose:** This folder is the **ONLY** allowed place for temporary files, draft notes, JSON dumps, intermediate architecture diagrams, or raw LLM outputs.
+    * **Purpose:** This folder is the **ONLY** allowed place for temporary files, draft notes, or raw LLM outputs.
     * **Git Rule:** The `/scratchpad` folder must be included in `.gitignore`. Files inside it are never committed.
-* **AI Instruction:**
-    * If you (the AI) need to create a file to plan a task, store a long stack trace, or draft a complex refactor: **Create it inside `scratchpad/`**.
-    * **NEVER** create temporary files in the root, `src/`, or `tests/` directories.
-* **Cleanup:**
-    * While `scratchpad/` is ignored, developers are encouraged to clean it periodically.
-    * If a file in `scratchpad/` becomes valuable documentation, move it to `/docs` and format it properly.
+* **Cleanup:** Auxiliary files used during development **MUST be deleted** before merging.

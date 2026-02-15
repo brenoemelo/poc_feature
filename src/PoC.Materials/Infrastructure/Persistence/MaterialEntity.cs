@@ -1,6 +1,6 @@
 using Amazon.DynamoDBv2.DataModel;
 
-namespace PoC.Materials.Repositories;
+namespace PoC.Materials.Infrastructure.Persistence;
 
 [DynamoDBTable("materials-table")]
 public class MaterialEntity
@@ -19,6 +19,9 @@ public class MaterialEntity
 
     [DynamoDBProperty("properties")]
     public Dictionary<string, string> Properties { get; set; } = new();
+
+    [DynamoDBVersion]
+    public int? Version { get; set; }
 }
 
 public class DensityEntity

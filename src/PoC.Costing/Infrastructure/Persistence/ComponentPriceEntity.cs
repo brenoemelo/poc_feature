@@ -1,6 +1,6 @@
 using Amazon.DynamoDBv2.DataModel;
 
-namespace PoC.Costing.Repositories;
+namespace PoC.Costing.Infrastructure.Persistence;
 
 [DynamoDBTable("costing-prices-table")]
 public class ComponentPriceEntity
@@ -19,4 +19,7 @@ public class ComponentPriceEntity
 
     [DynamoDBProperty]
     public DateTime UpdatedAt { get; set; }
+
+    [DynamoDBVersion]
+    public int? Version { get; set; }
 }

@@ -7,7 +7,7 @@ using PoC.Shared.Events;
 using PoC.Shared.Models;
 using PoC.Shared.Services;
 
-namespace PoC.Populator;
+namespace PoC.Populator.Functions;
 
 public class PopulatorWorkerFunction
 {

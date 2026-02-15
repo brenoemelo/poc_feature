@@ -1,246 +1,92 @@
 # Setup Local Environment
 
-This guide will help you set up the Material Formulation System on your local machine using LocalStack.
+This guide explains how to run the Material Formulation System locally using LocalStack and Lambda Function URLs.
 
 ## Prerequisites
 
-- **Docker** (version 20.10+)
-- **Docker Compose** (version 2.0+)
-- **.NET SDK 8.0**
-- **Git**
-- **sg** command (for Docker group access on Linux)
+- Docker Desktop with Docker Compose
+- .NET SDK 8.0
+- Git
 
-## Step 1: Clone the Repository
+## 1) Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd poc_feature
 ```
 
-## Step 2: Start LocalStack
+## 2) Start LocalStack
 
 ```bash
 docker-compose up -d
 ```
 
-This will start LocalStack with the following services:
-
-- Lambda
-- DynamoDB
-- SNS
-- SQS
-- S3
-
-**Verify LocalStack is running:**
+Verify LocalStack:
 
 ```bash
 docker ps
 ```
 
-You should see `poc_feature-localstack-1` running on port `4566`.
+You should see the container `poc_feature-localstack-1` running on port `4566`.
 
-## Step 3: Build the Solution
+## 3) Build the Solution
 
 ```bash
 dotnet restore PoC.sln
 dotnet build PoC.sln
 ```
 
-**Expected output:** `Build succeeded` with 0 errors.
+Expected output: `Build succeeded`.
 
-## Step 4: Run Architecture Tests
+## 4) Run Architecture Tests
 
 ```bash
 dotnet test src/PoC.ArchitectureTests
 ```
 
-**Expected output:** All tests should pass.
+All tests should pass before proceeding.
 
-## Step 5: Build Docker Images
+## 5) Deploy PoC.Materials to LocalStack (Windows/PowerShell)
 
-### PoC.Lambda
+Use the deployment script to publish and deploy the Lambda with a public Function URL:
 
-```bash
-sg docker -c "docker build --network=host -t poc-lambda:latest -f src/PoC.Lambda/Dockerfile ."
-```
+- Execute [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1)
+- The script:
+  - Publishes [PoC.Materials.csproj](file:///d:/Projetos/poc_feature/src/PoC.Materials/PoC.Materials.csproj) for Linux (linux-x64)
+  - Creates the Lambda function `PoC-Materials`
+  - Creates the Function URL with `AuthType=NONE`
+- Copy the generated Function URL (e.g., `http://xxxxxxxx.lambda-url.us-east-1.localhost.localstack.cloud:4566/`)
 
-### PoC.Populator
+## 6) Test the API
 
-```bash
-sg docker -c "docker build --network=host -t poc-populator:latest -f src/PoC.Populator/Dockerfile ."
-```
+- List materials: `GET {FunctionUrl}/materials`
+- Get by ID: `GET {FunctionUrl}/materials/{id}`
+- Create: `POST {FunctionUrl}/materials` with JSON body
+- Delete: `DELETE {FunctionUrl}/materials/{id}`
 
-### PoC.Costing
+## 7) Configure E2E Tests
 
-```bash
-sg docker -c "docker build --network=host -t poc-costing:latest -f src/PoC.Costing/Dockerfile ."
-```
-
-## Step 6: Deploy Lambda Functions
-
-### Extract and Package Lambda Code
-
-**For PoC.Lambda:**
+- Update the BaseUrl in [appsettings.test.json](file:///d:/Projetos/poc_feature/tests/PoC.E2E/appsettings.test.json) with the Function URL
+- Run tests:
 
 ```bash
-rm -rf lambda-publish function.zip
-sg docker -c "docker create --name extract-lambda poc-lambda:latest"
-sg docker -c "docker cp extract-lambda:/var/task ./lambda-publish"
-sg docker -c "docker rm extract-lambda"
-cd lambda-publish && zip -r ../function.zip . && cd ..
-sg docker -c "docker cp function.zip poc_feature-localstack-1:/tmp/function.zip"
+dotnet test tests/PoC.E2E/PoC.E2E.csproj
 ```
 
-**For PoC.Populator:**
+## 8) Insomnia Collection
 
-```bash
-rm -rf populator-publish populator.zip
-sg docker -c "docker create --name extract-populator poc-populator:latest"
-sg docker -c "docker cp extract-populator:/var/task ./populator-publish"
-sg docker -c "docker rm extract-populator"
-cd populator-publish && zip -r ../populator.zip . && cd ..
-sg docker -c "docker cp populator.zip poc_feature-localstack-1:/tmp/populator.zip"
-```
-
-**For PoC.Costing:**
-
-```bash
-rm -rf costing-publish costing.zip
-sg docker -c "docker create --name extract-costing poc-costing:latest"
-sg docker -c "docker cp extract-costing:/var/task ./costing-publish"
-sg docker -c "docker rm extract-costing"
-cd costing-publish && zip -r ../costing.zip . && cd ..
-sg docker -c "docker cp costing.zip poc_feature-localstack-1:/tmp/costing.zip"
-```
-
-### Create Lambda Functions
-
-```bash
-# PoC.Lambda functions
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-lambda \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Lambda::PoC.Lambda.Function::FunctionHandler \
-    --zip-file fileb:///tmp/function.zip"
-
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-query \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Lambda::PoC.Lambda.QueryFunction::FunctionHandler \
-    --zip-file fileb:///tmp/function.zip"
-
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-ingestion-worker \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Lambda::PoC.Lambda.MaterialIngestionFunction::FunctionHandler \
-    --zip-file fileb:///tmp/function.zip"
-
-# PoC.Populator functions
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-populator-api \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Populator::PoC.Populator.PopulatorApiFunction::FunctionHandler \
-    --zip-file fileb:///tmp/populator.zip"
-
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-populator-worker \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Populator::PoC.Populator.PopulatorWorkerFunction::FunctionHandler \
-    --zip-file fileb:///tmp/populator.zip"
-
-# PoC.Costing functions
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-costing-price-mgmt \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Costing::PoC.Costing.PriceManagementFunction::FunctionHandler \
-    --zip-file fileb:///tmp/costing.zip"
-
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-function \
-    --function-name poc-costing-engine \
-    --runtime dotnet8 \
-    --role arn:aws:iam::000000000000:role/lambda-role \
-    --handler PoC.Costing::PoC.Costing.CostCalculationFunction::FunctionHandler \
-    --zip-file fileb:///tmp/costing.zip"
-```
-
-### Configure Event Source Mappings
-
-```bash
-# Populator worker consumes from populator-queue
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-event-source-mapping \
-    --function-name poc-populator-worker \
-    --event-source-arn arn:aws:sqs:us-east-1:000000000000:populator-queue"
-
-# Ingestion worker consumes from material-ingestion-queue
-sg docker -c "docker exec poc_feature-localstack-1 awslocal lambda create-event-source-mapping \
-    --function-name poc-ingestion-worker \
-    --event-source-arn arn:aws:sqs:us-east-1:000000000000:material-ingestion-queue"
-```
-
-## Step 7: Test the APIs
-
-### Using Insomnia
-
-1. Import `docs/insomnia_collection.json` into Insomnia
-2. Update the `base_url` environment variable if needed
-3. Test the endpoints:
-   - **List Materials** (GET)
-   - **Create Material** (POST)
-   - **Populate Data** (POST)
-   - **Upsert Component Price** (PUT)
-   - **Calculate Material Cost** (POST)
-
-### Using cURL
-
-**Create a material:**
-
-```bash
-curl -X POST http://localhost:4566/restapis/lambda/local/outputs/v1/materials \
-  -H "Content-Type: application/json" \
-  -d '{
-    "material_id": "test-001",
-    "name": "Test Material",
-    "formulation": [
-      {"component": "Polycarbonate", "percentage": 100.0, "type": "Base"}
-    ]
-  }'
-```
-
-**Populate 1000 materials:**
-
-```bash
-curl -X POST http://localhost:4566/restapis/lambda/local/outputs/v1/populate \
-  -H "Content-Type: application/json" \
-  -d '{"target": "materials", "count": 1000}'
-```
+- Import `docs/insomnia_collection.json` into Insomnia
+- Set the environment variable `base_url` to the Function URL
+- Exercise endpoints for Materials, Population, and Costing
 
 ## Troubleshooting
 
-### LocalStack not starting
-
-```bash
-docker-compose logs localstack
-```
-
-### Lambda function errors
-
-```bash
-sg docker -c "docker exec poc_feature-localstack-1 awslocal logs tail /aws/lambda/poc-lambda"
-```
-
-### DynamoDB table not found
-
-Verify tables exist:
-
-```bash
-sg docker -c "docker exec poc_feature-localstack-1 awslocal dynamodb list-tables"
-```
+- 403 on Function URL
+  - Redeploy with [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1) to recreate the Function and its URL
+- 500 during startup
+  - Ensure `TargetFramework=net8.0` and the publish target is `linux-x64`
+- DynamoDB missing tables
+  - Check LocalStack init: [init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh) should create `materials-table`
 
 ## Clean Up
 
@@ -248,4 +94,4 @@ sg docker -c "docker exec poc_feature-localstack-1 awslocal dynamodb list-tables
 docker-compose down -v
 ```
 
-This removes all containers and volumes.
+This stops containers and removes volumes.
