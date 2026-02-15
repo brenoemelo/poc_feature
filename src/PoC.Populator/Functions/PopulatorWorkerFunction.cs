@@ -12,7 +12,6 @@ namespace PoC.Populator.Functions;
 public class PopulatorWorkerFunction
 {
     private readonly IAmazonSimpleNotificationService _snsClient;
-    private readonly IPopulationStrategy _strategy;
     private readonly string _topicArn;
 
     public PopulatorWorkerFunction()
@@ -32,15 +31,13 @@ public class PopulatorWorkerFunction
         };
         _snsClient = new AmazonSimpleNotificationServiceClient(config);
         
-        _strategy = new MaterialPopulationStrategy();
         // Assuming TOPIC ARN is standard for LocalStack or passed via env var
         _topicArn = Environment.GetEnvironmentVariable("SNS_TOPIC_ARN") ?? "arn:aws:sns:us-east-1:000000000000:material-events";
     }
 
-    public PopulatorWorkerFunction(IAmazonSimpleNotificationService snsClient, IPopulationStrategy strategy, string topicArn)
+    public PopulatorWorkerFunction(IAmazonSimpleNotificationService snsClient, string topicArn)
     {
         _snsClient = snsClient;
-        _strategy = strategy;
         _topicArn = topicArn;
     }
 
@@ -57,21 +54,48 @@ public class PopulatorWorkerFunction
 
                 context.Logger.LogInformation($"Processing job: Create {job.BatchSize} records for {job.Target}");
 
-                var items = _strategy.Generate(job.BatchSize);
+                var strategy = GetStrategy(job.Target);
+                var items = strategy.Generate(job.BatchSize);
                 
                 var tasks = new List<Task>();
 
                 // Publish each item as an event
                 foreach (var item in items)
                 {
-                    var materialEvent = new MaterialCreatedEvent { Material = item };
+                    string messageBody;
+                    string eventType;
+
+                    if (item is MaterialFormulation material)
+                    {
+                        var evt = new MaterialCreatedEvent { Material = material };
+                        messageBody = JsonSerializer.Serialize(evt);
+                        eventType = "MaterialCreated";
+                    }
+                    else if (item is ComponentPriceRequest price)
+                    {
+                        var evt = new PriceUpdatedEvent 
+                        { 
+                            ComponentName = price.ComponentName,
+                            UnitPrice = price.UnitPrice,
+                            Currency = price.Currency,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        messageBody = JsonSerializer.Serialize(evt);
+                        eventType = "PriceUpdated";
+                    }
+                    else
+                    {
+                        context.Logger.LogWarning($"Unknown item type generated: {item.GetType().Name}");
+                        continue;
+                    }
+
                     var publishRequest = new PublishRequest
                     {
                         TopicArn = _topicArn,
-                        Message = JsonSerializer.Serialize(materialEvent),
+                        Message = messageBody,
                         MessageAttributes = new Dictionary<string, MessageAttributeValue>
                         {
-                            { "EventType", new MessageAttributeValue { DataType = "String", StringValue = "MaterialCreated" } }
+                            { "EventType", new MessageAttributeValue { DataType = "String", StringValue = eventType } }
                         }
                     };
                     
@@ -90,7 +114,7 @@ public class PopulatorWorkerFunction
                     await Task.WhenAll(tasks);
                 }
 
-                context.Logger.LogInformation($"Successfully published {job.BatchSize} events.");
+                context.Logger.LogInformation($"Successfully published {job.BatchSize} events for target {job.Target}.");
             }
             catch (Exception ex)
             {
@@ -98,5 +122,15 @@ public class PopulatorWorkerFunction
                 throw; 
             }
         }
+    }
+
+    private IPopulationStrategy GetStrategy(string target)
+    {
+        return target.ToLowerInvariant() switch
+        {
+            "materials" => new MaterialPopulationStrategy(),
+            "prices" => new PricePopulationStrategy(),
+            _ => throw new ArgumentException($"Unknown target: {target}")
+        };
     }
 }

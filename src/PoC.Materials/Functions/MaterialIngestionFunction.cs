@@ -1,13 +1,51 @@
-using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using PoC.Materials.Domain.Interfaces;
+using PoC.Materials.Infrastructure;
 using PoC.Shared.Events;
+using System.Text.Json;
 
 namespace PoC.Materials.Functions;
 
-public class MaterialIngestionFunction(IMaterialRepository repository)
+public class MaterialIngestionFunction
 {
+    private readonly IMaterialRepository _repository;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MaterialIngestionFunction"/> class.
+    /// Default constructor for Lambda runtime.
+    /// Initializes dependency injection container and resolves dependencies.
+    /// </summary>
+    public MaterialIngestionFunction()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        services.AddLogging(logging =>
+        {
+            logging.AddConfiguration(configuration.GetSection("Logging"));
+            logging.AddConsole();
+        });
+
+        services.AddMaterialsInfrastructure(configuration);
+
+        var serviceProvider = services.BuildServiceProvider();
+        _repository = serviceProvider.GetRequiredService<IMaterialRepository>();
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MaterialIngestionFunction"/> class.
+    /// Constructor for testing or manual dependency injection.
+    /// </summary>
+    /// <param name="repository">The material repository.</param>
+    public MaterialIngestionFunction(IMaterialRepository repository)
+    {
+        _repository = repository;
+    }
+
 #pragma warning disable VSTHRD200
     public async Task FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
@@ -64,7 +102,7 @@ public class MaterialIngestionFunction(IMaterialRepository repository)
         context.Logger.LogInformation(
             $"[MaterialIngestion] Ingesting material: {materialEvent.Material.Name} ({materialEvent.Material.MaterialId})");
 
-        var result = await repository.SaveAsync(materialEvent.Material);
+        var result = await _repository.SaveAsync(materialEvent.Material);
 
         if (result.IsFailure)
         {

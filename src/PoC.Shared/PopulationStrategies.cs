@@ -6,12 +6,12 @@ namespace PoC.Shared.Services;
 public interface IPopulationStrategy
 {
     string TargetTable { get; }
-    IEnumerable<MaterialFormulation> Generate(int count);
+    IEnumerable<object> Generate(int count);
 }
 
 public class MaterialPopulationStrategy : IPopulationStrategy
 {
-    public string TargetTable => "poc-table";
+    public string TargetTable => "materials-table";
     private readonly Faker<MaterialFormulation> _faker;
 
     public MaterialPopulationStrategy()
@@ -38,8 +38,29 @@ public class MaterialPopulationStrategy : IPopulationStrategy
             });
     }
 
-    public IEnumerable<MaterialFormulation> Generate(int count)
+    public IEnumerable<object> Generate(int count)
     {
-        return _faker.Generate(count);
+        return _faker.Generate(count).Cast<object>();
+    }
+}
+
+public class PricePopulationStrategy : IPopulationStrategy
+{
+    public string TargetTable => "prices-table"; // Not really used but kept for interface
+    private readonly Faker<ComponentPriceRequest> _faker;
+
+    public PricePopulationStrategy()
+     {
+         _faker = new Faker<ComponentPriceRequest>()
+             .CustomInstantiator(f => new ComponentPriceRequest(
+                 ComponentName: f.Commerce.ProductMaterial(),
+                 UnitPrice: Math.Round(f.Random.Decimal(0.5m, 100.0m), 2),
+                 Unit: "kg",
+                 Currency: "USD"));
+     }
+
+    public IEnumerable<object> Generate(int count)
+    {
+        return _faker.Generate(count).Cast<object>();
     }
 }

@@ -11,16 +11,25 @@ public class DynamoDbCostingRepository(IDynamoDBContext context) : ICostingRepos
     {
         try
         {
-            var entity = new ComponentPriceEntity
-            {
-                ComponentName = request.ComponentName,
-                UnitPrice = request.UnitPrice,
-                Unit = request.Unit,
-                Currency = request.Currency,
-                UpdatedAt = DateTime.UtcNow
-            };
+            var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName);
+            var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
 
-            await context.SaveAsync(entity);
+            Console.WriteLine($"[UpsertPriceAsync] Processing {request.ComponentName}. Existing: {existing != null}, Version: {existing?.Version}");
+
+            entity.UnitPrice = request.UnitPrice;
+            entity.Unit = request.Unit;
+            entity.Currency = request.Currency;
+            entity.UpdatedAt = DateTime.UtcNow;
+
+            // If item exists but has no version (e.g. manually inserted), skip version check to initialize it
+            var config = new DynamoDBOperationConfig();
+            if (existing != null && existing.Version == null)
+            {
+                Console.WriteLine("[UpsertPriceAsync] Existing item has no version. Skipping version check.");
+                config.SkipVersionCheck = true;
+            }
+
+            await context.SaveAsync(entity, config);
             return Result.Success();
         }
         catch (Exception ex)

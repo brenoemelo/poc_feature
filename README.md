@@ -20,7 +20,7 @@ This system demonstrates a **serverless, event-driven architecture** for managin
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  PoC.Lambda │     │ PoC.Populator│     │ PoC.Costing │
+│PoC.Materials│     │ PoC.Populator│     │ PoC.Costing │
 │             │     │              │     │             │
 │ • Materials │     │ • Population │     │ • Prices    │
 │ • Query     │     │ • Worker     │     │ • Cost Calc │
@@ -33,8 +33,8 @@ This system demonstrates a **serverless, event-driven architecture** for managin
        └────────────────────────────────────────┘
               │              │              │
        ┌──────▼──────┐ ┌────▼────┐ ┌───────▼────────┐
-       │ poc-table   │ │SNS/SQS  │ │costing-prices- │
-       │ (DynamoDB)  │ │ Events  │ │table (DynamoDB)│
+       │ materials-  │ │SNS/SQS  │ │costing-prices- │
+       │ table (DDB) │ │ Events  │ │table (DynamoDB)│
        └─────────────┘ └─────────┘ └────────────────┘
 ```
 
@@ -42,6 +42,7 @@ This system demonstrates a **serverless, event-driven architecture** for managin
 
 - **[Full Documentation](docs/index.md)** - Complete documentation index
 - **[Setup Guide](docs/guides/setup-local-environment.md)** - Get started with LocalStack
+- **[Health Check](docs/guides/deployment-health.md)** - Verify deployments and logs
 - **[ADRs](docs/adr/)** - Architecture Decision Records
 - **[Domain Concepts](docs/concepts/)** - Business domain documentation
 - **[OpenAPI Spec](docs/openapi.yaml)** - REST API contract
@@ -80,49 +81,65 @@ dotnet test
 
 ### 4. Deploy to LocalStack
 
-Follow the detailed steps in [Setup Guide](docs/guides/setup-local-environment.md).
+Use the provided scripts to deploy the API Gateway and all microservices:
 
-## 🧭 Como Executar Localmente (Passo a Passo)
+```powershell
+# 1. Deploy API Gateway
+./deploy-gateway.ps1
 
-- Pré-requisitos
-  - Instalar .NET SDK 8.0
-  - Instalar Docker Desktop e habilitar Docker Compose
-  - Clonar o repositório para `d:\Projetos\poc_feature`
+# 2. Deploy Services
+./deploy-localstack.ps1           # PoC.Materials
+./deploy-localstack-costing.ps1   # PoC.Costing
+./deploy-localstack-populator.ps1 # PoC.Populator
+```
 
-- Subir infraestrutura local (LocalStack)
-  - Rodar `docker-compose up -d` na raiz do projeto
-  - Confirmar que o container `poc_feature-localstack-1` está em execução
+### 5. Verify Deployment
 
-- Publicar e criar a Lambda de Materiais
-  - Executar o script [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1)
-  - Esse script:
-    - Publica [PoC.Materials.csproj](file:///d:/Projetos/poc_feature/src/PoC.Materials/PoC.Materials.csproj) para Linux (`-r linux-x64`)
-    - Cria/atualiza a função Lambda `PoC-Materials`
-    - Cria a Function URL pública (AuthType NONE)
-  - Ao final, copie a URL exibida (ex.: `http://xxxxx.lambda-url.us-east-1.localhost.localstack.cloud:4566/`)
+Run the automated API test script:
 
-- Testar a API manualmente
-  - Lista de materiais: `GET {FunctionUrl}/materials`
-  - Buscar por ID: `GET {FunctionUrl}/materials/{id}`
-  - Criar material: `POST {FunctionUrl}/materials` com JSON do DTO
+```powershell
+./test_all_apis.ps1
+```
 
-- Configurar testes E2E
-  - Atualize o BaseUrl em [appsettings.test.json](file:///d:/Projetos/poc_feature/tests/PoC.E2E/appsettings.test.json) com a Function URL gerada
-  - Execute `dotnet test tests/PoC.E2E/PoC.E2E.csproj`
+## 🧭 How to Run Locally (Step-by-Step)
 
-- Dicas de troubleshooting
-  - 403 na URL: redeploy com [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1) para recriar a Function URL
-  - 500 na inicialização: garanta `TargetFramework=net8.0` e publicação para `linux-x64`
-  - DynamoDB vazio: o script de init ([init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh)) cria tabelas; valide `materials-table`
+- **Prerequisites**
+  - Install .NET SDK 8.0
+  - Install Docker Desktop and enable Docker Compose
+  - Clone the repository to `d:\Projetos\poc_feature`
 
-> Observação: É possível executar o serviço como Lambda local via Function URL (recomendado) ou como processo .NET, desde que as dependências estejam apontando para o endpoint do LocalStack.
+- **Start Local Infrastructure (LocalStack)**
+  - Run `docker-compose up -d` in the project root
+  - Confirm that the `poc_feature-localstack-1` container is running
+
+- **Deploy Infrastructure and Services**
+  - Run `./deploy-gateway.ps1` to create the API Gateway.
+  - Run the service scripts:
+    - `./deploy-localstack.ps1` (Materials)
+    - `./deploy-localstack-costing.ps1` (Costing)
+    - `./deploy-localstack-populator.ps1` (Populator)
+
+- **Test APIs**
+  - Run `./test_all_apis.ps1` to validate all endpoints.
+  - The script automatically detects the API Gateway ID and runs integration tests.
+
+- **Automated E2E Tests**
+  - E2E tests are already configured to use the API Gateway.
+  - Run `dotnet test tests/PoC.E2E/PoC.E2E.csproj`
+
+- **Troubleshooting Tips**
+  - 500 on Gateway: Verify if deployment scripts were executed in the correct order (Gateway first).
+  - 500 on startup: Ensure `TargetFramework=net8.0` and publish target is `linux-x64`
+  - Empty DynamoDB: The init script ([init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh)) creates tables; validate `materials-table`
+
+> **Note:** It is possible to run the service as a local Lambda via Function URL (recommended) or as a .NET process, provided dependencies point to the LocalStack endpoint.
 
 ## 📦 Project Structure
 
 ```
 poc_feature/
 ├── src/
-│   ├── PoC.Lambda/          # Material management microservice
+│   ├── PoC.Materials/       # Material management microservice
 │   ├── PoC.Populator/       # Data generation microservice
 │   ├── PoC.Costing/         # Cost calculation microservice
 │   ├── PoC.Shared/          # Shared domain models & events
@@ -148,12 +165,11 @@ poc_feature/
 
 ## 📊 Microservices
 
-### PoC.Lambda
+### PoC.Materials
 
 Material management service with three Lambda functions:
 
-- `poc-lambda` - Create materials (POST /materials)
-- `poc-query` - Query materials (GET /materials, GET /materials/{id})
+- `poc-materials-api` - Create and query materials (POST/GET /materials)
 - `poc-ingestion-worker` - Consume SNS events and persist to DynamoDB
 
 ### PoC.Populator
@@ -206,9 +222,9 @@ dotnet test tests/PoC.E2E
 
 | Method | Endpoint           | Service    | Description                |
 |--------|--------------------|------------|----------------------------|
-| GET    | /materials         | Lambda     | List all materials         |
-| GET    | /materials/{id}    | Lambda     | Get material by ID         |
-| POST   | /materials         | Lambda     | Create material            |
+| GET    | /materials         | Materials  | List all materials         |
+| GET    | /materials/{id}    | Materials  | Get material by ID         |
+| POST   | /materials         | Materials  | Create material            |
 | POST   | /populate          | Populator  | Generate test data         |
 | PUT    | /prices            | Costing    | Upsert component price     |
 | POST   | /calculate-cost    | Costing    | Calculate material cost    |

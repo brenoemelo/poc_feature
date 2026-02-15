@@ -1,7 +1,11 @@
+using Amazon.Lambda.Core;
+using Amazon.Lambda.Serialization.SystemTextJson;
 using PoC.Populator.API.Endpoints;
 using PoC.Populator.Infrastructure;
 using Serilog;
 using Serilog.Formatting.Compact;
+
+[assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +18,8 @@ builder.Host.UseSerilog((context, configuration) =>
 });
 
 // AWS Lambda Hosting
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
+Console.WriteLine("STARTING UP PoC.Populator with REST API");
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 // Dependency Injection
 builder.Services.AddPopulatorInfrastructure(builder.Configuration);

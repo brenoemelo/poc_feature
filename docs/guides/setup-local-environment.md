@@ -46,52 +46,69 @@ dotnet test src/PoC.ArchitectureTests
 
 All tests should pass before proceeding.
 
-## 5) Deploy PoC.Materials to LocalStack (Windows/PowerShell)
+## 5) Deploy Services to LocalStack (Windows/PowerShell)
+ 
+ The project uses **API Gateway** as the single entry point. You must deploy the Gateway first, then the services.
+ 
+ 1. **Deploy API Gateway**:
+    ```powershell
+    ./deploy-gateway.ps1
+    ```
+    This sets up the unified API at `http://localhost:4566/restapis/<api-id>/prod/_user_request_/`.
+ 
+ 2. **Deploy Microservices**:
+    ```powershell
+    ./deploy-localstack.ps1           # Deploys PoC.Materials
+    ./deploy-localstack-costing.ps1   # Deploys PoC.Costing
+    ./deploy-localstack-populator.ps1 # Deploys PoC.Populator
+    ```
+ 
+ Each script publishes the .NET application, creates the Lambda function, and updates the API Gateway integration.
+ 
+ ## 6) Test the API
+ 
+ Use the provided PowerShell script to verify all endpoints automatically:
+ 
+ ```powershell
+ ./test_all_apis.ps1
+ ```
+ 
+ This script:
+ - Detects the API Gateway ID
+ - Runs functional tests for Materials (CRUD), Costing (Price/Calc), and Population
+ - Validates the responses against expected results
+ 
+ ## 7) Run E2E Tests
+ 
+ The E2E tests are configured to use the API Gateway.
+ 
+ ```bash
+ dotnet test tests/PoC.E2E/PoC.E2E.csproj
+ ```
+ 
+ ## 8) Insomnia Collection
 
-Use the deployment script to publish and deploy the Lambda with a public Function URL:
-
-- Execute [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1)
-- The script:
-  - Publishes [PoC.Materials.csproj](file:///d:/Projetos/poc_feature/src/PoC.Materials/PoC.Materials.csproj) for Linux (linux-x64)
-  - Creates the Lambda function `PoC-Materials`
-  - Creates the Function URL with `AuthType=NONE`
-- Copy the generated Function URL (e.g., `http://xxxxxxxx.lambda-url.us-east-1.localhost.localstack.cloud:4566/`)
-
-## 6) Test the API
-
-- List materials: `GET {FunctionUrl}/materials`
-- Get by ID: `GET {FunctionUrl}/materials/{id}`
-- Create: `POST {FunctionUrl}/materials` with JSON body
-- Delete: `DELETE {FunctionUrl}/materials/{id}`
-
-## 7) Configure E2E Tests
-
-- Update the BaseUrl in [appsettings.test.json](file:///d:/Projetos/poc_feature/tests/PoC.E2E/appsettings.test.json) with the Function URL
-- Run tests:
-
-```bash
-dotnet test tests/PoC.E2E/PoC.E2E.csproj
-```
-
-## 8) Insomnia Collection
-
-- Import `docs/insomnia_collection.json` into Insomnia
-- Set the environment variable `base_url` to the Function URL
-- Exercise endpoints for Materials, Population, and Costing
-
-## Troubleshooting
-
-- 403 on Function URL
-  - Redeploy with [deploy-localstack.ps1](file:///d:/Projetos/poc_feature/deploy-localstack.ps1) to recreate the Function and its URL
-- 500 during startup
-  - Ensure `TargetFramework=net8.0` and the publish target is `linux-x64`
-- DynamoDB missing tables
-  - Check LocalStack init: [init-aws.sh](file:///d:/Projetos/poc_feature/init-aws.sh) should create `materials-table`
-
-## Clean Up
-
-```bash
-docker-compose down -v
-```
-
-This stops containers and removes volumes.
+- Import `docs/api/insomnia_antigravity_v1.json` into Insomnia
+- Switch to the "LocalStack Environment"
+- Update the `base_url` variable by replacing `API_ID_HERE` with your actual API Gateway ID.
+  - Example: `http://localhost:4566/restapis/bgl2ladyeo/prod/_user_request_`
+- You can find the correct URL in the output of `./test_all_apis.ps1` or `./deploy-gateway.ps1`.
+ 
+ ## Troubleshooting
+ 
+ - **500 Internal Server Error**:
+   - Check Lambda logs using the commands in [Deployment Health Check](deployment-health.md).
+   - Ensure `deploy-gateway.ps1` was run *before* the service deployment scripts if you are setting up for the first time.
+ - **403 Forbidden**:
+   - Ensure you are using the **API Gateway URL** and NOT the Lambda Function URL.
+   - Run `./deploy-gateway.ps1` again to ensure permissions are set correctly.
+ - **DynamoDB concurrency errors**:
+   - The system uses Optimistic Locking. If you see concurrency errors, retry the operation with the latest version of the entity.
+ 
+ ## Clean Up
+ 
+ ```bash
+ docker-compose down -v
+ ```
+ 
+ This stops containers and removes volumes.

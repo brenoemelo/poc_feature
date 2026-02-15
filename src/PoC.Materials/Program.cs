@@ -1,3 +1,5 @@
+using Amazon.Lambda.Core;
+using Amazon.Lambda.Serialization.SystemTextJson;
 using FluentValidation;
 using PoC.Materials.API.Endpoints;
 using PoC.Materials.Infrastructure;
@@ -5,6 +7,8 @@ using PoC.Shared.Validators;
 using Serilog;
 using Serilog.Formatting.Compact;
 using System.Text.Json;
+
+[assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +20,8 @@ builder.Host.UseSerilog((context, configuration) =>
         .WriteTo.Console(new CompactJsonFormatter());
 });
 
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
+Console.WriteLine("STARTING UP PoC.Materials with REST API");
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 

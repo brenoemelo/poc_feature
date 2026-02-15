@@ -19,17 +19,18 @@ Welcome to the **Material Formulation System** documentation. This project is a 
 ### Guides
 
 - [Setup Local Environment](guides/setup-local-environment.md) - Get started with LocalStack
+- [Deployment Health Check](guides/deployment-health.md) - Verify deployment status and logs
 
 ### API Documentation
 
 - [OpenAPI Specification](openapi.yaml) - REST API contract
-- [Insomnia Collection](insomnia_collection.json) - Ready-to-use API requests
+- [Insomnia Collection](api/insomnia_antigravity_v1.json) - Ready-to-use API requests
 
 ## 🏗️ System Architecture
 
-The system consists of three main microservices:
+The system consists of three main microservices exposed via a unified **API Gateway**:
 
-1. **PoC.Lambda** - Material management and query operations
+1. **PoC.Materials** - Material management and query operations
 2. **PoC.Populator** - Synthetic data generation for testing
 3. **PoC.Costing** - Cost calculation and pricing engine
 
@@ -41,11 +42,17 @@ All services follow the **Data Sovereignty** principle and communicate via **SNS
 # Start LocalStack
 docker-compose up -d
 
-# Build the solution
-dotnet build PoC.sln
+# Deploy Infrastructure & Services
+./deploy-gateway.ps1
+./deploy-localstack.ps1
+./deploy-localstack-costing.ps1
+./deploy-localstack-populator.ps1
 
-# Run architecture tests
-dotnet test src/PoC.ArchitectureTests
+# Run API Tests
+./test_all_apis.ps1
+
+# Run E2E Tests
+dotnet test tests/PoC.E2E/PoC.E2E.csproj
 ```
 
 ## 📖 Key Features

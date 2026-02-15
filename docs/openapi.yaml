@@ -4,14 +4,19 @@ info:
   description: API for managing and querying material formulations for the POC.
   version: 1.0.0
 servers:
-  - url: http://lambda-url.example.com/
-    description: Lambda Function URL (replace with your deployed URL)
+  - url: http://localhost:4566/restapis/{api_id}/prod/_user_request_/
+    description: LocalStack REST API (Replace {api_id} with the ID from `aws apigateway get-rest-apis`)
 
 paths:
   /materials:
     get:
       summary: List all materials
       description: Returns a list of all material formulations stored in the system.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
       responses:
         200:
           description: A list of materials.
@@ -26,6 +31,11 @@ paths:
     post:
       summary: Create a new material formulation
       description: Stores a new material formulation in the DynamoDB table.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        httpMethod: POST
       requestBody:
         required: true
         content:
@@ -49,6 +59,11 @@ paths:
           required: true
           schema:
             type: string
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        httpMethod: POST
       responses:
         200:
           description: Material formulation details.
@@ -68,6 +83,11 @@ paths:
           required: true
           schema:
             type: string
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        httpMethod: POST
       responses:
         204:
           description: Material deleted successfully.
@@ -80,6 +100,11 @@ paths:
     post:
       summary: Populates the database with random data
       description: Triggers an asynchronous job to generate and insert random material formulations.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Populator/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
       requestBody:
         required: true
         content:
@@ -94,10 +119,15 @@ paths:
         500:
           $ref: '#/components/responses/ServerError'
 
-  /prices:
-    put:
+  /costing/prices:
+    post:
       summary: Upsert a component price
       description: Creates or updates the price for a component in the costing catalog.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Costing/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
       requestBody:
         required: true
         content:
@@ -116,10 +146,15 @@ paths:
         500:
           $ref: '#/components/responses/ServerError'
 
-  /calculate-cost:
+  /costing/calculate-cost:
     post:
       summary: Calculate material cost
       description: Calculates the total cost and breakdown for a material formulation based on component prices.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Costing/invocations
+        payloadFormatVersion: "2.0"
+        type: aws_proxy
+        httpMethod: POST
       requestBody:
         required: true
         content:

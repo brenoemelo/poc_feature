@@ -1,9 +1,13 @@
+using Amazon.Lambda.Core;
+using Amazon.Lambda.Serialization.SystemTextJson;
 using FluentValidation;
 using PoC.Costing.API.Endpoints;
 using PoC.Costing.Infrastructure;
 using PoC.Shared.Validators;
 using Serilog;
 using Serilog.Formatting.Compact;
+
+[assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +20,8 @@ builder.Host.UseSerilog((context, configuration) =>
 });
 
 // AWS Lambda Hosting
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
+Console.WriteLine("STARTING UP PoC.Costing with REST API");
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 // Dependency Injection
 builder.Services.AddCostingInfrastructure(builder.Configuration);

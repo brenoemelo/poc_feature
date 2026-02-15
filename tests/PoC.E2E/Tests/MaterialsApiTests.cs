@@ -3,11 +3,11 @@ using System.Text.Json.Serialization;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
-using Antigravity.E2E.Common;
 using FluentAssertions;
+using PoC.E2E.Common;
 using RestSharp;
 
-namespace Antigravity.E2E.Tests;
+namespace PoC.E2E.Tests;
 
 public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
 {
@@ -72,7 +72,7 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         response.Content.Should().NotBeNullOrWhiteSpace();
         response.StatusCode.Should().NotBe(HttpStatusCode.OK, because: "must not return 200 for missing resource");
-        response.Content!.Contains("Material not found").Should().BeTrue();
+        response.Content!.Contains("Resource not found").Should().BeTrue();
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using RestSharp;
 
-namespace Antigravity.E2E.Common;
+namespace PoC.E2E.Common;
 
 public abstract class ApiTestBase
 {

@@ -1,235 +1,266 @@
 {
-	"_type": "export",
-	"__export_format": 4,
-	"__export_date": "2026-02-14T15:35:00.000Z",
-	"__export_source": "insomnia.desktop.app:v2023.5.8",
-	"resources": [
-		{
-			"_id": "wrk_1",
-			"parentId": null,
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"name": "PoC AWS Simulator",
-			"description": "",
-			"scope": "collection",
-			"_type": "workspace"
-		},
-		{
-			"_id": "env_1",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"name": "Base Environment",
-			"data": {
-				"base_url": "http://55medlo33b9rpdiu481tasasw3vg1s7m.lambda-url.us-east-1.localhost.localstack.cloud:4566"
-			},
-			"dataPropertyOrder": {
-				"&": [
-					"base_url"
-				]
-			},
-			"color": null,
-			"isPrivate": false,
-			"metaSortKey": 1700000000000,
-			"_type": "environment"
-		},
-		{
-			"_id": "req_1",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/materials",
-			"name": "List Materials",
-			"description": "",
-			"method": "GET",
-			"body": {},
-			"parameters": [],
-			"headers": [],
-			"authentication": {},
-			"metaSortKey": -1700000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_2",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/materials/composite-x-100",
-			"name": "Get Material by ID",
-			"description": "",
-			"method": "GET",
-			"body": {},
-			"parameters": [],
-			"headers": [],
-			"authentication": {},
-			"metaSortKey": -1600000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_2_del",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/materials/{{ material_id }}",
-			"name": "Delete Material by ID",
-			"description": "",
-			"method": "DELETE",
-			"body": {},
-			"parameters": [
-				{
-					"name": "material_id",
-					"value": "composite-x-100"
-				}
-			],
-			"headers": [],
-			"authentication": {},
-			"metaSortKey": -1550000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_3",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/materials",
-			"name": "Create Material",
-			"description": "",
-			"method": "POST",
-			"body": {
-				"mimeType": "application/json",
-				"text": "{\n  \"material_id\": \"composite-x-100\",\n  \"name\": \"High-Strength Polymer Blend\",\n  \"density\": {\n    \"value\": 1.25,\n    \"unit\": \"g/cm3\"\n  },\n  \"formulation\": [\n    {\n      \"component\": \"Polycarbonate\",\n      \"percentage\": 60.0,\n      \"type\": \"Base Polymer\"\n    },\n    {\n      \"component\": \"Glass Fiber\",\n      \"percentage\": 30.0,\n      \"type\": \"Reinforcement\"\n    },\n    {\n      \"component\": \"Flame Retardant A\",\n      \"percentage\": 10.0,\n      \"type\": \"Additive\"\n    }\n  ],\n  \"properties\": {\n    \"tensile_strength\": \"120 MPa\",\n    \"melting_point\": \"250C\"\n  }\n}"
-			},
-			"parameters": [],
-			"headers": [
-				{
-					"name": "Content-Type",
-					"value": "application/json"
-				}
-			],
-			"authentication": {},
-			"metaSortKey": -1500000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_4",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/populate",
-			"name": "Populate Data",
-			"description": "",
-			"method": "POST",
-			"body": {
-				"mimeType": "application/json",
-				"text": "{\n  \"target\": \"materials\",\n  \"count\": 1000\n}"
-			},
-			"parameters": [],
-			"headers": [
-				{
-					"name": "Content-Type",
-					"value": "application/json"
-				}
-			],
-			"authentication": {},
-			"metaSortKey": -1400000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_5",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/prices",
-			"name": "Upsert Component Price",
-			"description": "",
-			"method": "PUT",
-			"body": {
-				"mimeType": "application/json",
-				"text": "{\n  \"component_name\": \"Polycarbonate\",\n  \"unit_price\": 12.50,\n  \"unit\": \"kg\",\n  \"currency\": \"USD\"\n}"
-			},
-			"parameters": [],
-			"headers": [
-				{
-					"name": "Content-Type",
-					"value": "application/json"
-				}
-			],
-			"authentication": {},
-			"metaSortKey": -1300000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		},
-		{
-			"_id": "req_6",
-			"parentId": "wrk_1",
-			"modified": 1700000000000,
-			"created": 1700000000000,
-			"url": "{{ base_url }}/calculate-cost",
-			"name": "Calculate Material Cost",
-			"description": "",
-			"method": "POST",
-			"body": {
-				"mimeType": "application/json",
-				"text": "{\n  \"material_id\": \"composite-x-100\",\n  \"formulation\": [\n    {\n      \"component\": \"Polycarbonate\",\n      \"percentage\": 60.0\n    },\n    {\n      \"component\": \"Glass Fiber\",\n      \"percentage\": 30.0\n    },\n    {\n      \"component\": \"Flame Retardant A\",\n      \"percentage\": 10.0\n    }\n  ],\n  \"desired_margin_percent\": 25.0\n}"
-			},
-			"parameters": [],
-			"headers": [
-				{
-					"name": "Content-Type",
-					"value": "application/json"
-				}
-			],
-			"authentication": {},
-			"metaSortKey": -1200000000000,
-			"isPrivate": false,
-			"settingStoreCookies": true,
-			"settingSendCookies": true,
-			"settingDisableRenderRequestBody": false,
-			"settingEncodeUrl": true,
-			"settingRebuildPath": true,
-			"settingFollowRedirects": "global",
-			"_type": "request"
-		}
-	]
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-02-14T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "req_materials_get_all",
+      "parentId": "fld_materials",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/materials/",
+      "name": "Get All Materials",
+      "description": "Retrieve a list of all material formulations.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868800000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_materials_get_by_id",
+      "parentId": "fld_materials",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/materials/mat-001",
+      "name": "Get Material By ID",
+      "description": "Retrieve a specific material formulation by its ID.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868700000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_materials_create",
+      "parentId": "fld_materials",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/materials/",
+      "name": "Create Material",
+      "description": "Create a new material formulation.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"material_id\": \"mat-001\",\n\t\"name\": \"Super Alloy\",\n\t\"density\": {\n\t\t\"value\": 7.8,\n\t\t\"unit\": \"g/cm3\"\n\t},\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80,\n\t\t\t\"type\": \"Metal\"\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20,\n\t\t\t\"type\": \"Non-Metal\"\n\t\t}\n\t],\n\t\"properties\": {\n\t\t\"hardness\": \"high\"\n\t}\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868600000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_materials_delete",
+      "parentId": "fld_materials",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/materials/mat-001",
+      "name": "Delete Material",
+      "description": "Delete a material formulation by its ID.",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868500000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_costing_upsert_price",
+      "parentId": "fld_costing",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/costing/prices",
+      "name": "Upsert Price",
+      "description": "Create or update a component price.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"component_name\": \"Iron\",\n\t\"unit_price\": 15.50,\n\t\"unit\": \"kg\",\n\t\"currency\": \"USD\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868800000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_costing_calculate",
+      "parentId": "fld_costing",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/costing/calculate-cost",
+      "name": "Calculate Cost",
+      "description": "Calculate the cost of a material formulation.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"material_id\": \"mat-001\",\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20\n\t\t}\n\t],\n\t\"desired_margin_percent\": 25.0\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868700000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_populator_generate",
+      "parentId": "fld_populator",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/populate/",
+      "name": "Generate Data",
+      "description": "Trigger a job to generate random material data.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"target\": \"materials\",\n\t\"count\": 10\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868800000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "env_local",
+      "parentId": "wrk_1",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "LocalStack Environment",
+      "data": {
+        "base_url": "http://localhost:4566/restapis/API_ID_HERE/prod/_user_request_"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url"
+        ]
+      },
+      "color": "#7d69cb",
+      "isPrivate": false,
+      "metaSortKey": 1707868800000,
+      "_type": "environment"
+    },
+    {
+      "_id": "wrk_1",
+      "parentId": null,
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "PoC Feature API",
+      "description": "API collection for PoC Feature microservices.",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "fld_materials",
+      "parentId": "wrk_1",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "Materials Service",
+      "description": "Endpoints for managing material formulations.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1707868800000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_costing",
+      "parentId": "wrk_1",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "Costing Service",
+      "description": "Endpoints for cost calculation and pricing.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1707868700000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_populator",
+      "parentId": "wrk_1",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "Populator Service",
+      "description": "Endpoints for data generation.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1707868600000,
+      "_type": "request_group"
+    }
+  ]
 }

@@ -61,6 +61,7 @@ _ReSharper*/
 # LocalStack / Docker volumes
 volume/
 lambda-publish/
+*-publish/
 
 # OS generated files
 .DS_Store

@@ -40,7 +40,14 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context) : IMate
     {
         try
         {
+            var existingEntity = await context.LoadAsync<MaterialEntity>(material.MaterialId);
             var entity = MapToEntity(material);
+
+            if (existingEntity != null)
+            {
+                entity.Version = existingEntity.Version;
+            }
+
             await context.SaveAsync(entity);
             return Result.Success();
         }
