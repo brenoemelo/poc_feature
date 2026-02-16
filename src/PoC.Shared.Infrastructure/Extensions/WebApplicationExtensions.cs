@@ -18,6 +18,7 @@ public static class WebApplicationExtensions
     /// <returns>The application for chaining.</returns>
     public static WebApplication UsePoCDefaults(this WebApplication app)
     {
+        app.UseMiddleware<TraceIdResponseMiddleware>();
         app.UseSerilogRequestLogging();
 
         app.UseExceptionHandler(exceptionHandlerApp =>
