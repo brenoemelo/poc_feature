@@ -88,12 +88,12 @@ if [ -f "/opt/deploy/PoC.Populator.zip" ]; then
   awslocal lambda create-function \
     --function-name "PoC-Populator-Worker" \
     --runtime dotnet8 \
-    --handler "PoC.Populator::PoC.Populator.PopulatorWorkerFunction::FunctionHandler" \
+    --handler "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler" \
     --role arn:aws:iam::000000000000:role/lambda-role \
     --zip-file fileb:///opt/deploy/PoC.Populator.zip \
     --timeout 30 \
     --memory-size 512 \
-    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events}"
+    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_}"
 
   # Event source mapping to SQS
   awslocal lambda create-event-source-mapping \

@@ -2,22 +2,19 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.Serialization.SystemTextJson;
 using FluentValidation;
 using PoC.Costing.API.Endpoints;
+using PoC.Costing.Domain.Interfaces;
+using PoC.Costing.Domain.Services;
 using PoC.Costing.Infrastructure;
+using PoC.Costing.Infrastructure.ExternalServices;
+using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Validators;
-using Serilog;
-using Serilog.Formatting.Compact;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, configuration) =>
-{
-    configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext()
-        .WriteTo.Console(new CompactJsonFormatter());
-});
+// Observability (Serilog + OpenTelemetry)
+builder.AddPoCObservability("PoC-Costing", "1.0.0");
 
 // AWS Lambda Hosting
 Console.WriteLine("STARTING UP PoC.Costing with REST API");
@@ -26,38 +23,37 @@ builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 // Dependency Injection
 builder.Services.AddCostingInfrastructure(builder.Configuration);
 
+builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
+
+builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>(client =>
+{
+    var materialsUrl = builder.Configuration["MATERIALS_API_URL"] ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
+    client.BaseAddress = new Uri(materialsUrl);
+})
+.AddStandardResilienceHandler();
+
 // Validators
 builder.Services.AddValidatorsFromAssemblyContaining<ComponentPriceRequestValidator>();
 
 // JSON Configuration
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
 });
 
 var app = builder.Build();
 
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(new { error = "Internal Server Error" });
-    });
-});
+app.UsePoCDefaults();
 
-app.MapGroup("/costing")
+app.MapGroup("/api/v1/costing")
    .MapCostingEndpoints();
 
 app.Run();
 
 /// <summary>
-/// Entry point for tests.
+/// Program entry point.
 /// </summary>
 public partial class Program
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="Program"/> class.
-    /// </summary>
     protected Program() { }
 }

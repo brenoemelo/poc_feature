@@ -1,44 +1,23 @@
 using System.Text.Json.Serialization;
 
-using PoC.Shared.Common;
-
 namespace PoC.Shared.Models;
 
-public sealed class MaterialFormulation : BaseEntity
-{
-    [JsonPropertyName("material_id")]
-    public string MaterialId { get; set; } = string.Empty;
+public sealed record MaterialFormulation(
+    [property: JsonPropertyName("material_id")] string MaterialId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("density")] Density? Density,
+    [property: JsonPropertyName("formulation")] List<FormulationComponent> Formulation,
+    [property: JsonPropertyName("properties")] Dictionary<string, string> Properties,
+    [property: JsonPropertyName("version")] int? Version
+);
 
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
+public sealed record Density(
+    [property: JsonPropertyName("value")] double Value,
+    [property: JsonPropertyName("unit")] string Unit
+);
 
-    [JsonPropertyName("density")]
-    public Density? Density { get; set; }
-
-    [JsonPropertyName("formulation")]
-    public List<FormulationComponent> Formulation { get; set; } = new();
-
-    [JsonPropertyName("properties")]
-    public Dictionary<string, string> Properties { get; set; } = new();
-}
-
-public class Density
-{
-    [JsonPropertyName("value")]
-    public double Value { get; set; }
-
-    [JsonPropertyName("unit")]
-    public string Unit { get; set; } = string.Empty;
-}
-
-public class FormulationComponent
-{
-    [JsonPropertyName("component")]
-    public string Component { get; set; } = string.Empty;
-
-    [JsonPropertyName("percentage")]
-    public double Percentage { get; set; }
-
-    [JsonPropertyName("type")]
-    public string Type { get; set; } = string.Empty;
-}
+public sealed record FormulationComponent(
+    [property: JsonPropertyName("component")] string Component,
+    [property: JsonPropertyName("percentage")] double Percentage,
+    [property: JsonPropertyName("type")] string Type
+);

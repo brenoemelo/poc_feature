@@ -215,6 +215,15 @@ function Ensure-SnsTopicDeleted {
     Invoke-Aws -Service "sns" -Command "delete-topic" -Arguments @("--topic-arn", $TopicArn) -IgnoreError $true | Out-Null
 }
 
+function Ensure-DynamoDbTableDeleted {
+    param(
+        [string]$TableName
+    )
+    
+    Write-Log "Ensuring DynamoDB Table '$TableName' is deleted..." "Info"
+    Invoke-Aws -Service "dynamodb" -Command "delete-table" -Arguments @("--table-name", $TableName) -IgnoreError $true | Out-Null
+}
+
 function Ensure-S3BucketDeleted {
     param(
         [string]$BucketName

@@ -6,7 +6,12 @@ namespace PoC.Materials.Infrastructure.Persistence;
 public class MaterialEntity
 {
     [DynamoDBHashKey("material_id")]
+    [DynamoDBGlobalSecondaryIndexRangeKey("IX_Materials_By_Type")]
     public string MaterialId { get; set; } = string.Empty;
+
+    [DynamoDBGlobalSecondaryIndexHashKey("IX_Materials_By_Type")]
+    [DynamoDBProperty("record_type")]
+    public string RecordType { get; set; } = "MATERIAL";
 
     [DynamoDBProperty("name")]
     public string Name { get; set; } = string.Empty;

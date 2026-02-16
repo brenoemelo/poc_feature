@@ -1,0 +1,17 @@
+{
+    "resource": "/api/v1/materials",
+    "path": "/api/v1/materials",
+    "httpMethod": "GET",
+    "queryStringParameters": {
+        "limit": "100"
+    },
+    "requestContext": {
+        "resourcePath": "/api/v1/materials",
+        "httpMethod": "GET",
+        "path": "/prod/api/v1/materials"
+    },
+    "headers": {},
+    "multiValueHeaders": {},
+    "body": null,
+    "isBase64Encoded": false
+}

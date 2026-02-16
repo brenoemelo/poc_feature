@@ -5,7 +5,7 @@ namespace PoC.E2E.Common;
 
 public abstract class ApiTestBase
 {
-    protected RestClient Client { get; }
+    protected RestClient Client { get; set; }
     protected IConfiguration Config { get; }
 
     protected ApiTestBase()

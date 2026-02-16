@@ -1,12 +1,14 @@
+using System.Text.Json.Serialization;
+
 namespace PoC.Shared.Events;
 
-public class PriceUpdatedEvent : IEvent
+public sealed record PriceUpdatedEvent(
+    [property: JsonPropertyName("component_name")] string ComponentName,
+    [property: JsonPropertyName("unit_price")] decimal UnitPrice,
+    [property: JsonPropertyName("currency")] string Currency,
+    [property: JsonPropertyName("updated_at")] DateTime UpdatedAt
+) : IEvent
 {
-    public Guid EventId { get; set; } = Guid.NewGuid();
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    
-    public string ComponentName { get; set; } = string.Empty;
-    public decimal UnitPrice { get; set; }
-    public string Currency { get; set; } = string.Empty;
-    public DateTime UpdatedAt { get; set; }
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }

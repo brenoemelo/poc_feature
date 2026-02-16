@@ -9,21 +9,25 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddCostingInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
-        if (string.IsNullOrEmpty(serviceUrl))
+        var endpoint = configuration["AWS_ENDPOINT_URL"] ?? Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
+        
+        if (string.IsNullOrEmpty(endpoint))
         {
-            var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME") ?? "localhost";
-            var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
-            serviceUrl = $"http://{localStackHost}:{edgePort}";
+             var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME");
+             if (!string.IsNullOrEmpty(localStackHost))
+             {
+                 var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
+                 endpoint = $"http://{localStackHost}:{edgePort}";
+             }
         }
 
-        var dynamoConfig = new AmazonDynamoDBConfig
+        if (!string.IsNullOrEmpty(endpoint))
         {
-            ServiceURL = serviceUrl,
-            AuthenticationRegion = "us-east-1"
-        };
+            Environment.SetEnvironmentVariable("AWS_ENDPOINT_URL", endpoint);
+        }
 
-        services.AddSingleton<IAmazonDynamoDB>(sp => new AmazonDynamoDBClient(dynamoConfig));
+        services.AddAWSService<IAmazonDynamoDB>();
+
         services.AddScoped<IDynamoDBContext, DynamoDBContext>();
         services.AddScoped<ICostingRepository, DynamoDbCostingRepository>();
 

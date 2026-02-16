@@ -35,8 +35,8 @@ Expected Output:
 Use `curl` or PowerShell to hit the health check or list endpoint.
 
 ```bash
-# Replace <api-id> with the ID from above
-curl http://localhost:4566/restapis/<api-id>/prod/_user_request_/materials
+# The API ID is set to 'material-api' by default in the deployment scripts
+curl http://localhost:4566/restapis/material-api/prod/_user_request_/api/v1/materials
 ```
 
 ## 2. Lambda Functions
@@ -112,6 +112,9 @@ docker exec poc_feature-localstack-1 awslocal logs tail /aws/lambda/PoC-Populato
 docker exec poc_feature-localstack-1 awslocal logs tail /aws/lambda/PoC-Materials-Ingestion --follow
 docker exec poc_feature-localstack-1 awslocal logs tail /aws/lambda/PoC-Populator-Worker --follow
 ```
+
+> [!TIP]
+> **Advanced Tracing & Correlation:** The system now uses structured OTLP logging. For a detailed guide on how to link logs to traces and monitor performance metrics, see the [Observability Guide](observability.md).
 
 ## 3. Asynchronous Messaging (SQS & SNS)
 

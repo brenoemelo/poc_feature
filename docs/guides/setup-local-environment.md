@@ -72,7 +72,7 @@ If you need to deploy specific services, use the individual scripts in `deployme
    ```powershell
    ./deployment/localstack/gateway.ps1
    ```
-   This sets up the unified API at `http://localhost:4566/restapis/<api-id>/prod/_user_request_/`.
+   This sets up the unified API at `http://localhost:4566/restapis/material-api/prod/_user_request_/`.
 
 2. **Deploy Microservices**:
    ```powershell
@@ -108,9 +108,8 @@ Use the provided PowerShell script to verify all endpoints automatically:
 
 - Import `docs/api/insomnia_antigravity_v1.json` into Insomnia
 - Switch to the "LocalStack Environment"
-- Update the `base_url` variable by replacing `API_ID_HERE` with your actual API Gateway ID.
-  - Example: `http://localhost:4566/restapis/bgl2ladyeo/prod/_user_request_`
-- You can find the correct URL in the output of `./test_all_apis.ps1` or `./deploy-gateway.ps1`.
+- The `base_url` is pre-configured to `http://localhost:4566/restapis/material-api/prod/_user_request_`.
+- If you changed the ID manually, update the variable accordingly.
  
  ## Troubleshooting
 

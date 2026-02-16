@@ -1,8 +1,9 @@
 using FluentValidation;
+using PoC.Materials.API.Extensions;
 using PoC.Materials.Domain.Interfaces;
+using PoC.Shared.API;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
-using PoC.Shared.Validation;
 
 namespace PoC.Materials.API.Endpoints;
 
@@ -12,7 +13,11 @@ public static class MaterialsEndpoints
     {
         group.MapGet("/", GetAllMaterialsAsync)
              .WithName("GetMaterials")
-             .Produces<IEnumerable<MaterialFormulation>>();
+             .Produces<PagedResponse<MaterialFormulation>>();
+
+        group.MapGet("/count", GetMaterialCountAsync)
+             .WithName("GetMaterialCount")
+             .Produces<int>();
 
         group.MapGet("/{id}", GetMaterialByIdAsync)
              .WithName("GetMaterialById")
@@ -34,13 +39,34 @@ public static class MaterialsEndpoints
 
     private static async Task<IResult> GetAllMaterialsAsync(
         IMaterialRepository repository,
+        ILogger<Program> logger,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
+        int limit = 10,
+        string? cursor = null)
+    {
+        logger.LogInformation("[MaterialQuery] Listing materials (Limit: {Limit}, Cursor: {Cursor})", limit, cursor);
+        var result = await repository.GetAllAsync(limit, cursor);
+        
+        if (result.IsFailure)
+        {
+            logger.LogError("[MaterialQuery] Failed to list materials: {Error} - {Detail}", result.Error.Code, result.Error.Description);
+            return result.ToProblem();
+        }
+
+        var response = result.Value.ToPagedResponse(httpContext, linkGenerator, "GetMaterials", limit, cursor);
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetMaterialCountAsync(
+        IMaterialRepository repository,
         ILogger<Program> logger)
     {
-        logger.LogInformation("[MaterialQuery] Listing all materials");
-        var result = await repository.GetAllAsync();
-        
-        return result.IsSuccess 
-            ? Results.Ok(result.Value) 
+        logger.LogInformation("[MaterialQuery] Counting materials");
+        var result = await repository.GetCountAsync();
+
+        return result.IsSuccess
+            ? Results.Ok(new { count = result.Value })
             : result.ToProblem();
     }
 
@@ -72,11 +98,8 @@ public static class MaterialsEndpoints
         if (!validationResult.IsValid)
         {
             logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
-            var problemDetails = validationResult.ToProblemDetails();
-            return Results.Problem(
-                title: problemDetails.Title,
-                detail: string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)),
-                statusCode: StatusCodes.Status400BadRequest);
+            logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
+            return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
         var result = await repository.SaveAsync(input);
@@ -112,28 +135,5 @@ public static class MaterialsEndpoints
         }
 
         return Results.NoContent();
-    }
-
-    private static IResult ToProblem(this Result result)
-    {
-        if (result.IsSuccess)
-        {
-            throw new InvalidOperationException("Cannot convert success result to problem.");
-        }
-
-        var error = result.Error;
-
-        if (error == Error.NotFound)
-        {
-            return Results.Problem(
-                title: "Resource not found",
-                detail: error.Description,
-                statusCode: StatusCodes.Status404NotFound);
-        }
-
-        return Results.Problem(
-            title: "An error occurred",
-            detail: error.Description,
-            statusCode: StatusCodes.Status500InternalServerError);
     }
 }

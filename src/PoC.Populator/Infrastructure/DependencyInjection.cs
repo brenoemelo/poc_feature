@@ -1,4 +1,6 @@
 using Amazon.SQS;
+using FluentValidation;
+using PoC.Shared.Validators;
 
 namespace PoC.Populator.Infrastructure;
 
@@ -6,6 +8,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPopulatorInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddValidatorsFromAssemblyContaining<PopulationRequestValidator>();
+
         var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
         if (string.IsNullOrEmpty(serviceUrl))
         {

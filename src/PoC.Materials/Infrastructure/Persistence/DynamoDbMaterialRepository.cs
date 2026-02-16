@@ -1,23 +1,70 @@
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
+using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
+using System.Text;
 
 namespace PoC.Materials.Infrastructure.Persistence;
 
-public sealed class DynamoDbMaterialRepository(IDynamoDBContext context) : IMaterialRepository
+public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client) : IMaterialRepository
 {
-    public async Task<Result<IEnumerable<MaterialFormulation>>> GetAllAsync()
+    public async Task<Result<PagedResult<MaterialFormulation>>> GetAllAsync(int limit, string? cursor)
     {
         try
         {
-            var scan = context.ScanAsync<MaterialEntity>(default);
-            var entities = await scan.GetRemainingAsync();
-            return Result.Success(entities.Select(MapToDomain));
+            var tableName = Environment.GetEnvironmentVariable("MATERIALS_TABLE_NAME") ?? "materials-table";
+            var request = new QueryRequest
+            {
+                TableName = tableName,
+                IndexName = "IX_Materials_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue> 
+                {
+                    { ":v_type", new AttributeValue { S = "MATERIAL" } }
+                },
+                Limit = limit
+            };
+
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                try
+                {
+                    var json = Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
+                    var doc = Document.FromJson(json);
+                    request.ExclusiveStartKey = doc.ToAttributeMap();
+                }
+                catch
+                {
+                    return Result.Failure<PagedResult<MaterialFormulation>>(new Error("Pagination.InvalidCursor", "The provided cursor is invalid."));
+                }
+            }
+
+            var response = await client.QueryAsync(request);
+            
+            var items = new List<MaterialFormulation>();
+            foreach (var item in response.Items)
+            {
+                var doc = Document.FromAttributeMap(item);
+                var entity = context.FromDocument<MaterialEntity>(doc);
+                items.Add(MapToDomain(entity));
+            }
+
+            string? nextCursor = null;
+            if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
+            {
+                var lastKeyDoc = Document.FromAttributeMap(response.LastEvaluatedKey);
+                var json = lastKeyDoc.ToJson();
+                nextCursor = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            }
+
+            return Result.Success(new PagedResult<MaterialFormulation>(items, nextCursor));
         }
         catch (Exception ex)
         {
-            return Result.Failure<IEnumerable<MaterialFormulation>>(new Error("DynamoDb.Error", ex.Message));
+            return Result.Failure<PagedResult<MaterialFormulation>>(new Error("DynamoDb.Error", ex.Message));
         }
     }
 
@@ -36,18 +83,32 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context) : IMate
         }
     }
 
+    public async Task<Result<int>> GetCountAsync()
+    {
+        try
+        {
+            var tableName = Environment.GetEnvironmentVariable("MATERIALS_TABLE_NAME") ?? "materials-table";
+            var response = await client.DescribeTableAsync(tableName);
+            
+            // ItemCount is approximate, updated every 6 hours. 
+            // For a PoC/High-scale system, this is often preferred over scanning.
+            // If realtime count is needed, we should maintain a counter item.
+            var count = (int)response.Table.ItemCount;
+            return Result.Success(count);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<int>(new Error("DynamoDb.Error", ex.Message));
+        }
+    }
+
     public async Task<Result> SaveAsync(MaterialFormulation material)
     {
         try
         {
-            var existingEntity = await context.LoadAsync<MaterialEntity>(material.MaterialId);
+            // Optimistic Locking: We trust DynamoDBContext to handle the Version check.
+            // We do NOT manually copy the version unless we want to force an overwrite (which we don't).
             var entity = MapToEntity(material);
-
-            if (existingEntity != null)
-            {
-                entity.Version = existingEntity.Version;
-            }
-
             await context.SaveAsync(entity);
             return Result.Success();
         }
@@ -72,23 +133,13 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context) : IMate
 
     private static MaterialFormulation MapToDomain(MaterialEntity entity)
     {
-        return new MaterialFormulation
-        {
-            MaterialId = entity.MaterialId,
-            Name = entity.Name,
-            Density = entity.Density is null ? null : new Density
-            {
-                Value = entity.Density.Value,
-                Unit = entity.Density.Unit
-            },
-            Formulation = entity.Formulation.Select(f => new FormulationComponent
-            {
-                Component = f.Component,
-                Percentage = f.Percentage,
-                Type = f.Type
-            }).ToList(),
-            Properties = entity.Properties
-        };
+        return new MaterialFormulation(
+            entity.MaterialId,
+            entity.Name,
+            entity.Density is null ? null : new Density(entity.Density.Value, entity.Density.Unit),
+            entity.Formulation.Select(f => new FormulationComponent(f.Component, f.Percentage, f.Type)).ToList(),
+            entity.Properties,
+            entity.Version);
     }
 
     private static MaterialEntity MapToEntity(MaterialFormulation domain)
@@ -108,7 +159,8 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context) : IMate
                 Percentage = f.Percentage,
                 Type = f.Type
             }).ToList(),
-            Properties = domain.Properties
+            Properties = domain.Properties,
+            Version = domain.Version
         };
     }
 }

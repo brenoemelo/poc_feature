@@ -176,22 +176,24 @@ poc_feature/
 
 Material management service with three Lambda functions:
 
-- `poc-materials-api` - Create and query materials (POST/GET /materials)
+- `poc-materials-api` - Create and query materials (POST/GET /api/v1/materials)
 - `poc-ingestion-worker` - Consume SNS events and persist to DynamoDB
 
 ### PoC.Populator
 
 Synthetic data generation service:
 
-- `poc-populator-api` - Accept population requests (POST /populate)
+- `poc-populator-api` - Accept population requests (POST /api/v1/populator/jobs)
 - `poc-populator-worker` - Generate and publish materials via SNS
 
 ### PoC.Costing
 
 Cost calculation and pricing service:
 
-- `poc-costing-price-mgmt` - Manage component prices (PUT /prices)
-- `poc-costing-engine` - Calculate material costs (POST /calculate-cost)
+- `poc-costing-lambda` - Unified service for prices and estimations
+- `PUT /api/v1/costing/prices` - Manage component prices
+- `POST /api/v1/costing/estimations` - Calculate material costs
+- `GET /api/v1/costing/estimations/batch` - Bulk cost calculation
 
 ## 🧪 Testing Strategy
 
@@ -224,17 +226,20 @@ dotnet test tests/PoC.E2E
 - CRUD operations
 - Event-driven workflows
 - Cost calculations
+- Bulk estimations (Batch)
 
 ## 📖 API Endpoints
 
-| Method | Endpoint           | Service    | Description                |
-|--------|--------------------|------------|----------------------------|
-| GET    | /materials         | Materials  | List all materials         |
-| GET    | /materials/{id}    | Materials  | Get material by ID         |
-| POST   | /materials         | Materials  | Create material            |
-| POST   | /populate          | Populator  | Generate test data         |
-| PUT    | /prices            | Costing    | Upsert component price     |
-| POST   | /calculate-cost    | Costing    | Calculate material cost    |
+| Method | Endpoint                    | Service    | Description                    |
+|--------|-----------------------------|------------|--------------------------------|
+| GET    | /api/v1/materials           | Materials  | List all materials (Paged)      |
+| GET    | /api/v1/materials/{id}      | Materials  | Get material by ID             |
+| POST   | /api/v1/materials           | Materials  | Create material                |
+| DELETE | /api/v1/materials/{id}      | Materials  | Delete material                |
+| POST   | /api/v1/populator/jobs      | Populator  | Generate test data             |
+| POST   | /api/v1/costing/prices      | Costing    | Upsert component price         |
+| POST   | /api/v1/costing/estimations | Costing    | Calculate material cost        |
+| GET    | /api/v1/costing/estimations/batch | Costing | Bulk cost calculation       |
 
 ## 🎨 Design Principles
 

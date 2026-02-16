@@ -72,6 +72,10 @@ Every line of code must adhere to these principles. Violations are considered im
 * **Correlation ID:** Every log entry must include a `TraceId` or `CorrelationId`.
 * **Security:** **STRICTLY FORBIDDEN** to log PII or secrets.
 
+### 7.1. Performance Metrics (Warm-up & Runtime)
+* **Startup Tracking:** All services must measure and emit `app.startup_duration_ms` via OpenTelemetry.
+* **Runtime Stats:** `AddRuntimeInstrumentation` must be enabled to track JIT, GC, and ThreadPool usage, allowing diagnosis of Cold Start performance issues.
+
 ## 8. Version Control & Commits
 * **Conventional Commits:** Follow the standard (e.g., `feat(cart): add item limit`).
 * **Branching:** Trunk Based Development or Short-lived Feature Branches.
@@ -185,6 +189,32 @@ Do not create new endpoints for filtering. Use **Query Parameters**.
 * **Pattern:** `/api/v{number}/resource`
     * Example: `/api/v1/payments`
 * **Breaking Changes:** Never introduce breaking changes to an existing version. Create `/api/v2/payments` instead.
+
+### 14.6. Pagination Strategy (Cursor-based)
+* **No Offset Pagination:** Due to DynamoDB architectural constraints, standard "Skip/Take" (Offset) logic is **STRICTLY FORBIDDEN** for large collections.
+* **Cursor Pattern:** Use **Forward-Only Pagination** via Continuation Tokens.
+    * **Request:** Clients must send `?limit={n}&cursor={base64_token}`.
+    * **Response:** The API returns a `nextCursor` (encoded `LastEvaluatedKey`) in the metadata.
+* **Token Security:** Tokens must be Base64 encoded and treated as opaque strings by the client.
+
+### 14.7. HATEOAS (Hypermedia)
+* **Navigability:** The API must implement HATEOAS (Richardson Maturity Model Level 3). Clients should discover available actions via links, rather than hardcoded URL logic.
+* **Standard Envelope:** All collection endpoints must wrap the response in a standard envelope structure containing `data`, `meta`, and `links`:
+    ```json
+    {
+      "data": [ ... ],
+      "meta": {
+        "limit": 10,
+        "count": 5,
+        "nextCursor": "ewJ... (Base64)"
+      },
+      "links": [
+        { "rel": "self", "href": "https://api.../items?limit=10", "method": "GET" },
+        { "rel": "next", "href": "https://api.../items?limit=10&cursor=ewJ...", "method": "GET" }
+      ]
+    }
+    ```
+* **Link Object:** Must contain at least `rel` (relationship type), `href` (absolute URL), and `method` (HTTP Verb).
 
 ## 15. AI Collaboration Standards
 To maximize AI assistant efficiency (Trae, Cursor, Copilot), we maintain specific context files.

@@ -21,9 +21,11 @@ public class ArchitectureTests
             .HaveDependencyOn(PopulatorNamespace)
             .And()
             .HaveDependencyOn(CostingNamespace)
+            .And()
+            .HaveDependencyOn("PoC.Shared.Infrastructure")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, "Domain (PoC.Shared) should not depend on other layers.");
+        Assert.True(result.IsSuccessful, "Domain (PoC.Shared) should not depend on other layers or infrastructure.");
     }
 
     [Fact]
@@ -94,7 +96,7 @@ public class ArchitectureTests
     {
         var result = Types.InAssembly(typeof(PoC.Shared.AssemblyMarker).Assembly)
             .That()
-            .Inherit(typeof(PoC.Shared.Common.BaseEntity))
+            .ResideInNamespace("PoC.Shared.Models")
             .Should()
             .BeSealed()
             .Or()

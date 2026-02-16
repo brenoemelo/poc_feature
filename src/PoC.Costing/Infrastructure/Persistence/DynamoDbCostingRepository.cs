@@ -5,7 +5,7 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-public class DynamoDbCostingRepository(IDynamoDBContext context) : ICostingRepository
+public sealed class DynamoDbCostingRepository(IDynamoDBContext context) : ICostingRepository
 {
     public async Task<Result> UpsertPriceAsync(ComponentPriceRequest request)
     {

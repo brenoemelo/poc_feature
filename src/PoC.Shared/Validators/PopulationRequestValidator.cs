@@ -16,5 +16,21 @@ public class PopulationRequestValidator : AbstractValidator<PopulationRequest>
         RuleFor(x => x.Target)
             .NotEmpty()
             .WithMessage("Target is required.");
+
+        RuleFor(x => x.MinComponents)
+            .GreaterThanOrEqualTo(1)
+            .WithMessage("MinComponents must be at least 1.")
+            .LessThanOrEqualTo(1000)
+            .WithMessage("MinComponents must be at most 1000.")
+            .When(x => x.MinComponents.HasValue);
+
+        RuleFor(x => x.MaxComponents)
+            .GreaterThanOrEqualTo(1)
+            .WithMessage("MaxComponents must be at least 1.")
+            .LessThanOrEqualTo(1000)
+            .WithMessage("MaxComponents must be at most 1000.")
+            .GreaterThanOrEqualTo(x => x.MinComponents ?? 1)
+            .WithMessage("MaxComponents must be greater than or equal to MinComponents.")
+            .When(x => x.MaxComponents.HasValue);
     }
 }

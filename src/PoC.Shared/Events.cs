@@ -9,11 +9,10 @@ public interface IEvent
     DateTime Timestamp { get; }
 }
 
-public class MaterialCreatedEvent : IEvent
+public sealed record MaterialCreatedEvent(
+    [property: JsonPropertyName("material")] MaterialFormulation Material
+) : IEvent
 {
-    public Guid EventId { get; set; } = Guid.NewGuid();
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
-    [JsonPropertyName("material")]
-    public MaterialFormulation Material { get; set; } = new();
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }

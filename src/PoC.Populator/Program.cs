@@ -2,20 +2,14 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.Serialization.SystemTextJson;
 using PoC.Populator.API.Endpoints;
 using PoC.Populator.Infrastructure;
-using Serilog;
-using Serilog.Formatting.Compact;
+using PoC.Shared.Infrastructure.Extensions;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, configuration) =>
-{
-    configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext()
-        .WriteTo.Console(new CompactJsonFormatter());
-});
+// Observability (Serilog + OpenTelemetry)
+builder.AddPoCObservability("PoC-Populator", "1.0.0");
 
 // AWS Lambda Hosting
 Console.WriteLine("STARTING UP PoC.Populator with REST API");
@@ -32,16 +26,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(new { error = "Internal Server Error" });
-    });
-});
+app.UsePoCDefaults();
 
-app.MapGroup("/populate")
+app.MapGroup("/api/v1/populator")
    .MapPopulatorEndpoints();
 
 app.Run();

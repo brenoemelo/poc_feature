@@ -53,14 +53,14 @@ Write-Log "--- STARTING 100% CLEANUP ---" "Warning"
 # Delete Functions
 Ensure-LambdaDeleted -FunctionName $FunctionName
 $WorkerFunctionName = "PoC-Populator-Worker"
-$WorkerQueueArn = "arn:aws:sqs:${Region}:000000000000:population-jobs-queue"
+$WorkerQueueArn = "arn:aws:sqs:${Region}:000000000000:populator-queue"
 Ensure-LambdaDeleted -FunctionName $WorkerFunctionName -EventSourceArn $WorkerQueueArn
 
 # Delete Queues and Topics
 $TopicArn = "arn:aws:sns:us-east-1:000000000000:population-requests"
 Ensure-SnsTopicDeleted -TopicArn $TopicArn
 
-$QueueUrl = "$EndpointUrl/000000000000/population-jobs-queue"
+$QueueUrl = "$EndpointUrl/000000000000/populator-queue"
 Ensure-SqsDeleted -QueueUrl $QueueUrl
 
 Write-Log "--- CLEANUP COMPLETED ---" "Success"
@@ -78,7 +78,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
-    "--memory-size", "512",
+    "--memory-size", "1024",
     "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
 ) | Out-Null
 
@@ -91,8 +91,8 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
-    "--memory-size", "512",
-    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+    "--memory-size", "1024",
+    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events}"
 ) | Out-Null
 
 # 3. Configure Function URL & Public Access
@@ -115,12 +115,12 @@ Write-Log "Creating SNS Topic: population-requests" "Info"
 Invoke-Aws -Service "sns" -Command "create-topic" -Arguments @("--name", "population-requests") | Out-Null
 
 # 5. Create SQS Queue
-Write-Log "Creating SQS Queue: population-jobs-queue" "Info"
-Invoke-Aws -Service "sqs" -Command "create-queue" -Arguments @("--queue-name", "population-jobs-queue") | Out-Null
+Write-Log "Creating SQS Queue: populator-queue" "Info"
+Invoke-Aws -Service "sqs" -Command "create-queue" -Arguments @("--queue-name", "populator-queue") | Out-Null
 
 # 6. Subscribe Queue to Topic
 Write-Log "Subscribing Queue to Topic..." "Info"
-$QueueArn = "arn:aws:sqs:us-east-1:000000000000:population-jobs-queue"
+$QueueArn = "arn:aws:sqs:us-east-1:000000000000:populator-queue"
 Invoke-Aws -Service "sns" -Command "subscribe" -Arguments @(
     "--topic-arn", $TopicArn,
     "--protocol", "sqs",

@@ -43,7 +43,7 @@ public class CostingApiTests : ApiTestBase
             Unit: "kg",
             Currency: "USD");
 
-        var request = new RestRequest("/costing/prices", Method.Post)
+        var request = new RestRequest("/api/v1/costing/prices", Method.Post)
             .AddJsonBody(requestBody);
 
         var response = await Client.ExecuteAsync(request);
@@ -77,7 +77,7 @@ public class CostingApiTests : ApiTestBase
             },
             DesiredMarginPercent: 20);
 
-        var request = new RestRequest("/costing/calculate-cost", Method.Post)
+        var request = new RestRequest("/api/v1/costing/estimations", Method.Post)
             .AddJsonBody(calculationRequest);
 
         var response = await Client.ExecuteAsync<CostCalculationResponse>(request);
@@ -107,7 +107,7 @@ public class CostingApiTests : ApiTestBase
             },
             DesiredMarginPercent: null);
 
-        var request = new RestRequest("/costing/calculate-cost", Method.Post)
+        var request = new RestRequest("/api/v1/costing/estimations", Method.Post)
             .AddJsonBody(calculationRequest);
 
         var response = await Client.ExecuteAsync(request);
@@ -124,7 +124,7 @@ public class CostingApiTests : ApiTestBase
             Unit: "kg",
             Currency: "USD");
 
-        var request = new RestRequest("/costing/prices", Method.Post)
+        var request = new RestRequest("/api/v1/costing/prices", Method.Post)
             .AddJsonBody(requestBody);
 
         var response = await Client.ExecuteAsync(request);

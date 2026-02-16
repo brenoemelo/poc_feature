@@ -9,7 +9,7 @@
       "parentId": "fld_materials",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/materials/",
+      "url": "{{ _.base_url }}/api/v1/materials/",
       "name": "Get All Materials",
       "description": "Retrieve a list of all material formulations.",
       "method": "GET",
@@ -28,11 +28,34 @@
       "_type": "request"
     },
     {
+      "_id": "req_materials_count",
+      "parentId": "fld_materials",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/api/v1/materials/count",
+      "name": "Get Material Count",
+      "description": "Retrieve the total count of material formulations.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868750000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
       "_id": "req_materials_get_by_id",
       "parentId": "fld_materials",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/materials/mat-001",
+      "url": "{{ _.base_url }}/api/v1/materials/mat-001",
       "name": "Get Material By ID",
       "description": "Retrieve a specific material formulation by its ID.",
       "method": "GET",
@@ -55,7 +78,7 @@
       "parentId": "fld_materials",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/materials/",
+      "url": "{{ _.base_url }}/api/v1/materials/",
       "name": "Create Material",
       "description": "Create a new material formulation.",
       "method": "POST",
@@ -86,7 +109,7 @@
       "parentId": "fld_materials",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/materials/mat-001",
+      "url": "{{ _.base_url }}/api/v1/materials/mat-001",
       "name": "Delete Material",
       "description": "Delete a material formulation by its ID.",
       "method": "DELETE",
@@ -109,7 +132,7 @@
       "parentId": "fld_costing",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/costing/prices",
+      "url": "{{ _.base_url }}/api/v1/costing/prices",
       "name": "Upsert Price",
       "description": "Create or update a component price.",
       "method": "POST",
@@ -140,7 +163,7 @@
       "parentId": "fld_costing",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/costing/calculate-cost",
+      "url": "{{ _.base_url }}/api/v1/costing/estimations",
       "name": "Calculate Cost",
       "description": "Calculate the cost of a material formulation.",
       "method": "POST",
@@ -167,17 +190,40 @@
       "_type": "request"
     },
     {
+      "_id": "req_costing_calculate_batch",
+      "parentId": "fld_costing",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/api/v1/costing/estimations/batch",
+      "name": "Calculate Batch Cost",
+      "description": "Calculate costs for all materials in the system.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868600000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
       "_id": "req_populator_generate",
       "parentId": "fld_populator",
       "modified": 1707868800000,
       "created": 1707868800000,
-      "url": "{{ _.base_url }}/populate/",
-      "name": "Generate Data",
+      "url": "{{ _.base_url }}/api/v1/populator/jobs",
+      "name": "Generate Materials",
       "description": "Trigger a job to generate random material data.",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n\t\"target\": \"materials\",\n\t\"count\": 10\n}"
+        "text": "{\n\t\"target\": \"materials\",\n\t\"count\": 10,\n\t\"minComponents\": 10,\n\t\"maxComponents\": 30\n}"
       },
       "parameters": [],
       "headers": [
@@ -198,13 +244,44 @@
       "_type": "request"
     },
     {
+      "_id": "req_populator_ensure_prices",
+      "parentId": "fld_populator",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "{{ _.base_url }}/api/v1/populator/jobs",
+      "name": "Ensure Prices",
+      "description": "Trigger a job to ensure all components in materials have prices.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"target\": \"ensure-prices\",\n\t\"count\": 100\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868750000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
       "_id": "env_local",
       "parentId": "wrk_1",
       "modified": 1707868800000,
       "created": 1707868800000,
       "name": "LocalStack Environment",
       "data": {
-        "base_url": "http://localhost:4566/restapis/API_ID_HERE/prod/_user_request_"
+        "base_url": "http://localhost:4566/restapis/material-api/prod/_user_request_"
       },
       "dataPropertyOrder": {
         "&": [

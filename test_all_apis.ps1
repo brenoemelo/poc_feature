@@ -16,10 +16,11 @@ $BaseUrl = $null
 function Test-ApiUrl {
     param($Url)
     try {
-        $testPath = "$Url/materials" # Use a known safe GET path
+        $testPath = "$Url/api/v1/materials" # Use a known safe GET path
         $response = Invoke-RestMethod -Uri $testPath -Method GET -ErrorAction Stop
         return $true
-    } catch {
+    }
+    catch {
         # 404 means service reachable but path/resource not found (which might be okay if just testing base URL connectivity, but here we expect /materials to exist)
         # However, for LocalStack Custom Domain 404, it means the routing failed.
         return $false
@@ -31,7 +32,8 @@ if ($API_FIXED_URL) {
     if (Test-ApiUrl $API_FIXED_URL) {
         $BaseUrl = $API_FIXED_URL
         Write-Host " OK" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host " Unreachable/404 (Skipping)" -ForegroundColor Red
     }
 }
@@ -42,7 +44,8 @@ if (-not $BaseUrl) {
         $DynamicUrl = "http://localhost:4566/restapis/$ApiId/prod/_user_request_"
         Write-Host "Using API ID from .env.local: $ApiId" -ForegroundColor Cyan
         $BaseUrl = $DynamicUrl
-    } else {
+    }
+    else {
         # Default fallback
         $ApiId = "material-api"
         $BaseUrl = "http://localhost:4566/restapis/$ApiId/prod/_user_request_"
@@ -64,8 +67,8 @@ function Invoke-Api {
     
     try {
         $params = @{
-            Method = $Method
-            Uri = $Uri
+            Method      = $Method
+            Uri         = $Uri
             ContentType = "application/json"
         }
         if ($Body) {
@@ -93,44 +96,44 @@ Write-Host "`n--- Testing PoC.Materials ---" -ForegroundColor Yellow
 $materialId = "mat-" + (Get-Random)
 $material = @{
     material_id = $materialId
-    name = "Test Material $materialId"
+    name        = "Test Material $materialId"
     formulation = @(
         @{ component = "Polycarbonate"; percentage = 80.0; type = "Polymer" }
         @{ component = "CarbonFiber"; percentage = 20.0; type = "Reinforcement" }
     )
 } | ConvertTo-Json -Depth 5
 
-$created = Invoke-Api -Method POST -Path "/materials" -Body $material
+$created = Invoke-Api -Method POST -Path "/api/v1/materials" -Body $material
 
 # 2. Get All Materials
-$all = Invoke-Api -Method GET -Path "/materials"
-if ($all -and $all.Count -gt 0) { Write-Host "Found $($all.Count) materials." }
+$all = Invoke-Api -Method GET -Path "/api/v1/materials"
+if ($all -and $all.items -and $all.items.Count -ge 0) { Write-Host "Found $($all.items.Count) materials (Page 1)." }
 
 # 3. Get Specific Material
 if ($created) {
-    Invoke-Api -Method GET -Path "/materials/$materialId" | Out-Null
+    Invoke-Api -Method GET -Path "/api/v1/materials/$materialId" | Out-Null
 }
 
 Write-Host "`n--- Testing PoC.Costing ---" -ForegroundColor Yellow
 # 1. Upsert Price 1
 $price1 = @{
     component_name = "Polycarbonate"
-    unit_price = 5.50
-    unit = "kg"
-    currency = "USD"
+    unit_price     = 5.50
+    unit           = "kg"
+    currency       = "USD"
 } | ConvertTo-Json
 
-Invoke-Api -Method POST -Path "/costing/prices" -Body $price1 | Out-Null
+Invoke-Api -Method POST -Path "/api/v1/costing/prices" -Body $price1 | Out-Null
 
 # 2. Upsert Price 2
 $price2 = @{
     component_name = "CarbonFiber"
-    unit_price = 25.00
-    unit = "kg"
-    currency = "USD"
+    unit_price     = 25.00
+    unit           = "kg"
+    currency       = "USD"
 } | ConvertTo-Json
 
-Invoke-Api -Method POST -Path "/costing/prices" -Body $price2 | Out-Null
+Invoke-Api -Method POST -Path "/api/v1/costing/prices" -Body $price2 | Out-Null
 
 # 3. Calculate Cost
 $calcReq = @{
@@ -141,17 +144,28 @@ $calcReq = @{
     )
 } | ConvertTo-Json
 
-Invoke-Api -Method POST -Path "/costing/calculate-cost" -Body $calcReq | Out-Null
+Invoke-Api -Method POST -Path "/api/v1/costing/estimations" -Body $calcReq | Out-Null
 
 
 Write-Host "`n--- Testing PoC.Populator ---" -ForegroundColor Yellow
 # 1. Trigger Population
 $popReq = @{
     target = "materials"
-    count = 10
+    count  = 10
 } | ConvertTo-Json
 
-Invoke-Api -Method POST -Path "/populate" -Body $popReq | Out-Null
+Invoke-Api -Method POST -Path "/api/v1/populator/jobs" -Body $popReq | Out-Null
+
+
+# 4. Calculate Batch Cost
+Write-Host "Testing Batch Cost..." -NoNewline
+$batch = Invoke-Api -Method GET -Path "/api/v1/costing/estimations/batch"
+if ($batch -and $batch.Count -ge 0) {
+    Write-Host " OK - Calculated costs for $($batch.Count) materials" -ForegroundColor Green
+}
+else {
+    Write-Host " FAILED or Empty" -ForegroundColor Red
+}
 
 Write-Host "`n--- Tests Completed ---" -ForegroundColor Green
 

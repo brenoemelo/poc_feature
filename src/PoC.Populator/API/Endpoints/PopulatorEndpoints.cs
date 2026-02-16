@@ -1,7 +1,7 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using PoC.Shared.Common;
 using PoC.Shared.Models;
 using System.Text.Json;
 
@@ -11,7 +11,7 @@ public static class PopulatorEndpoints
 {
     public static RouteGroupBuilder MapPopulatorEndpoints(this RouteGroupBuilder group)
     {
-        group.MapPost("/", HandlePopulationRequestAsync)
+        group.MapPost("/jobs", HandlePopulationRequestAsync)
              .WithName("CreatePopulationJob");
 
         return group;
@@ -19,17 +19,14 @@ public static class PopulatorEndpoints
 
     private static async Task<IResult> HandlePopulationRequestAsync(
         [FromBody] PopulationRequest request,
+        [FromServices] IValidator<PopulationRequest> validator,
         [FromServices] IAmazonSQS sqsClient,
         [FromServices] ILogger<Program> logger)
     {
-        if (request == null || request.Count <= 0)
+        var validationResult = await validator.ValidateAsync(request);
+        if (!validationResult.IsValid)
         {
-            return Result.Failure(new Error("Validation.Error", "Invalid count")).ToProblem();
-        }
-
-        if (request.Count > 100000)
-        {
-            return Result.Failure(new Error("Validation.Error", "Count exceeds limit of 100,000")).ToProblem();
+            return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
         int batchSize = 250;
@@ -52,11 +49,11 @@ public static class PopulatorEndpoints
         {
             int currentBatchSize = (i == totalBatches - 1) ? request.Count - (i * batchSize) : batchSize;
 
-            var job = new PopulationJob
-            {
-                Target = request.Target,
-                BatchSize = currentBatchSize
-            };
+            var job = new PopulationJob(
+                request.Target,
+                currentBatchSize,
+                request.MinComponents,
+                request.MaxComponents);
 
             var message = new SendMessageRequest
             {
@@ -75,28 +72,5 @@ public static class PopulatorEndpoints
             total_records = request.Count,
             batches_queued = totalBatches
         });
-    }
-
-    private static IResult ToProblem(this Result result)
-    {
-        if (result.IsSuccess)
-        {
-            throw new InvalidOperationException("Cannot convert success result to problem.");
-        }
-
-        var error = result.Error;
-
-        if (error == Error.NotFound)
-        {
-            return Results.Problem(
-                title: "Resource not found",
-                detail: error.Description,
-                statusCode: StatusCodes.Status404NotFound);
-        }
-
-        return Results.Problem(
-            title: "An error occurred",
-            detail: error.Description,
-            statusCode: StatusCodes.Status400BadRequest); // Default to BadRequest for validation errors here
     }
 }

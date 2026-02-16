@@ -1,13 +1,17 @@
+using System.Text.Json.Serialization;
+
 namespace PoC.Shared.Models;
 
-public class PopulationRequest
-{
-    public string Target { get; set; } = "materials";
-    public int Count { get; set; }
-}
+public sealed record PopulationRequest(
+    [property: JsonPropertyName("target")] string Target = "materials",
+    [property: JsonPropertyName("count")] int Count = 0,
+    [property: JsonPropertyName("min_components")] int? MinComponents = null,
+    [property: JsonPropertyName("max_components")] int? MaxComponents = null
+);
 
-public class PopulationJob
-{
-    public string Target { get; set; } = string.Empty;
-    public int BatchSize { get; set; }
-}
+public sealed record PopulationJob(
+    [property: JsonPropertyName("target")] string Target,
+    [property: JsonPropertyName("batch_size")] int BatchSize,
+    [property: JsonPropertyName("min_components")] int? MinComponents,
+    [property: JsonPropertyName("max_components")] int? MaxComponents
+);

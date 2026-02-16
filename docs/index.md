@@ -10,6 +10,7 @@ Welcome to the **Material Formulation System** documentation. This project is a 
 - [ADR 002: Costing Engine Architecture](adr/002-costing-engine-architecture.md)
 - [ADR 0001: Use DynamoDB](adr/0001-use-dynamodb.md)
 - [ADR 0002: Use Clean Architecture](adr/0002-use-clean-architecture.md)
+- [ADR 003: Shared Observability Library](adr/003-shared-observability-library.md)
 
 ### Concepts
 
@@ -20,6 +21,7 @@ Welcome to the **Material Formulation System** documentation. This project is a 
 
 - [Setup Local Environment](guides/setup-local-environment.md) - Get started with LocalStack
 - [Deployment Health Check](guides/deployment-health.md) - Verify deployment status and logs
+- [Observability Guide](guides/observability.md) - Monitoring, Tracing, and Logging walkthrough
 
 ### API Documentation
 
@@ -55,8 +57,10 @@ dotnet test tests/PoC.E2E/PoC.E2E.csproj
 ## 📖 Key Features
 
 - **Material Formulation Management** - Create and query material compositions
-- **Automated Data Population** - Generate thousands of test records
-- **Cost Calculation Engine** - Calculate material costs with margin analysis
+- **Pagination & HATEOAS** - Cursor-based navigation for large datasets
+- [x] Automated Data Population - Generate thousands of test records
+- [x] Vendor-Agnostic Observability - Centralized monitoring with OpenTelemetry & OTLP
+- [x] Cost Calculation Engine - Calculate material costs with margin analysis
 - **Event-Driven Architecture** - Decoupled services using SNS/SQS
 - **FluentValidation** - Business rule enforcement
 - **RFC 7807 ProblemDetails** - Standardized error responses

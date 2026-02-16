@@ -6,6 +6,7 @@
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <AWSProjectType>Lambda</AWSProjectType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PublishReadyToRun>true</PublishReadyToRun>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -13,18 +14,19 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
+    <ProjectReference Include="../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.7.2" />
-    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
+    <PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.1" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.400" />
     <PackageReference Include="Amazon.Lambda.Core" Version="2.5.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.4" />
     <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.7.1" />
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.301" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.400" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.2.0" />
   </ItemGroup>
 
   <ItemGroup>

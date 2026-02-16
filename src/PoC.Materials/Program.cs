@@ -3,22 +3,16 @@ using Amazon.Lambda.Serialization.SystemTextJson;
 using FluentValidation;
 using PoC.Materials.API.Endpoints;
 using PoC.Materials.Infrastructure;
+using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Validators;
-using Serilog;
-using Serilog.Formatting.Compact;
 using System.Text.Json;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, configuration) =>
-{
-    configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext()
-        .WriteTo.Console(new CompactJsonFormatter());
-});
+// Observability (Serilog + OpenTelemetry)
+builder.AddPoCObservability("PoC-Materials", "1.0.0");
 
 Console.WriteLine("STARTING UP PoC.Materials with REST API");
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
@@ -35,34 +29,17 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/problem+json";
-        await context.Response.WriteAsJsonAsync(new
-        {
-            type = "about:blank",
-            title = "Internal Server Error",
-            status = StatusCodes.Status500InternalServerError,
-            detail = "An unexpected error occurred"
-        });
-    });
-});
+app.UsePoCDefaults();
 
-app.MapGroup("/materials")
+app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();
 
 app.Run();
 
 /// <summary>
-/// Entry point for tests.
+/// Program entry point.
 /// </summary>
 public partial class Program
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="Program"/> class.
-    /// </summary>
     protected Program() { }
 }

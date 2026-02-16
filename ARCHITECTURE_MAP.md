@@ -22,7 +22,9 @@ This file provides a high-level overview of the project structure, architecture,
     ... (Same structure as Materials)
 
   /PoC.Populator         # [Service] Seeding tool for data
-    ... (Same structure as Materials)
+    /API/Endpoints       # Minimal API Definitions
+    /Domain/Services     # Population Strategies
+    /Functions           # Lambda Worker (SQS Processor)
 
   /PoC.Shared            # [Shared Kernel] Common DTOs, Results, Validators
     /Common              # BaseEntity, Result Pattern
@@ -32,7 +34,7 @@ This file provides a high-level overview of the project structure, architecture,
 
 ## 3. Request Flow (Data Path)
 
-**Example: `POST /materials`**
+**Example: `POST /api/v1/materials`**
 
 1.  **API Gateway**: Routes request to `PoC-Materials` Lambda.
 2.  **Lambda Entry (`Program.cs`)**: Bootstraps ASP.NET Core on Lambda.
@@ -52,20 +54,13 @@ This file provides a high-level overview of the project structure, architecture,
 > Used for: API Request/Response & Persistence (currently shared model)
 
 ```csharp
-public sealed class MaterialFormulation : BaseEntity
-{
-    [JsonPropertyName("material_id")]
-    public string MaterialId { get; set; }
-
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
-
-    [JsonPropertyName("density")]
-    public Density? Density { get; set; }
-
-    [JsonPropertyName("formulation")]
-    public List<FormulationComponent> Formulation { get; set; }
-}
+public sealed record MaterialFormulation(
+    string MaterialId,
+    string Name,
+    Density? Density,
+    List<FormulationComponent> Formulation,
+    Dictionary<string, string> Properties,
+    int? Version) : IEvent; // Example interface if applicable
 ```
 
 **Result Pattern (Error Handling)**
@@ -90,3 +85,11 @@ public async Task<Result<MaterialFormulation>> GetByIdAsync(string id) { ... }
 - **Validation**: FluentValidation is required for all write operations.
 - **Logging**: Serilog is used; structured logging required (`logger.LogInformation("Processing {Id}", id)`).
 - **URLs**: LocalStack API Base URL is static: `http://localhost:4566/restapis/material-api/prod/_user_request_`.
+
+## 7. Pagination & HATEOAS
+
+- **Strategy**: Cursor-based pagination (Forward-only) for efficiency with DynamoDB.
+- **Implementation**:
+  - **Repository**: Accepts `limit` and `cursor` (Base64 encoded `LastEvaluatedKey`). Returns `PagedResult<T>` with `Cursor`.
+  - **API**: Returns `PagedResponse<T>` containing `data`, `meta` (limit, count), and `links` (HATEOAS).
+  - **Links**: `self` and `next` (if more pages exist). Generated using `LinkGenerator`.

@@ -18,6 +18,7 @@ public sealed class MaterialFormulation : BaseEntity
     public Density? Density { get; set; }
     public List<FormulationComponent> Formulation { get; set; }
     public Dictionary<string, string> Properties { get; set; }
+    public int? Version { get; set; }
 }
 ```
 

@@ -16,16 +16,15 @@
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.7.2" />
     <PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.0" />
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.301" />
-    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.400" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.400" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PoC.Shared\PoC.Shared.csproj" />
+    <ProjectReference Include="..\PoC.Shared.Infrastructure\PoC.Shared.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
