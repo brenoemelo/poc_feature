@@ -338,6 +338,103 @@
       "environmentPropertyOrder": null,
       "metaSortKey": -1707868600000,
       "_type": "request_group"
+    },
+    {
+      "_id": "fld_feature_flags",
+      "parentId": "wrk_1",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "name": "Feature Flags (GoFeatureFlag)",
+      "description": "Management endpoints for the Feature Flag relay proxy.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1707868500000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_ff_health",
+      "parentId": "fld_feature_flags",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "http://localhost:1031/health",
+      "name": "Health Check",
+      "description": "Check if the GoFeatureFlag proxy is running.",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1707868800000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_ff_all_flags",
+      "parentId": "fld_feature_flags",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "http://localhost:1031/v1/allflags",
+      "name": "Get All Flags",
+      "description": "Retrieve the current state of all flags for a specific user.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"user\": {\n\t\t\"key\": \"anonymous\"\n\t}\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868700000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_ff_eval",
+      "parentId": "fld_feature_flags",
+      "modified": 1707868800000,
+      "created": 1707868800000,
+      "url": "http://localhost:1031/v1/feature/price-ingestion/eval",
+      "name": "Evaluate Flag",
+      "description": "Test evaluation of a specific flag.",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"user\": {\n\t\t\"key\": \"test-user\",\n\t\t\"custom\": {\n\t\t\t\"email\": \"test@example.com\"\n\t\t}\n\t},\n\t\"defaultValue\": false\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1707868600000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
     }
   ]
 }

@@ -1,0 +1,9 @@
+# GO Feature Flag Relay Proxy Configuration
+# Docs: https://gofeatureflag.org/docs/relay_proxy/configure_relay_proxy
+
+retriever:
+  kind: file
+  path: /config/flags.yaml
+
+listen: 1031
+enableSwagger: true

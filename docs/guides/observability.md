@@ -1,140 +1,66 @@
 # Observability Guide
 
-The PoC project implements a **vendor-agnostic observability stack** using the OpenTelemetry Protocol (OTLP). This guide explains how to monitor, debug, and trace the system using the provided **Local Observability Stack**.
+The PoC project uses a **Vendor-Agnostic** observability stack based on the **OpenTelemetry (OTel)** standard. This ensures we can switch backends (e.g., from Tempo to Datadog) without changing application code.
 
----
+## 1. The Stack (Local)
 
-## 🏗️ Architecture
-The observability stack is centrally managed in the `PoC.Shared.Infrastructure` library. Every microservice automatically inherits best-in-class instrumentation.
+We use a pre-configured Docker stack (`docker/observability/docker-compose.yaml`):
 
-- **Logging:** Structured JSON logs via Serilog.
-- **Tracing:** Distributed tracing with automatic context propagation.
-- **Metrics:** Performance tracking (e.g., startup duration).
-- **Correlation:** Every log entry is enriched with `TraceId` and `SpanId`.
+| Component | Role | Port |
+|---|---|---|
+| **OTel Collector** | The "Router". Receives telemetry from apps and forwards it. | `:4317` (gRPC), `:4318` (HTTP) |
+| **Tempo** | **Distributed Tracing** backend (stores traces). | Internal |
+| **Prometheus** | **Metrics** backend (stores time-series data). | `:9090` |
+| **Loki** | **Logging** backend (stores logs). | `:3100` |
+| **Grafana** | **Visualization** UI. | [`http://localhost:3000`](http://localhost:3000) |
 
----
+## 2. How to: Find a Trace
 
-## 🚀 Local Observability Stack (Docker)
+Tracing is the most powerful tool for debugging distributed transactions (e.g., API -> SNS -> Worker).
 
-We provide a complete pre-configured stack running in Docker.
+### Scenario: "My request failed, here is the Trace ID"
+When an API request fails, the API returns a `traceId` field in the ProblemDetails JSON.
 
-### 1. Requirements
-- Docker Desktop / Docker Compose
-- `poc-net` network must exist (usually created by the main `docker-compose.yaml`):
-  ```bash
-  docker network create poc-net || true
-  ```
+1. Copy the `traceId` (e.g., `5b8aa5a2d2c872e9...`).
+2. Open **Grafana** -> **Explore**.
+3. Select **Tempo** as the datasource.
+4. Paste the ID into the "Trace ID" field and run query.
+5. **Result:** You will see a Gantt chart showing:
+   - The API Latency.
+   - DynamoDB calls.
+   - SNS Publishing.
+   - (If configured) The async worker processing the message.
 
-### 2. Start the Stack
-Run the following command from the repository root:
+### Scenario: "I want to see traces for a specific error"
+1. Select **Loki** datasource.
+2. Query logs with error level: `{app="PoC.Materials"} |= "error"`.
+3. Expand a log line.
+4. Click the **"Tempo"** button next to the `TraceID` field.
 
-```bash
-docker compose -f docker/observability/docker-compose.yaml up -d
-```
+## 3. Metrics & Performance
 
-This will start:
-- **OTel Collector** (`:4317` gRPC / `:4318` HTTP / `:8889` Prom)
-- **Tempo** (Traces)
-- **Prometheus** (Metrics)
-- **Loki** (Logs)
-- **Grafana** (`http://localhost:3000`)
+We track key metrics to ensure system health.
 
-### 3. Connect .NET Services
-To send telemetry to this local stack, configure your application (or IDE launch profile) with:
+### Key Metrics
+- **`app.startup_duration_ms`**: Measures the time from process start to "Ready".
+  - **Goal:** < 500ms for Cold Starts.
+  - **Usage:** Used to detect slow initialization logic (e.g., heavy reflection or DB connection setup).
+- **`http.server.request.duration`**: Latency of API requests.
+- **`process.runtime.dotnet.gc.collections.count`**: Garbage Collection frequency.
+  - **High Gen2 count?** Indicates memory leaks or inefficient object allocation.
 
-**Option A: appsettings.json**
-```json
-{
-  "Otel": {
-    "Endpoint": "http://localhost:4317",
-    "Protocol": "grpc",
-    "Environment": "local-docker"
-  }
-}
-```
+## 4. Troubleshooting Missing Telemetry
 
-**Option B: Environment Variables**
-```bash
-OTEL__ENDPOINT=http://localhost:4317
-OTEL__PROTOCOL=grpc
-```
+**Symptoms:** No traces in Grafana.
 
----
-
-## 📊 Using Grafana
-
-1. Open [http://localhost:3000](http://localhost:3000).
-2. Go to **Explore** (Compass icon).
-3. Select a Datasource:
-   - **Tempo:** Search for traces by ID or filter by Service Name.
-   - **Prometheus:** Query metrics (e.g., `http_server_request_duration_seconds_bucket`).
-   - **Loki:** Query logs (e.g., `{service_name="PoC-Materials"}`).
-
-> **Pro Tip:** Logs in Loki contain a "TraceID" link that jumps directly to the Trace in Tempo.
-
----
-
-## 📝 Developer Workflow
-
-### One-Liner Integration
-To add observability to a new service, just add this to `Program.cs`:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-// Standard setup: Logging + Traces + Metrics
-builder.AddPoCObservability("PoC-NewService", "1.0.0");
-
-var app = builder.Build();
-
-// Standard middleware: Exception Handling + Request Logging
-app.UsePoCDefaults();
-```
-
-### Writing Logs
-Always use structured logging:
-
-```csharp
-// ❌ Avoid string interpolation
-Log.Information($"Created material {material.Id}");
-
-// ✅ Use message templates (better for indexing)
-Log.Information("Created material {MaterialId}", material.Id);
-```
-
----
-
-## 🔍 Verification
-
-### 1. Check Integration
-Run the stack and your app. look at the OTel Collector logs:
-
-```bash
-docker compose -f docker/observability/docker-compose.yaml logs -f otel-collector
-```
-
-You should see "TracesExporter", "MetricsExporter", "LogsExporter" outputting data if the `debug` exporter is enabled.
-
-### 2. AWS Lambda Status
-Check current Lambda logs in LocalStack:
-```bash
-awslocal logs tail /aws/lambda/PoC-Materials-MaterialsFunction-prod --follow
-```
-
----
-
-## 💡 Troubleshooting
-
-### "Missing Logs to Traces linkage"
-Ensure you are using `builder.AddPoCObservability()`. This method configures the Serilog enricher that injects OTel context into the logs.
-
-### "No metrics reaching the backend"
-- Verify your `OTEL__ENDPOINT` is reachable from the network.
-- Ensure the `OTEL__PROTOCOL` matches what the backend expects (`grpc` vs `http`).
-- Check if your backend requires custom `OTEL__HEADERS` (e.g., `X-Scope-OrgId` or `Authorization`).
-
----
-
-## 🔗 Related Resources
-- [ADR 003: Shared Observability Library](../adr/003-shared-observability-library.md)
-- [Technical Design](../observability-design.md)
+**Checklist:**
+1. **Is the OTel Collector running?**
+   ```bash
+   docker ps | grep otel-collector
+   ```
+2. **Is the App pointing to the Collector?**
+   - Check `appsettings.json`: `"Otel": { "Endpoint": "http://localhost:4317" }`.
+   - **Docker:** Must use `http://otel-collector:4317`.
+   - **Localhost:** Must use `http://localhost:4317`.
+3. **Are logs showing errors?**
+   - Look for "Connection refused" or "Export failed" in the app console.

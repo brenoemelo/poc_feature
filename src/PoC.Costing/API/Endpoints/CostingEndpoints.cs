@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Domain.Services;
 using PoC.Shared.API;
-
+using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
 
 namespace PoC.Costing.API.Endpoints;
@@ -13,10 +13,12 @@ public static class CostingEndpoints
     public static RouteGroupBuilder MapCostingEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/prices", UpsertPriceAsync)
-             .WithName("UpsertPrice");
+             .WithName("UpsertPrice")
+             .WithFeatureGate("price-ingestion");
 
         group.MapPost("/estimations", CalculateCostAsync)
-             .WithName("CalculateCost");
+             .WithName("CalculateCost")
+             .WithFeatureGate("price-calculation");
 
         group.MapGet("/estimations/batch", CalculateAllCostsAsync)
              .WithName("CalculateAllCosts");

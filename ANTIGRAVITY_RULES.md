@@ -5,8 +5,9 @@ This project follows an **Event-Driven Microservices Architecture** built upon t
 * **Runtime:** .NET 8 (C# 12)
 * **Database:** Amazon DynamoDB (Single Table Design preferred)
 * **Messaging:** Amazon SNS (Topics) & Amazon SQS (Queues)
-* **Observability:** OpenTelemetry & Serilog
-* **Infrastructure:** AWS
+* **Observability:** OpenTelemetry (OTLP), W3C Trace Context
+* **Feature Management:** OpenFeature Standard (Provider: GoFeatureFlag)
+* **Infrastructure:** AWS (LocalStack for Dev) & Docker
 
 ## 2. Language & Localization Rules
 **Strict Rule:** English is the sole official language of this project.
@@ -49,6 +50,10 @@ Every line of code must adhere to these principles. Violations are considered im
 * **Async First:** Use SNS/SQS for state-changing operations.
 * **Synchronous:** Use HTTP/gRPC sparingly (Queries only), wrapped in **Polly Policies**.
 
+### 4.4. Shared Kernel Strategy
+* **Reusability:** Common infrastructure logic (Observability, Feature Flags, Resilience) must be centralized in `PoC.Shared` (or `PoC.Kernel`).
+* **No Domain Leakage:** The Shared Kernel must contain **ONLY** infrastructure concerns. It must never contain business rules or domain entities.
+
 ## 5. Internal Service Architecture (.NET 8)
 
 ### 5.1. Project Structure (Clean Architecture)
@@ -58,9 +63,10 @@ Every line of code must adhere to these principles. Violations are considered im
 * **src/API (Presentation):** Controllers, Middleware.
 
 ### 5.2. C# Coding Style
-* Use **Records** for DTOs, Commands, and Events.
-* Use `file-scoped namespaces`.
-* Avoid `null`. Utilize *Nullable Reference Types*.
+* **Primary Constructors:** Use C# 12 Primary Constructors for classes and dependency injection to reduce boilerplate.
+* **Records:** Use `record` types for DTOs, Commands, and Events (immutability).
+* **Namespaces:** Use `file-scoped namespaces` to reduce indentation.
+* **Null Safety:** Avoid `null`. Utilize *Nullable Reference Types* and treat warnings as errors.
 
 ## 6. Data Persistence (DynamoDB)
 * **Single Responsibility:** Repositories handle data access only.
@@ -68,13 +74,21 @@ Every line of code must adhere to these principles. Violations are considered im
 * **Performance:** Prefer `Query`. Avoid `Scan`.
 
 ## 7. Logging & Observability Standards
-* **Structured Logging:** Logs must be structured JSON using **Serilog**.
-* **Correlation ID:** Every log entry must include a `TraceId` or `CorrelationId`.
-* **Security:** **STRICTLY FORBIDDEN** to log PII or secrets.
+The system must be fully observable via **OpenTelemetry (OTLP)** and **Vendor Agnostic**.
 
-### 7.1. Performance Metrics (Warm-up & Runtime)
-* **Startup Tracking:** All services must measure and emit `app.startup_duration_ms` via OpenTelemetry.
-* **Runtime Stats:** `AddRuntimeInstrumentation` must be enabled to track JIT, GC, and ThreadPool usage, allowing diagnosis of Cold Start performance issues.
+### 7.1. OTLP & Vendor Neutrality
+* **Protocol:** All telemetry (Logs, Metrics, Traces) must be exported via **OTLP** (gRPC or HTTP/Protobuf).
+* **No Vendor SDKs:** Do not use proprietary SDKs (e.g., Datadog.Trace, NewRelic.Agent) inside the application code.
+* **Configuration:** Endpoints and Headers must be configurable via `appsettings.json` to allow switching backends (e.g., Grafana Cloud <-> Datadog) without code changes.
+
+### 7.2. Metrics & Warm-up
+* **Startup Tracking:** All services must measure and emit `app.startup_duration_ms` to monitor Cold Starts.
+* **Runtime Stats:** `AddRuntimeInstrumentation` must be enabled to track JIT, GC, and ThreadPool usage.
+
+### 7.3. Distributed Tracing
+* **W3C Standard:** Use **W3C Trace Context** for propagation.
+* **Correlation:** Ensure `TraceId` is injected into Logs (Serilog `LogContext`) and HTTP Response Headers for easier debugging.
+* **AWS Instrumentation:** Must instrument AWS SDK calls (DynamoDB, SNS, SQS) to visualize the full dependency chain.
 
 ## 8. Version Control & Commits
 * **Conventional Commits:** Follow the standard (e.g., `feat(cart): add item limit`).
@@ -93,6 +107,7 @@ Documentation is treated as code.
 * **Stack:** xUnit + RestSharp + FluentAssertions.
 * **Scope:** Black Box Testing of running endpoints.
 * **Environment:** Must use external configuration (`appsettings.test.json`). No Mocks allowed.
+* **Observability Testing:** E2E tests must verify if Traces are being emitted using a Mock Collector (e.g., WireMock) to validate the `TraceId` propagation.
 
 ## 12. Repository Hygiene & Scratchpad Protocol
 * **The Scratchpad (`/scratchpad`):**
@@ -104,129 +119,57 @@ Documentation is treated as code.
 Scripts used to provision AWS resources (local or remote) must be robust, idempotent, and self-documenting.
 
 ### 13.1. Safety & Pre-flight Checks
-* **Fail Fast:** The script must immediately stop if any command fails.
-    * *Bash:* Use `set -euo pipefail`.
-    * *PowerShell:* Use `$ErrorActionPreference = "Stop"`.
-* **Connection Check:** Before attempting any logic, the script must verify connectivity to the AWS provider (e.g., `aws sts get-caller-identity`). If this fails, abort immediately.
-* **Environment Safety:** Destructive scripts (cleanup/re-create) must explicitly check if the target environment is PRODUCTION. If so, they must abort or require manual confirmation.
+* **Fail Fast:** The script must immediately stop if any command fails (`set -euo pipefail`).
+* **Connection Check:** Verify AWS connectivity before execution.
 
-### 13.2. Idempotency & Cleanup (The "Clean Slate" Strategy)
-* **Check-Delete-Create:**
-    1.  Check if the resource exists.
-    2.  If exists, delete it (and wait for deletion to complete).
-    3.  Create the new resource.
-* **Dependency Handling:** When deleting a resource (e.g., DynamoDB Table), ensure dependent triggers (e.g., Lambda Event Source Mappings) are removed first to avoid "ResourceInUse" errors.
-
-### 13.3. Resilience (Retries)
-* **Eventual Consistency:** AWS is eventually consistent. A command to create a resource might succeed, but the resource might not be ready immediately.
-* **Retry Pattern:** All AWS CLI commands (Create, Delete, Update) must be wrapped in a `retry` function that attempts the operation at least 3 times with exponential backoff.
-
-### 13.4. Logging & Documentation
-* **Structured Output:** Use colors to denote steps:
-    * GREEN: Success / Completion.
-    * YELLOW: Warning / Retrying / Waiting.
-    * RED: Critical Failure.
-* **Self-Documenting:** Use comments as documentation. Each major block (e.g., "Create SQS") must have a header comment explaining *why* it is needed.
+### 13.2. Idempotency & Cleanup
+* **Clean Slate Strategy:** Check if resource exists -> Delete (if testing) -> Create.
+* **Retry Pattern:** Wrap AWS CLI commands in a retry loop to handle eventual consistency.
 
 ## 14. REST API Design Guidelines
-We follow **Pragmatic REST** standards. The API must be predictable, resource-oriented, and use standard HTTP mechanics.
+We follow **Pragmatic REST** standards (Richardson Maturity Model).
 
-### 14.1. Resource Naming (URIs)
-* **Nouns, not Verbs:** URIs represent resources (things), not actions.
-    * *Bad:* `POST /api/create-product`, `GET /api/get-all-users`
-    * *Good:* `POST /api/products`, `GET /api/users`
-* **Pluralization:** Always use **plural nouns** for consistency.
-    * `GET /api/orders` (Collection)
-    * `GET /api/orders/{id}` (Single Resource)
-* **Kebab-case:** Use lowercase and hyphens for URLs.
-    * *Bad:* `/api/UserProfile`, `/api/user_profile`
-    * *Good:* `/api/user-profiles`
-* **Hierarchy:** Use nesting to show relationships, but avoid going deeper than 2 levels.
-    * *Good:* `/api/customers/{id}/orders` (Orders belonging to a customer)
-    * *Too Deep:* `/api/customers/{id}/orders/{orderId}/items/{itemId}` (Prefer flat: `/api/order-items/{itemId}`)
+### 14.1. Naming & Verbs
+* **Nouns:** `/api/products` (Plural, Kebab-case).
+* **Verbs:** Use correct HTTP methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`).
 
-### 14.2. HTTP Methods (Semantics)
-You must use the correct verb for the action.
+### 14.2. Status Codes
+* **No Soft Failures:** Never return `200 OK` with an error body. Use `4xx` or `5xx`.
 
-| Verb | Action | Idempotent? | Success Status | Failure Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **GET** | Read a resource or collection. Never modifies state. | YES | `200 OK` | `404 Not Found` |
-| **POST** | Create a new resource. | NO | `201 Created` (Must return `Location` header) | `400 Bad Request`, `422 Unprocessable` |
-| **PUT** | **Replace** a resource entirely. If a field is missing, it is set to null. | YES | `200 OK` or `204 No Content` | `404 Not Found` |
-| **PATCH** | **Partial Update**. Only fields sent are updated. | NO* | `200 OK` | `404 Not Found`, `400 Bad Request` |
-| **DELETE** | Remove a resource. | YES | `204 No Content` | `404 Not Found` |
+### 14.3. Pagination Strategy (Cursor-based)
+* **No Offset Pagination:** "Skip/Take" is **STRICTLY FORBIDDEN** for DynamoDB.
+* **Cursor Pattern:** Use **Forward-Only Pagination** via Continuation Tokens (`?limit=10&cursor=Base64Token`).
 
-*(Note on PATCH: Ideally idempotent, but technically not guaranteed by spec. Treat with care).*
-
-### 14.3. Status Codes (The Contract)
-* **The "200 OK with Error" Anti-Pattern:**
-    * **STRICTLY FORBIDDEN:** Returning `200 OK` with a body like `{"error": "Validation Failed"}`.
-    * If the request failed, the HTTP Status Code **MUST** reflect the failure (4xx or 5xx).
-* **Common Codes to Use:**
-    * `200 OK`: Standard success (synchronous).
-    * `201 Created`: Resource created successfully.
-    * `202 Accepted`: Request received for background processing (Async).
-    * `204 No Content`: Successful action with no body to return (DELETE/PUT).
-    * `400 Bad Request`: Malformed syntax.
-    * `401 Unauthorized`: Missing or invalid token.
-    * `403 Forbidden`: Token valid, but user lacks permission.
-    * `404 Not Found`: Resource does not exist.
-    * `422 Unprocessable Entity`: Business validation failed (e.g., "Email already exists").
-    * `500 Internal Server Error`: Unhandled exception (Bug).
-
-### 14.4. Filtering, Sorting, and Pagination
-Do not create new endpoints for filtering. Use **Query Parameters**.
-
-* **Filtering:** `GET /api/products?category=electronics&status=active`
-* **Sorting:** `GET /api/products?sort=-created_at` ( `-` implies descending, `+` or none implies ascending).
-* **Pagination:**
-    * Use `page` and `pageSize` (or `limit`/`offset`).
-    * Default `pageSize` should be reasonable (e.g., 20).
-    * Responses must include pagination metadata (Total items, Total pages).
-
-### 14.5. Versioning
-* **URI Versioning:** All public endpoints must be versioned.
-* **Pattern:** `/api/v{number}/resource`
-    * Example: `/api/v1/payments`
-* **Breaking Changes:** Never introduce breaking changes to an existing version. Create `/api/v2/payments` instead.
-
-### 14.6. Pagination Strategy (Cursor-based)
-* **No Offset Pagination:** Due to DynamoDB architectural constraints, standard "Skip/Take" (Offset) logic is **STRICTLY FORBIDDEN** for large collections.
-* **Cursor Pattern:** Use **Forward-Only Pagination** via Continuation Tokens.
-    * **Request:** Clients must send `?limit={n}&cursor={base64_token}`.
-    * **Response:** The API returns a `nextCursor` (encoded `LastEvaluatedKey`) in the metadata.
-* **Token Security:** Tokens must be Base64 encoded and treated as opaque strings by the client.
-
-### 14.7. HATEOAS (Hypermedia)
-* **Navigability:** The API must implement HATEOAS (Richardson Maturity Model Level 3). Clients should discover available actions via links, rather than hardcoded URL logic.
-* **Standard Envelope:** All collection endpoints must wrap the response in a standard envelope structure containing `data`, `meta`, and `links`:
+### 14.4. HATEOAS (Hypermedia)
+* **Navigability:** Responses must include a `links` array guiding the client to the next actions.
+* **Envelope:** Use a standard wrapper:
     ```json
     {
       "data": [ ... ],
-      "meta": {
-        "limit": 10,
-        "count": 5,
-        "nextCursor": "ewJ... (Base64)"
-      },
-      "links": [
-        { "rel": "self", "href": "https://api.../items?limit=10", "method": "GET" },
-        { "rel": "next", "href": "https://api.../items?limit=10&cursor=ewJ...", "method": "GET" }
-      ]
+      "meta": { "nextCursor": "..." },
+      "links": [ { "rel": "next", "href": "..." } ]
     }
     ```
-* **Link Object:** Must contain at least `rel` (relationship type), `href` (absolute URL), and `method` (HTTP Verb).
 
 ## 15. AI Collaboration Standards
 To maximize AI assistant efficiency (Trae, Cursor, Copilot), we maintain specific context files.
 
-### 15.1. The AI Context Map (`.ai-context.md`)
-* **Purpose:** A high-level technical summary of the system state, specifically optimized for LLM token efficiency.
-* **Content:**
-    * Current list of Microservices and their ports.
-    * Simplified Entity-Relationship diagrams (text-based).
-    * Key architectural constraints (e.g., "Always use Result<T>", "No direct DB access").
-* **Maintenance:** This file must be updated when a new service or major architectural pattern is introduced.
+### 15.1. Context-as-Code
+* **The Map:** Maintain a `.ai-context.md` (or `ARCHITECTURE_MAP.md`) file describing the current high-level structure and data flow.
+* **Updates:** This file must be updated whenever a new service is added.
 
-### 15.2. Prompting Strategy (CoT)
-* **Chain of Thought:** When requesting complex changes, explicitly ask the AI to "Plan first, then implement".
-    * *Prompt Pattern:* "Read @POC_RULES.md. Plan the implementation of [Feature] creating a checklist of files to modify. Wait for my approval before writing code."
+### 15.2. Prompting Strategy
+* **Plan Before Code:** Ask the AI to "Plan first, then implement".
+* **Spec-First:** For complex logic, ask the AI to generate a Gherkin Spec or a Checklist before writing C#.
+
+## 16. Feature Flags (OpenFeature)
+Decouple deployment from release using the **OpenFeature** standard.
+
+### 16.1. Implementation Standard
+* **Provider:** Use **GoFeatureFlag** (running in Docker sidecar) as the backend provider.
+* **Clean Code:** Avoid polluting Controllers with `if (feature.IsEnabled)`.
+* **Attribute-Based:** Use the `[FeatureGate("flag-key")]` attribute to secure endpoints.
+
+### 16.2. Lifecycle Management
+* **Debt:** Feature flags are technical debt. Once a feature is stable, the flag and the attribute **MUST** be removed.
+* **UI:** Manage flags via the GoFeatureFlag Dashboard (Docker) or YAML file. Do not hardcode values in C#.

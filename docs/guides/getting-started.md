@@ -88,7 +88,7 @@ Each script publishes the .NET application, creates the Lambda function (removin
 Use the provided PowerShell script to verify all endpoints automatically:
 
 ```powershell
-./test_all_apis.ps1
+./scripts/tests/test_all_apis.ps1
 ```
  
  This script:

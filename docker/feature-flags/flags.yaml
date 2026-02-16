@@ -1,0 +1,16 @@
+# GO Feature Flag - Feature Flags Definition
+# Docs: https://gofeatureflag.org/docs/configure_flag/flag_format
+
+price-calculation:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+
+price-ingestion:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: disabled

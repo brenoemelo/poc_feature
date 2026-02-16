@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenFeature;
+using OpenFeature.Providers.GOFeatureFlag;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
@@ -16,7 +18,8 @@ using Serilog.Formatting.Compact;
 namespace PoC.Shared.Infrastructure.Extensions;
 
 /// <summary>
-/// Extensions for <see cref="IServiceCollection"/> and <see cref="WebApplicationBuilder"/> to configure observability.
+/// Extensions for <see cref="IServiceCollection"/> and <see cref="WebApplicationBuilder"/> to configure
+/// observability (Serilog + OpenTelemetry) and feature flags (OpenFeature + GO Feature Flag).
 /// </summary>
 public static class ServiceCollectionExtensions
 {
@@ -86,6 +89,38 @@ public static class ServiceCollectionExtensions
         ConfigureOpenTelemetry(builder.Services, builder.Configuration, builder.Environment.EnvironmentName, serviceName, serviceVersion, isWeb: false);
 
         return builder;
+    }
+
+    /// <summary>
+    /// Configures Feature Flags using OpenFeature + GO Feature Flag provider.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddPoCFeatureFlags(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var options = configuration.GetSection("FeatureFlags").Get<FeatureFlagOptions>() ?? new FeatureFlagOptions();
+        services.Configure<FeatureFlagOptions>(configuration.GetSection("FeatureFlags"));
+
+        var providerOptions = new GOFeatureFlagProviderOptions
+        {
+            Endpoint = options.Endpoint
+        };
+
+        var provider = new GOFeatureFlagProvider(providerOptions);
+
+#pragma warning disable VSTHRD002
+        Api.Instance.SetProviderAsync(options.AppName, provider).GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
+
+        var client = Api.Instance.GetClient(options.AppName);
+        services.AddSingleton(client);
+
+        Log.Information("Feature Flags configured with GO Feature Flag at '{Endpoint}'.", options.Endpoint);
+
+        return services;
     }
 
     private static void ConfigureOpenTelemetry(

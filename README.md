@@ -1,279 +1,62 @@
-# Material Formulation System - PoC
+# PoC Feature: Material Formulation System
 
-A proof-of-concept microservices system for managing material formulations in engineering contexts, built with .NET 8, AWS Lambda, and LocalStack.
-
-## 🎯 Project Overview
-
-This system demonstrates a **serverless, event-driven architecture** for managing material compositions, calculating costs, and generating synthetic test data. It follows **Clean Architecture** principles with strict **Data Sovereignty** between microservices.
-
-### Key Features
-
-- ✅ **Material Management** - CRUD operations for material formulations
-- ✅ **Cost Calculation Engine** - Calculate material costs with margin analysis
-- ✅ **Data Population** - Generate thousands of synthetic materials for testing
-- ✅ **Event-Driven Architecture** - Decoupled services using SNS/SQS
-- ✅ **FluentValidation** - Business rule enforcement at API boundaries
-- ✅ **RFC 7807 ProblemDetails** - Standardized error responses
-- ✅ **Architecture Tests** - Automated enforcement of architectural constraints
-
-## 🏗️ Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│PoC.Materials│     │ PoC.Populator│     │ PoC.Costing │
-│             │     │              │     │             │
-│ • Materials │     │ • Population │     │ • Prices    │
-│ • Query     │     │ • Worker     │     │ • Cost Calc │
-│ • Ingestion │     │              │     │             │
-└──────┬──────┘     └──────┬───────┘     └──────┬──────┘
-       │                   │                    │
-       ├───────────────────┴────────────────────┤
-       │            PoC.Shared (Domain)         │
-       │  • Models  • Events  • Validators      │
-       └────────────────────────────────────────┘
-              │              │              │
-       ┌──────▼──────┐ ┌────▼────┐ ┌───────▼────────┐
-       │ materials-  │ │SNS/SQS  │ │costing-prices- │
-       │ table (DDB) │ │ Events  │ │table (DynamoDB)│
-       └─────────────┘ └─────────┘ └────────────────┘
-```
-
-## 📚 Documentation
-
-- **[Full Documentation](docs/index.md)** - Complete documentation index
-- **[Setup Guide](docs/guides/setup-local-environment.md)** - Get started with LocalStack
-- **[Health Check](docs/guides/deployment-health.md)** - Verify deployments and logs
-- **[ADRs](docs/adr/)** - Architecture Decision Records
-- **[Domain Concepts](docs/concepts/)** - Business domain documentation
-- **[OpenAPI Spec](docs/openapi.yaml)** - REST API contract
-- **[ANTIGRAVITY_RULES.md](ANTIGRAVITY_RULES.md)** - Coding standards and guidelines
+## Overview
+A microservices-based proof-of-concept for managing material formulations, built with **.NET 8**, **AWS Lambda**, **DynamoDB**, and **Clean Architecture**.
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 1. Prerequisites
+- Docker Desktop
+- .NET 8 SDK
+- PowerShell Core (pwsh)
 
-- Docker & Docker Compose
-- .NET SDK 8.0
-- `sg` command (Linux) or Docker Desktop (Windows/Mac)
-
-### 1. Start LocalStack
-
+### 2. Start Infrastructure
 ```bash
-docker-compose up -d
+docker compose -f docker-compose.yml up -d
+docker compose -f docker/feature-flags/docker-compose.yaml up -d
+docker compose -f docker/observability/docker-compose.yaml up -d
 ```
 
-### 2. Build the Solution
-
+### 3. Deploy Services (LocalStack)
 ```bash
-dotnet restore PoC.sln
-dotnet build PoC.sln
-```
-
-### 3. Run Tests
-
-```bash
-# Architecture tests
-dotnet test src/PoC.ArchitectureTests
-
-# All tests
-dotnet test
-```
-
-### 4. Deploy to LocalStack
-
-You can deploy all services at once using the master script:
-
-```powershell
 ./deployment/localstack/deploy-all.ps1
 ```
 
-Or deploy services individually:
-
-```powershell
-# 1. Deploy API Gateway
-./deployment/localstack/gateway.ps1
-
-# 2. Deploy Services
-./deployment/localstack/materials.ps1   # PoC.Materials
-./deployment/localstack/costing.ps1     # PoC.Costing
-./deployment/localstack/populator.ps1   # PoC.Populator
-```
-
-### 5. Verify Deployment
-
-Run the automated API test script:
-
-```powershell
-./test_all_apis.ps1
-```
-
-## 🧭 How to Run Locally (Step-by-Step)
-
-- **Prerequisites**
-  - Install .NET SDK 8.0
-  - Install Docker Desktop and enable Docker Compose
-  - Clone the repository to `d:\Projetos\poc_feature`
-
-- **Start Local Infrastructure (LocalStack)**
-  - Run `docker-compose up -d` in the project root
-  - Confirm that the `poc_feature-localstack-1` container is running
-
-- **Deploy Infrastructure and Services**
-  - **Option A (Recommended)**: Run `./deployment/localstack/deploy-all.ps1` to deploy everything.
-  - **Option B (Manual)**:
-    - Run `./deployment/localstack/gateway.ps1` (Gateway)
-    - Run `./deployment/localstack/materials.ps1` (Materials)
-    - Run `./deployment/localstack/costing.ps1` (Costing)
-    - Run `./deployment/localstack/populator.ps1` (Populator)
-
-- **Test APIs**
-  - Run `./test_all_apis.ps1` to validate all endpoints.
-  - The script automatically detects the API Gateway ID and runs integration tests.
-
-- **Automated E2E Tests**
-  - E2E tests are already configured to use the API Gateway.
-  - Run `dotnet test tests/PoC.E2E/PoC.E2E.csproj`
-
-- **Troubleshooting Tips**
-  - 500 on Gateway: Verify if deployment scripts were executed successfully.
-  - 500 on startup: Ensure `TargetFramework=net8.0` and publish target is `linux-x64`
-  - Empty DynamoDB: The init script ([init-aws.sh](file:///d:/Projetos/poc_feature/deployment/docker/init-aws.sh)) creates tables; validate `materials-table`
-
-> **Note:** It is possible to run the service as a local Lambda via Function URL (recommended) or as a .NET process, provided dependencies point to the LocalStack endpoint.
-
-## 📦 Project Structure
-
-```
-poc_feature/
-├── src/
-│   ├── PoC.Materials/       # Material management microservice
-│   ├── PoC.Populator/       # Data generation microservice
-│   ├── PoC.Costing/         # Cost calculation microservice
-│   ├── PoC.Shared/          # Shared domain models & events
-│   └── PoC.ArchitectureTests/ # Architecture constraint tests
-├── tests/
-│   └── PoC.E2E/             # End-to-end tests
-├── docs/                    # Documentation
-├── docker-compose.yml       # LocalStack configuration
-└── init-aws.sh             # AWS resource initialization
-```
-
-## 🔧 Technology Stack
-
-- **.NET 8** - Runtime
-- **AWS Lambda** - Serverless compute
-- **DynamoDB** - NoSQL database
-- **SNS/SQS** - Event messaging
-- **LocalStack** - Local AWS simulation
-- **FluentValidation** - Input validation
-- **NetArchTest** - Architecture testing
-- **xUnit** - Unit & E2E testing
-- **RestSharp** - HTTP client (E2E tests)
-
-## 📊 Microservices
-
-### PoC.Materials
-
-Material management service with three Lambda functions:
-
-- `poc-materials-api` - Create and query materials (POST/GET /api/v1/materials)
-- `poc-ingestion-worker` - Consume SNS events and persist to DynamoDB
-
-### PoC.Populator
-
-Synthetic data generation service:
-
-- `poc-populator-api` - Accept population requests (POST /api/v1/populator/jobs)
-- `poc-populator-worker` - Generate and publish materials via SNS
-
-### PoC.Costing
-
-Cost calculation and pricing service:
-
-- `poc-costing-lambda` - Unified service for prices and estimations
-- `PUT /api/v1/costing/prices` - Manage component prices
-- `POST /api/v1/costing/estimations` - Calculate material costs
-- `GET /api/v1/costing/estimations/batch` - Bulk cost calculation
-
-## 🧪 Testing Strategy
-
-### Architecture Tests
-
-Enforce architectural constraints using NetArchTest:
-
+### 4. Verify APIs
+Run the automated test suite to ensure all services are healthy:
 ```bash
-dotnet test src/PoC.ArchitectureTests
+./scripts/tests/test_all_apis.ps1
 ```
 
-**Rules enforced:**
+## 📚 Developer Portal
 
-- Domain (PoC.Shared) has no dependencies on other layers
-- Services are independent (no cross-service dependencies)
-- Lambda functions follow naming conventions
-- Entities are sealed or abstract
+| Section | Content |
+|---|---|
+| **[Architecture](docs/architecture/system-overview.md)** | Diagrams, Layers, Data Flow, Concepts |
+| **[Guides](docs/guides/getting-started.md)** | Standards, Observability, Feature Flags |
+| **[Operations](docs/operations/troubleshooting.md)** | Troubleshooting Runbooks, Health Checks |
+| **[Decisions](docs/decisions/adr-001-microservices-stack.md)** | Architectural Decision Records (ADRs) |
 
-### End-to-End Tests
+## ❓ FAQ
 
-Black-box tests against deployed infrastructure:
+**Q: Why do we use a Shared Kernel?**
+A: To centralize cross-cutting concerns (logging, results, observability) and ensure consistency across microservices, preventing code duplication.
 
-```bash
-dotnet test tests/PoC.E2E
+**Q: Why no Offset Pagination (Skip/Take)?**
+A: DynamoDB scans are expensive. We use **Cursor-based pagination** (Continuous Tokens) for efficient, predictable performance at any scale.
+
+**Q: How do I debug a failed request?**
+A: Use the `traceId` from the error response and search for it in **Grafana Tempo** (`http://localhost:3000`). See the [Observability Guide](docs/guides/observability.md).
+
+**Q: What happens if Feature Flags go offline?**
+A: The system is fail-safe. If the GoFeatureFlag container is unreachable, all flags default to `false` (Disabled), and the app remains operational.
+
+## 🏗️ Project Structure
+```text
+/src                     # Microservices Source Code
+/docker                  # Infrastructure (OTel, Feature Flags)
+/deployment              # LocalStack Deployment Scripts
+/scripts                 # Test & Utility Scripts
+/config                  # JSON Payloads & Configurations
+/docs                    # Documentation & ADRs
 ```
-
-**Coverage:**
-
-- Health checks
-- CRUD operations
-- Event-driven workflows
-- Cost calculations
-- Bulk estimations (Batch)
-
-## 📖 API Endpoints
-
-| Method | Endpoint                    | Service    | Description                    |
-|--------|-----------------------------|------------|--------------------------------|
-| GET    | /api/v1/materials           | Materials  | List all materials (Paged)      |
-| GET    | /api/v1/materials/{id}      | Materials  | Get material by ID             |
-| POST   | /api/v1/materials           | Materials  | Create material                |
-| DELETE | /api/v1/materials/{id}      | Materials  | Delete material                |
-| POST   | /api/v1/populator/jobs      | Populator  | Generate test data             |
-| POST   | /api/v1/costing/prices      | Costing    | Upsert component price         |
-| POST   | /api/v1/costing/estimations | Costing    | Calculate material cost        |
-| GET    | /api/v1/costing/estimations/batch | Costing | Bulk cost calculation       |
-
-## 🎨 Design Principles
-
-1. **Data Sovereignty** - Each service owns its data
-2. **Async First** - Event-driven communication via SNS/SQS
-3. **Clean Architecture** - Domain-centric design
-4. **SOLID Principles** - Single responsibility, dependency inversion
-5. **Fail Fast** - Validate early with FluentValidation
-6. **RFC 7807** - Standardized error responses
-
-## 🛠️ Development Workflow
-
-1. **Make changes** to code
-2. **Build** the solution: `dotnet build`
-3. **Run architecture tests**: `dotnet test src/PoC.ArchitectureTests`
-4. **Build Docker images** for modified services
-5. **Deploy to LocalStack** and test manually or with E2E tests
-6. **Update documentation** (ADRs, OpenAPI, Insomnia)
-
-## 📝 Contributing
-
-Please follow the guidelines in [ANTIGRAVITY_RULES.md](ANTIGRAVITY_RULES.md):
-
-- English-only code and comments
-- Use records for DTOs
-- File-scoped namespaces
-- FluentValidation for business rules
-- Update ADRs for architectural decisions
-- Run architecture tests before committing
-
-## 📄 License
-
-This is a proof-of-concept project for educational purposes.
-
-## 🙏 Acknowledgments
-
-Built following Clean Architecture, DDD, and SOLID principles with inspiration from AWS serverless best practices.

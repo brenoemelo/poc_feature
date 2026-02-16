@@ -23,6 +23,9 @@ builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 // Dependency Injection
 builder.Services.AddCostingInfrastructure(builder.Configuration);
 
+// Feature Flags (OpenFeature + GO Feature Flag)
+builder.Services.AddPoCFeatureFlags(builder.Configuration);
+
 builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
 
 builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>(client =>

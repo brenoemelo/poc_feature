@@ -2,8 +2,8 @@ $ErrorActionPreference = "Stop"
 $EndpointUrl = "http://localhost:4566"
 $Region = "us-east-1"
 $FunctionName = "PoC-Costing-PriceIngestion"
-$PayloadPath = "d:\Projetos\poc_feature\payload.json"
-$OutputPath = "d:\Projetos\poc_feature\response.json"
+$PayloadPath = "..\..\config\payloads\invoke_payload.json"
+$OutputPath = "..\..\scratchpad\response.json"
 
 Write-Host "Checking AWS version..."
 cmd /c "aws --version"
@@ -22,6 +22,7 @@ Get-Content stderr.txt
 if (Test-Path $OutputPath) {
     Write-Host "Invocation completed. Response content:"
     Get-Content $OutputPath
-} else {
+}
+else {
     Write-Host "Invocation failed: $OutputPath not created."
 }

@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   localstack:
     image: localstack/localstack:latest
     ports:
-      - 4566:4566            # LocalStack Gateway
-      - 4510-4559:4510-4559  # external services port range
+      - 4566:4566 # LocalStack Gateway
+      - 4510-4559:4510-4559 # external services port range
     environment:
       - DEBUG=${DEBUG:-0}
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -20,6 +18,95 @@ services:
     networks:
       - poc-net
 
+  # -----------------------------------------------------
+  # OpenTelemetry Collector (The Gateway)
+  # Receives OTLP (gRPC/HTTP) from .NET Apps
+  # Exports to Tempo, Prometheus, Loki
+  # -----------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.145.0
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    volumes:
+      - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8889:8889" # Prometheus exporter metrics
+    networks:
+      - poc-net
+
+  # -----------------------------------------------------
+  # Tempo (Distributed Tracing Backend)
+  # -----------------------------------------------------
+  tempo:
+    image: grafana/tempo:2.10.0
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./docker/observability/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP
+    networks:
+      - poc-net
+
+  # -----------------------------------------------------
+  # Prometheus (Metrics Backend)
+  # -----------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --web.enable-remote-write-receiver # Enable pushing metrics from OTel Collector
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./docker/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - poc-net
+
+  # -----------------------------------------------------
+  # Loki (Logs Backend)
+  # -----------------------------------------------------
+  loki:
+    image: grafana/loki:3.6.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./docker/observability/loki.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - poc-net
+
+  # -----------------------------------------------------
+  # Grafana (The UI)
+  # -----------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./docker/observability/provisioning:/etc/grafana/provisioning # Auto-configure datasources
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - poc-net
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+
 networks:
   poc-net:
     driver: bridge
+
+volumes:
+  tempo-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:
