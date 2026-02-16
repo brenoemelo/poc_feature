@@ -21,10 +21,13 @@ public sealed class TraceIdResponseMiddleware
         context.Response.OnStarting(() =>
         {
             var traceId = Activity.Current?.TraceId.ToString();
-            if (!string.IsNullOrEmpty(traceId))
+            if (string.IsNullOrEmpty(traceId))
             {
-                context.Response.Headers[TraceIdHeaderName] = traceId;
+                // Fallback: Generate a new W3C TraceId if missing to ensure client receives one
+                traceId = ActivityTraceId.CreateRandom().ToString();
             }
+
+            context.Response.Headers[TraceIdHeaderName] = traceId;
 
             return Task.CompletedTask;
         });

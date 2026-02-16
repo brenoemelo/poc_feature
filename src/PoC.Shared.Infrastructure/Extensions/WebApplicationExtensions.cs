@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Serilog;
 
 namespace PoC.Shared.Infrastructure.Extensions;
@@ -28,7 +31,9 @@ public static class WebApplicationExtensions
                 var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
                 var exception = exceptionHandlerPathFeature?.Error;
 
-                Log.Error(exception, "Unhandled exception occurred: {Message}", exception?.Message);
+                var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
+                var logger = loggerFactory.CreateLogger("PoC.Shared.Infrastructure.Extensions.WebApplicationExtensions");
+                logger.LogError(exception, "Unhandled exception occurred: {Message}", exception?.Message);
 
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 context.Response.ContentType = "application/problem+json";
@@ -39,7 +44,8 @@ public static class WebApplicationExtensions
                     title = "Internal Server Error",
                     status = StatusCodes.Status500InternalServerError,
                     detail = app.Environment.IsDevelopment() ? exception?.ToString() : "An unexpected error occurred",
-                    instance = context.Request.Path
+                    instance = context.Request.Path,
+                    traceId = Activity.Current?.TraceId.ToString()
                 };
 
                 await context.Response.WriteAsJsonAsync(problem);

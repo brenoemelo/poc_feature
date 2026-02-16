@@ -88,13 +88,38 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
         try
         {
             var tableName = Environment.GetEnvironmentVariable("MATERIALS_TABLE_NAME") ?? "materials-table";
-            var response = await client.DescribeTableAsync(tableName);
             
-            // ItemCount is approximate, updated every 6 hours. 
-            // For a PoC/High-scale system, this is often preferred over scanning.
-            // If realtime count is needed, we should maintain a counter item.
-            var count = (int)response.Table.ItemCount;
-            return Result.Success(count);
+            // For PoC accuracy, we use Query on the GSI instead of DescribeTable (approximate).
+            var request = new QueryRequest
+            {
+                TableName = tableName,
+                IndexName = "IX_Materials_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue> 
+                {
+                    { ":v_type", new AttributeValue { S = "MATERIAL" } }
+                },
+                Select = Select.COUNT
+            };
+
+            var response = await client.QueryAsync(request);
+            
+            // QueryAsync with Select.COUNT returns Count in the response
+            // Note: If result > 1MB, Query might return partial count. 
+            // We should loop LastEvaluatedKey to get full count, but for PoC/Test this is likely sufficient 
+            // unless we have massive data. To be safe, let's loop.
+            long totalCount = response.Count;
+            var currentKey = response.LastEvaluatedKey;
+
+            while (currentKey != null && currentKey.Count > 0)
+            {
+                request.ExclusiveStartKey = currentKey;
+                response = await client.QueryAsync(request);
+                totalCount += response.Count;
+                currentKey = response.LastEvaluatedKey;
+            }
+
+            return Result.Success((int)totalCount);
         }
         catch (Exception ex)
         {

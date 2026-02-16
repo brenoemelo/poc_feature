@@ -78,10 +78,27 @@ public class PopulatorWorkerFunction
 
             try
             {
-                var job = JsonSerializer.Deserialize<PopulationJob>(message.Body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (job == null) continue;
+                _logger.LogInformation("Received SQS Message Body: {Body}", message.Body);
 
-                _logger.LogInformation("Processing job: Create {BatchSize} records for {Target}", job.BatchSize, job.Target);
+                var job = JsonSerializer.Deserialize<PopulationJob>(message.Body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (job == null) 
+                {
+                    _logger.LogWarning("Deserialized job is null");
+                    continue;
+                }
+
+                _logger.LogInformation(
+                    "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})",
+                    job.BatchSize,
+                    job.Target ?? "NULL",
+                    job.MinComponents,
+                    job.MaxComponents);
+
+                if (string.IsNullOrEmpty(job.Target))
+                {
+                    _logger.LogError("Job Target is null or empty. Body: {Body}", message.Body);
+                    continue;
+                }
 
                 var strategy = GetStrategy(job.Target);
                 var client = _httpClientFactory.CreateClient("MaterialsClient");
@@ -133,6 +150,8 @@ public class PopulatorWorkerFunction
                         }
                     };
                     
+                    _logger.LogInformation("Publishing event to {TopicArn}. Body: {Body}", _topicArn, messageBody);
+
                     tasks.Add(_snsClient.PublishAsync(publishRequest));
 
                     if (tasks.Count >= 50) 

@@ -67,13 +67,26 @@ Ensure-SqsDeleted -QueueUrl $QueueUrl
 # This prevents S3 vs API Gateway Custom Domain routing conflicts for "materials" path
 Ensure-S3BucketDeleted -BucketName "materials"
 
+# Delete Tables
+Ensure-DynamoDbTableDeleted -TableName "materials-table"
+
 Write-Log "--- CLEANUP COMPLETED ---" "Success"
 
 # -----------------------------------------------------------------------------
 # Resource Creation
 # -----------------------------------------------------------------------------
 
-# 1. Create Main Lambda Function
+# 1. Create DynamoDB Table
+Write-Log "Creating DynamoDB Table: materials-table" "Info"
+Invoke-Aws -Service "dynamodb" -Command "create-table" -Arguments @(
+    "--table-name", "materials-table",
+    "--attribute-definitions", "AttributeName=material_id,AttributeType=S AttributeName=record_type,AttributeType=S",
+    "--key-schema", "AttributeName=material_id,KeyType=HASH",
+    "--provisioned-throughput", "ReadCapacityUnits=5,WriteCapacityUnits=5",
+    "--global-secondary-indexes", "IndexName=IX_Materials_By_Type,KeySchema=[{AttributeName=record_type,KeyType=HASH},{AttributeName=material_id,KeyType=RANGE}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}"
+) | Out-Null
+
+# 2. Create Main Lambda Function
 Write-Log "Creating Lambda function: $FunctionName" "Info"
 Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--function-name", $FunctionName,
@@ -83,7 +96,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
     "--memory-size", "512",
-    "--environment", "Variables={MATERIALS_TABLE_NAME=materials-table,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+    "--environment", "Variables={MATERIALS_TABLE_NAME=materials-table,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
 ) | Out-Null
 
 # 2. Create Ingestion Worker Function
@@ -96,7 +109,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
     "--memory-size", "512",
-    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
 ) | Out-Null
 
 # 3. Configure Function URL & Public Access

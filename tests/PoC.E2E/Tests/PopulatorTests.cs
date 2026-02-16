@@ -67,7 +67,9 @@ public class PopulatorTests : ApiTestBase
             MaxComponents = 5
         };
         var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
-        request.AddJsonBody(requestBody);
+        // Explicitly serialize to ensure snake_case property names are used
+        string jsonBody = System.Text.Json.JsonSerializer.Serialize(requestBody);
+        request.AddStringBody(jsonBody, DataFormat.Json);
 
         // Act
         var response = await Client.ExecuteAsync(request);
@@ -89,7 +91,9 @@ public class PopulatorTests : ApiTestBase
             MaxComponents = 5 // Invalid: must be >= MinComponents
         };
         var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
-        request.AddJsonBody(requestBody);
+        // Explicitly serialize to ensure snake_case property names are used
+        string jsonBody = System.Text.Json.JsonSerializer.Serialize(requestBody);
+        request.AddStringBody(jsonBody, DataFormat.Json);
 
         // Act
         var response = await Client.ExecuteAsync(request);
@@ -157,8 +161,12 @@ public class PopulatorTests : ApiTestBase
         // Or, we can rely on the fact that this is a test environment and we just added them.
         var listResponse = await Client.ExecuteAsync<PagedResponse<MaterialFormulation>>(new RestRequest("/api/v1/materials?limit=100", Method.Get));
         listResponse.IsSuccessful.Should().BeTrue();
-        
-        var materialsWith3Components = listResponse.Data!.Data.Where(m => m.Formulation.Count == 3).ToList();
+
+        var allMaterials = listResponse.Data!.Data;
+        var materialsWith3Components = allMaterials
+            .Where(m => m.Formulation.Count == 3)
+            .ToList();
+
         materialsWith3Components.Count.Should().BeGreaterThan(2);
     }
 

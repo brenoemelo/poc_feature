@@ -24,7 +24,8 @@ public sealed class OtlpMockServer : IDisposable
         _server = WireMockServer.Start(new WireMockServerSettings
         {
             Port = port,
-            ReadStaticMappings = false
+            ReadStaticMappings = false,
+            Urls = new[] { $"http://+:{port}" }
         });
 
         _server

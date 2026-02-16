@@ -79,7 +79,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
     "--memory-size", "1024",
-    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
 ) | Out-Null
 
 # 2. Create Worker Function
@@ -90,9 +90,9 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--handler", "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler",
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",
-    "--timeout", "30",
+    "--timeout", "60",
     "--memory-size", "1024",
-    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events}"
+    "--environment", "Variables={MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_/,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
 ) | Out-Null
 
 # 3. Configure Function URL & Public Access

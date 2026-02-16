@@ -45,7 +45,7 @@ public sealed class MaterialPopulationStrategy : IPopulationStrategy
                     { "melting_point", $"{f.Random.Int(150, 400)}C" },
                     { "color", f.Commerce.Color() }
                 },
-                Version: 1));
+                Version: null));
 
         return Task.FromResult(faker.Generate(count).Cast<object>());
     }

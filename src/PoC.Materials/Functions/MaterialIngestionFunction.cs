@@ -70,6 +70,17 @@ public class MaterialIngestionFunction
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record, ILambdaContext context)
     {
+        context.Logger.LogInformation($"[MaterialIngestion] Raw Body Length: {record.Body?.Length ?? 0}");
+        
+        if (string.IsNullOrEmpty(record.Body))
+        {
+            context.Logger.LogWarning($"[MaterialIngestion] Record {record.MessageId} has empty body");
+            return;
+        }
+
+        var snippet = record.Body.Length > 200 ? record.Body.Substring(0, 200) : record.Body;
+        context.Logger.LogInformation($"[MaterialIngestion] Raw Body Snippet: {snippet}");
+
         using var doc = JsonDocument.Parse(record.Body);
         var root = doc.RootElement;
 
@@ -106,6 +117,13 @@ public class MaterialIngestionFunction
 
         if (result.IsFailure)
         {
+             // Idempotency check: If the material already exists (conditional check failed), we consider it a success.
+             if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
+             {
+                 context.Logger.LogWarning($"[MaterialIngestion] Material {materialEvent.Material.MaterialId} ingestion failed due to Optimistic Locking (Version mismatch or Item already exists). Skipping (idempotent).");
+                 return;
+             }
+
              throw new InvalidOperationException($"Failed to ingest material: {result.Error.Code} - {result.Error.Description}");
         }
 

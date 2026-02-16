@@ -110,6 +110,10 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
                 {
                     S = materialId
                 },
+                ["record_type"] = new AttributeValue
+                {
+                    S = "MATERIAL"
+                },
                 ["name"] = new AttributeValue
                 {
                     S = name

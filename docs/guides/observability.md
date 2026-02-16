@@ -1,6 +1,6 @@
 # Observability Guide
 
-The PoC project implements a **vendor-agnostic observability stack** using the OpenTelemetry Protocol (OTLP). This guide explains how to monitor, debug, and trace the system.
+The PoC project implements a **vendor-agnostic observability stack** using the OpenTelemetry Protocol (OTLP). This guide explains how to monitor, debug, and trace the system using the provided **Local Observability Stack**.
 
 ---
 
@@ -14,29 +14,63 @@ The observability stack is centrally managed in the `PoC.Shared.Infrastructure` 
 
 ---
 
-## 🛠️ Configuration
+## 🚀 Local Observability Stack (Docker)
 
-Monitoring backends are configured solely through `appsettings.json` or Environment Variables. No vendor SDK is required.
+We provide a complete pre-configured stack running in Docker.
 
-### 1. Active Backend (OTLP)
-Change the `Endpoint` to point to your collector or vendor gateway:
+### 1. Requirements
+- Docker Desktop / Docker Compose
+- `poc-net` network must exist (usually created by the main `docker-compose.yaml`):
+  ```bash
+  docker network create poc-net || true
+  ```
 
-| Scenario | Mode | Endpoint | Protocol |
-|---|---|---|---|
-| Local Dev | Console | `null` | N/A |
-| Jaeger | gRPC | `http://localhost:4317` | `grpc` |
-| Datadog Agent | gRPC | `http://datadog-agent:4317` | `grpc` |
-| Grafana Cloud | HTTP/Pbuf | `https://otlp-gateway.grafana.net/otlp` | `http` |
-
-### 2. Environment Overrides
-In production, sensitive headers (like Auth tokens) should be injected via environment variables:
+### 2. Start the Stack
+Run the following command from the repository root:
 
 ```bash
-OTEL__ENDPOINT=https://otlp-gateway.grafana.net/otlp
-OTEL__PROTOCOL=http
-OTEL__HEADERS=Authorization=Basic xxx
-OTEL__ENVIRONMENT=production
+docker compose -f docker/observability/docker-compose.yaml up -d
 ```
+
+This will start:
+- **OTel Collector** (`:4317` gRPC / `:4318` HTTP / `:8889` Prom)
+- **Tempo** (Traces)
+- **Prometheus** (Metrics)
+- **Loki** (Logs)
+- **Grafana** (`http://localhost:3000`)
+
+### 3. Connect .NET Services
+To send telemetry to this local stack, configure your application (or IDE launch profile) with:
+
+**Option A: appsettings.json**
+```json
+{
+  "Otel": {
+    "Endpoint": "http://localhost:4317",
+    "Protocol": "grpc",
+    "Environment": "local-docker"
+  }
+}
+```
+
+**Option B: Environment Variables**
+```bash
+OTEL__ENDPOINT=http://localhost:4317
+OTEL__PROTOCOL=grpc
+```
+
+---
+
+## 📊 Using Grafana
+
+1. Open [http://localhost:3000](http://localhost:3000).
+2. Go to **Explore** (Compass icon).
+3. Select a Datasource:
+   - **Tempo:** Search for traces by ID or filter by Service Name.
+   - **Prometheus:** Query metrics (e.g., `http_server_request_duration_seconds_bucket`).
+   - **Loki:** Query logs (e.g., `{service_name="PoC-Materials"}`).
+
+> **Pro Tip:** Logs in Loki contain a "TraceID" link that jumps directly to the Trace in Tempo.
 
 ---
 
@@ -72,10 +106,14 @@ Log.Information("Created material {MaterialId}", material.Id);
 
 ## 🔍 Verification
 
-### 1. Local Verification (Console)
-By default, logs and spans are printed to the console in JSON format.
-- Look for `TraceId` and `SpanId` fields in the output.
-- Check for `app.startup_duration_ms` metric on startup.
+### 1. Check Integration
+Run the stack and your app. look at the OTel Collector logs:
+
+```bash
+docker compose -f docker/observability/docker-compose.yaml logs -f otel-collector
+```
+
+You should see "TracesExporter", "MetricsExporter", "LogsExporter" outputting data if the `debug` exporter is enabled.
 
 ### 2. AWS Lambda Status
 Check current Lambda logs in LocalStack:
