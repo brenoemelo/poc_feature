@@ -8,10 +8,10 @@ services:
   # -----------------------------------------------------
   gofeatureflag:
     image: gofeatureflag/go-feature-flag:v1.51.2
-    command: [ "--config", "/config/goff-proxy.yaml" ]
+    container_name: gofeatureflag
     volumes:
-      - ./flags.yaml:/config/flags.yaml
-      - ./goff-proxy.yaml:/config/goff-proxy.yaml
+      - ./flags.yaml:/goff/flags.yaml
+      - ./goff-proxy.yaml:/goff/goff-proxy.yaml
     ports:
       - "1031:1031" # API + Swagger UI
     networks:
@@ -20,3 +20,4 @@ services:
 networks:
   poc-net:
     external: true
+    name: poc_feature_poc-net

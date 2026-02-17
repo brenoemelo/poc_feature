@@ -4,17 +4,8 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.Infrastructure.ExternalServices;
 
-public class MaterialsClient : IMaterialsClient
+public sealed class MaterialsClient(HttpClient httpClient, ILogger<MaterialsClient> logger) : IMaterialsClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<MaterialsClient> _logger;
-
-    public MaterialsClient(HttpClient httpClient, ILogger<MaterialsClient> logger)
-    {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
-
     public async Task<IEnumerable<MaterialFormulation>> GetAllMaterialsAsync()
     {
         var allMaterials = new List<MaterialFormulation>();
@@ -26,7 +17,7 @@ public class MaterialsClient : IMaterialsClient
             
             try 
             {
-                var response = await _httpClient.GetFromJsonAsync<PagedResponse<MaterialFormulation>>(url);
+                var response = await httpClient.GetFromJsonAsync<PagedResponse<MaterialFormulation>>(url);
                 
                 if (response?.Data != null)
                 {
@@ -40,7 +31,7 @@ public class MaterialsClient : IMaterialsClient
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error fetching materials from Materials Service");
+                logger.LogError(ex, "Error fetching materials from Materials Service");
                 throw;
             }
         }

@@ -16,8 +16,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Observability (Serilog + OpenTelemetry)
 builder.AddPoCObservability("PoC-Costing", "1.0.0");
 
-// AWS Lambda Hosting
-Console.WriteLine("STARTING UP PoC.Costing with REST API");
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 // Dependency Injection

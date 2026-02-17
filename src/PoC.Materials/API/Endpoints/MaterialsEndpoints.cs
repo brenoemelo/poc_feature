@@ -1,8 +1,9 @@
 using FluentValidation;
 using PoC.Materials.API.Extensions;
 using PoC.Materials.Domain.Interfaces;
-using PoC.Shared.API;
+
 using PoC.Shared.Common;
+using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
 
 namespace PoC.Materials.API.Endpoints;
@@ -13,24 +14,29 @@ public static class MaterialsEndpoints
     {
         group.MapGet("/", GetAllMaterialsAsync)
              .WithName("GetMaterials")
+             .WithFeatureGate("materials-crud")
              .Produces<PagedResponse<MaterialFormulation>>();
 
         group.MapGet("/count", GetMaterialCountAsync)
              .WithName("GetMaterialCount")
-             .Produces<int>();
+             .WithFeatureGate("materials-crud")
+             .Produces<ApiResponse<object>>();
 
         group.MapGet("/{id}", GetMaterialByIdAsync)
              .WithName("GetMaterialById")
-             .Produces<MaterialFormulation>()
+             .WithFeatureGate("materials-crud")
+             .Produces<ApiResponse<MaterialFormulation>>()
              .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/", CreateMaterialAsync)
              .WithName("CreateMaterial")
-             .Produces<MaterialFormulation>(StatusCodes.Status201Created)
+             .WithFeatureGate("materials-crud")
+             .Produces<ApiResponse<MaterialFormulation>>(StatusCodes.Status201Created)
              .Produces(StatusCodes.Status400BadRequest);
  
         group.MapDelete("/{id}", DeleteMaterialAsync)
              .WithName("DeleteMaterial")
+             .WithFeatureGate("materials-crud")
              .Produces(StatusCodes.Status204NoContent)
              .Produces(StatusCodes.Status404NotFound);
 
@@ -60,33 +66,54 @@ public static class MaterialsEndpoints
 
     private static async Task<IResult> GetMaterialCountAsync(
         IMaterialRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
         logger.LogInformation("[MaterialQuery] Counting materials");
         var result = await repository.GetCountAsync();
 
-        return result.IsSuccess
-            ? Results.Ok(new { count = result.Value })
-            : result.ToProblem();
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialCount") ?? "/api/v1/materials/count";
+        var response = new ApiResponse<object>(
+            new { count = result.Value },
+            [new Link("self", selfUrl, "GET")]);
+
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> GetMaterialByIdAsync(
         string id,
         IMaterialRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
         logger.LogInformation("[MaterialQuery] Getting material {MaterialId}", id);
         var result = await repository.GetByIdAsync(id);
 
-        return result.IsSuccess
-            ? Results.Ok(result.Value)
-            : result.ToProblem();
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialById", new { id }) ?? $"/api/v1/materials/{id}";
+        var response = new ApiResponse<MaterialFormulation>(
+            result.Value,
+            [
+                new Link("self", selfUrl, "GET"),
+                new Link("delete", selfUrl, "DELETE")
+            ]);
+
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> CreateMaterialAsync(
         MaterialFormulation input,
         IMaterialRepository repository,
         IValidator<MaterialFormulation> validator,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
         logger.LogInformation(
@@ -97,7 +124,6 @@ public static class MaterialsEndpoints
         var validationResult = await validator.ValidateAsync(input);
         if (!validationResult.IsValid)
         {
-            logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
             logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
@@ -111,7 +137,14 @@ public static class MaterialsEndpoints
 
         logger.LogInformation("[MaterialCreation] Successfully saved material {MaterialId}", input.MaterialId);
 
-        return Results.Created($"/materials/{input.MaterialId}", input);
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialById", new { id = input.MaterialId })
+                      ?? $"/api/v1/materials/{input.MaterialId}";
+
+        var response = new ApiResponse<MaterialFormulation>(
+            input,
+            [new Link("self", selfUrl, "GET")]);
+
+        return Results.Created(selfUrl, response);
     }
  
     private static async Task<IResult> DeleteMaterialAsync(

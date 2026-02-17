@@ -5,7 +5,7 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-public sealed class DynamoDbCostingRepository(IDynamoDBContext context) : ICostingRepository
+public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger) : ICostingRepository
 {
     public async Task<Result> UpsertPriceAsync(ComponentPriceRequest request)
     {
@@ -14,7 +14,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context) : ICosti
             var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName);
             var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
 
-            Console.WriteLine($"[UpsertPriceAsync] Processing {request.ComponentName}. Existing: {existing != null}, Version: {existing?.Version}");
+            logger.LogDebug("[UpsertPrice] Processing {ComponentName}. Existing: {Exists}, Version: {Version}", request.ComponentName, existing != null, existing?.Version);
 
             entity.UnitPrice = request.UnitPrice;
             entity.Unit = request.Unit;
@@ -25,7 +25,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context) : ICosti
             var config = new DynamoDBOperationConfig();
             if (existing != null && existing.Version == null)
             {
-                Console.WriteLine("[UpsertPriceAsync] Existing item has no version. Skipping version check.");
+                logger.LogDebug("[UpsertPrice] Existing item has no version. Skipping version check");
                 config.SkipVersionCheck = true;
             }
 

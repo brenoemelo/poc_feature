@@ -3,99 +3,82 @@ using Amazon.Lambda.SQSEvents;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
 using PoC.Shared.Events;
+using PoC.Shared.Infrastructure.Extensions;
 using System.Text.Json;
 
 namespace PoC.Materials.Functions;
 
-public class MaterialIngestionFunction
+public sealed class MaterialIngestionFunction
 {
     private readonly IMaterialRepository _repository;
+    private readonly ILogger<MaterialIngestionFunction> _logger;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MaterialIngestionFunction"/> class.
-    /// Default constructor for Lambda runtime.
-    /// Initializes dependency injection container and resolves dependencies.
-    /// </summary>
     public MaterialIngestionFunction()
     {
-        var services = new ServiceCollection();
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables()
-            .Build();
+        var builder = Host.CreateApplicationBuilder();
 
-        services.AddLogging(logging =>
-        {
-            logging.AddConfiguration(configuration.GetSection("Logging"));
-            logging.AddConsole();
-        });
+        builder.AddPoCObservability("PoC-Materials-Worker", "1.0.0");
+        builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
-        services.AddMaterialsInfrastructure(configuration);
+        var host = builder.Build();
 
-        var serviceProvider = services.BuildServiceProvider();
-        _repository = serviceProvider.GetRequiredService<IMaterialRepository>();
+        _repository = host.Services.GetRequiredService<IMaterialRepository>();
+        _logger = host.Services.GetRequiredService<ILogger<MaterialIngestionFunction>>();
     }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MaterialIngestionFunction"/> class.
-    /// Constructor for testing or manual dependency injection.
-    /// </summary>
-    /// <param name="repository">The material repository.</param>
-    public MaterialIngestionFunction(IMaterialRepository repository)
+    public MaterialIngestionFunction(IMaterialRepository repository, ILogger<MaterialIngestionFunction> logger)
     {
         _repository = repository;
+        _logger = logger;
     }
 
 #pragma warning disable VSTHRD200
-    public async Task FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
+    public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        context.Logger.LogInformation($"[MaterialIngestion] Processing {sqsEvent.Records.Count} SQS messages");
+        var batchResponse = new SQSBatchResponse();
+
+        _logger.LogInformation("[MaterialIngestion] Processing {Count} SQS messages", sqsEvent.Records.Count);
 
         foreach (var record in sqsEvent.Records)
         {
             try
             {
-                await ProcessSqsRecordAsync(record, context);
+                await ProcessSqsRecordAsync(record);
             }
             catch (Exception ex)
             {
-                context.Logger.LogError(
-                    $"[MaterialIngestion] Error processing record {record.MessageId}: {ex.Message}");
+                _logger.LogError(ex, "[MaterialIngestion] Failed to process record {MessageId}", record.MessageId);
+                batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                {
+                    ItemIdentifier = record.MessageId
+                });
             }
         }
 
-        context.Logger.LogInformation("[MaterialIngestion] Batch processing complete");
+        _logger.LogInformation(
+            "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}",
+            sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
+            batchResponse.BatchItemFailures.Count);
+
+        return batchResponse;
     }
 
-    private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record, ILambdaContext context)
+    private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)
     {
-        context.Logger.LogInformation($"[MaterialIngestion] Raw Body Length: {record.Body?.Length ?? 0}");
-        
-        if (string.IsNullOrEmpty(record.Body))
-        {
-            context.Logger.LogWarning($"[MaterialIngestion] Record {record.MessageId} has empty body");
-            return;
-        }
-
-        var snippet = record.Body.Length > 200 ? record.Body.Substring(0, 200) : record.Body;
-        context.Logger.LogInformation($"[MaterialIngestion] Raw Body Snippet: {snippet}");
-
         using var doc = JsonDocument.Parse(record.Body);
         var root = doc.RootElement;
 
         if (!root.TryGetProperty("Message", out var messageProperty))
         {
-            context.Logger.LogWarning(
-                $"[MaterialIngestion] Record {record.MessageId} has no 'Message' property");
+            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has no 'Message' property", record.MessageId);
             return;
         }
 
         var messageJson = messageProperty.GetString();
         if (string.IsNullOrEmpty(messageJson))
         {
-            context.Logger.LogWarning(
-                $"[MaterialIngestion] Record {record.MessageId} has empty message");
+            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has empty message", record.MessageId);
             return;
         }
 
@@ -105,29 +88,31 @@ public class MaterialIngestionFunction
 
         if (materialEvent?.Material is null)
         {
-            context.Logger.LogWarning(
-                $"[MaterialIngestion] Record {record.MessageId} has null material");
+            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has null material", record.MessageId);
             return;
         }
 
-        context.Logger.LogInformation(
-            $"[MaterialIngestion] Ingesting material: {materialEvent.Material.Name} ({materialEvent.Material.MaterialId})");
+        _logger.LogInformation(
+            "[MaterialIngestion] Ingesting material {MaterialName} ({MaterialId})",
+            materialEvent.Material.Name,
+            materialEvent.Material.MaterialId);
 
         var result = await _repository.SaveAsync(materialEvent.Material);
 
         if (result.IsFailure)
         {
-             // Idempotency check: If the material already exists (conditional check failed), we consider it a success.
-             if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
-             {
-                 context.Logger.LogWarning($"[MaterialIngestion] Material {materialEvent.Material.MaterialId} ingestion failed due to Optimistic Locking (Version mismatch or Item already exists). Skipping (idempotent).");
-                 return;
-             }
+            // Idempotency: version conflict means item already exists — safe to skip.
+            if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "[MaterialIngestion] Material {MaterialId} skipped due to Optimistic Locking conflict (idempotent)",
+                    materialEvent.Material.MaterialId);
+                return;
+            }
 
-             throw new InvalidOperationException($"Failed to ingest material: {result.Error.Code} - {result.Error.Description}");
+            throw new InvalidOperationException($"Failed to ingest material: {result.Error.Code} - {result.Error.Description}");
         }
 
-        context.Logger.LogInformation(
-            $"[MaterialIngestion] Successfully ingested material {materialEvent.Material.MaterialId}");
+        _logger.LogInformation("[MaterialIngestion] Successfully ingested material {MaterialId}", materialEvent.Material.MaterialId);
     }
 }

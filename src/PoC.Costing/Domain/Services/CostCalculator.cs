@@ -3,7 +3,7 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.Domain.Services;
 
-public class CostCalculator : ICostCalculator
+public sealed class CostCalculator : ICostCalculator
 {
     public Result<CostCalculationResponse> Calculate(
         string materialId,

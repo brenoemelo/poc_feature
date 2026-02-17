@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:4.1.0
     ports:
       - 4566:4566 # LocalStack Gateway
       - 4510-4559:4510-4559 # external services port range
@@ -84,7 +84,7 @@ services:
   # Grafana (The UI)
   # -----------------------------------------------------
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.2-alpine
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin

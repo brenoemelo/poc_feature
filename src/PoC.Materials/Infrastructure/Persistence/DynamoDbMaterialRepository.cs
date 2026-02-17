@@ -2,6 +2,7 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Options;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
@@ -9,13 +10,15 @@ using System.Text;
 
 namespace PoC.Materials.Infrastructure.Persistence;
 
-public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client) : IMaterialRepository
+public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client, IOptions<MaterialsOptions> options) : IMaterialRepository
 {
+    private readonly MaterialsOptions _options = options.Value;
+
     public async Task<Result<PagedResult<MaterialFormulation>>> GetAllAsync(int limit, string? cursor)
     {
         try
         {
-            var tableName = Environment.GetEnvironmentVariable("MATERIALS_TABLE_NAME") ?? "materials-table";
+            var tableName = _options.TableName;
             var request = new QueryRequest
             {
                 TableName = tableName,
@@ -87,7 +90,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
     {
         try
         {
-            var tableName = Environment.GetEnvironmentVariable("MATERIALS_TABLE_NAME") ?? "materials-table";
+            var tableName = _options.TableName;
             
             // For PoC accuracy, we use Query on the GSI instead of DescribeTable (approximate).
             var request = new QueryRequest

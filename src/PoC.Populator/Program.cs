@@ -11,8 +11,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Observability (Serilog + OpenTelemetry)
 builder.AddPoCObservability("PoC-Populator", "1.0.0");
 
-// AWS Lambda Hosting
-Console.WriteLine("STARTING UP PoC.Populator with REST API");
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 // Dependency Injection
@@ -21,7 +19,7 @@ builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 // JSON Configuration
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
 });
 
 var app = builder.Build();

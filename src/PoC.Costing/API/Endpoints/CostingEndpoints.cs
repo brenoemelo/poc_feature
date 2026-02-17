@@ -2,7 +2,8 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Domain.Services;
-using PoC.Shared.API;
+
+using PoC.Shared.Common;
 using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
 
@@ -21,7 +22,8 @@ public static class CostingEndpoints
              .WithFeatureGate("price-calculation");
 
         group.MapGet("/estimations/batch", CalculateAllCostsAsync)
-             .WithName("CalculateAllCosts");
+             .WithName("CalculateAllCosts")
+             .WithFeatureGate("costing-batch");
 
         return group;
     }
@@ -30,6 +32,8 @@ public static class CostingEndpoints
         [FromBody] ComponentPriceRequest request,
         [FromServices] ICostingRepository repository,
         [FromServices] IValidator<ComponentPriceRequest> validator,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
         var validationResult = await validator.ValidateAsync(request);
@@ -41,9 +45,15 @@ public static class CostingEndpoints
         logger.LogInformation("Upserting price for component: {ComponentName}", request.ComponentName);
         var result = await repository.UpsertPriceAsync(request);
 
-        return result.IsSuccess
-            ? Results.Ok(new { message = "Price updated successfully" })
-            : result.ToProblem();
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "UpsertPrice") ?? "/api/v1/costing/prices";
+        var response = new ApiResponse<object>(
+            new { message = "Price updated successfully", component_name = request.ComponentName },
+            [new Link("self", selfUrl, "POST")]);
+
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> CalculateCostAsync(
@@ -51,6 +61,8 @@ public static class CostingEndpoints
         [FromServices] ICostingRepository repository,
         [FromServices] ICostCalculator costCalculator,
         [FromServices] IValidator<CostCalculationRequest> validator,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
         var validationResult = await validator.ValidateAsync(request);
@@ -75,13 +87,23 @@ public static class CostingEndpoints
             request.DesiredMarginPercent, 
             pricesResult.Value);
 
-        return result.IsSuccess ? Results.Ok(result.Value) : result.ToProblem();
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "CalculateCost") ?? "/api/v1/costing/estimations";
+        var response = new ApiResponse<CostCalculationResponse>(
+            result.Value,
+            [new Link("self", selfUrl, "POST")]);
+
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> CalculateAllCostsAsync(
         [FromServices] IMaterialsClient materialsClient,
         [FromServices] ICostCalculator costCalculator,
         [FromServices] ICostingRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
         logger.LogInformation("Starting bulk cost calculation for all materials");
@@ -97,9 +119,14 @@ public static class CostingEndpoints
             return Results.Problem("Failed to fetch materials from Materials Service", statusCode: 502);
         }
 
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "CalculateAllCosts") ?? "/api/v1/costing/estimations/batch";
+
         if (!materials.Any())
         {
-            return Results.Ok(new List<CostCalculationResponse>());
+            var emptyResponse = new ApiResponse<IReadOnlyList<CostCalculationResponse>>(
+                [],
+                [new Link("self", selfUrl, "GET")]);
+            return Results.Ok(emptyResponse);
         }
 
         var uniqueComponents = materials.SelectMany(m => m.Formulation).Select(f => f.Component).Distinct().ToList();
@@ -132,6 +159,12 @@ public static class CostingEndpoints
             }
         }
 
-        return Results.Ok(results);
+        var response = new ApiResponse<IReadOnlyList<CostCalculationResponse>>(
+            results,
+            [new Link("self", selfUrl, "GET")]);
+
+        logger.LogInformation("Batch cost calculation completed. Processed {Count} materials", results.Count);
+
+        return Results.Ok(response);
     }
 }

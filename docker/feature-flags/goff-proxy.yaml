@@ -3,7 +3,7 @@
 
 retriever:
   kind: file
-  path: /config/flags.yaml
+  path: /goff/flags.yaml
 
 listen: 1031
 enableSwagger: true

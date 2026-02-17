@@ -1,9 +1,9 @@
-using Amazon.SQS;
-using Amazon.SQS.Model;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using PoC.Populator.Domain.Interfaces;
+using PoC.Shared.Common;
+using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
-using System.Text.Json;
 
 namespace PoC.Populator.API.Endpoints;
 
@@ -12,7 +12,8 @@ public static class PopulatorEndpoints
     public static RouteGroupBuilder MapPopulatorEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/jobs", HandlePopulationRequestAsync)
-             .WithName("CreatePopulationJob");
+             .WithName("CreatePopulationJob")
+             .WithFeatureGate("population-jobs");
 
         return group;
     }
@@ -20,7 +21,9 @@ public static class PopulatorEndpoints
     private static async Task<IResult> HandlePopulationRequestAsync(
         [FromBody] PopulationRequest request,
         [FromServices] IValidator<PopulationRequest> validator,
-        [FromServices] IAmazonSQS sqsClient,
+        [FromServices] IPopulationService populationService,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
         var validationResult = await validator.ValidateAsync(request);
@@ -29,48 +32,21 @@ public static class PopulatorEndpoints
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
-        int batchSize = 250;
-        int totalBatches = (int)Math.Ceiling((double)request.Count / batchSize);
-        logger.LogInformation("Splitting {Count} records into {TotalBatches} batches.", request.Count, totalBatches);
+        logger.LogInformation("Processing population request for {Count} items.", request.Count);
 
-        var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
-        if (string.IsNullOrEmpty(serviceUrl))
+        var result = await populationService.CreateJobAsync(request);
+
+        if (result.IsFailure)
         {
-            var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME") ?? "localhost";
-            var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
-            serviceUrl = $"http://{localStackHost}:{edgePort}";
+            return result.ToProblem();
         }
 
-        var queueUrl = $"{serviceUrl}/000000000000/populator-queue";
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "CreatePopulationJob") ?? "/api/v1/populator/jobs";
 
-        var sendTasks = new List<Task>();
+        var response = new ApiResponse<PopulationJobResponse>(
+            result.Value,
+            [new Link("self", selfUrl, "POST")]);
 
-        for (int i = 0; i < totalBatches; i++)
-        {
-            int currentBatchSize = (i == totalBatches - 1) ? request.Count - (i * batchSize) : batchSize;
-
-            var job = new PopulationJob(
-                request.Target,
-                currentBatchSize,
-                request.MinComponents,
-                request.MaxComponents);
-
-            var message = new SendMessageRequest
-            {
-                QueueUrl = queueUrl,
-                MessageBody = JsonSerializer.Serialize(job)
-            };
-
-            sendTasks.Add(sqsClient.SendMessageAsync(message));
-        }
-
-        await Task.WhenAll(sendTasks);
-
-        return Results.Accepted(value: new
-        {
-            message = "Population job accepted",
-            total_records = request.Count,
-            batches_queued = totalBatches
-        });
+        return Results.Accepted(uri: selfUrl, value: response);
     }
 }

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using PoC.Shared.Common;
 
-namespace PoC.Shared.API;
+namespace PoC.Shared.Infrastructure.Extensions;
 
 public static class ResultExtensions
 {

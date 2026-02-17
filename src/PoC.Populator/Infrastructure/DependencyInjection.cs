@@ -1,5 +1,8 @@
 using Amazon.SQS;
 using FluentValidation;
+using Microsoft.Extensions.Options;
+using PoC.Populator.Domain.Interfaces;
+using PoC.Populator.Infrastructure.Services;
 using PoC.Shared.Validators;
 
 namespace PoC.Populator.Infrastructure;
@@ -10,21 +13,36 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssemblyContaining<PopulationRequestValidator>();
 
-        var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
-        if (string.IsNullOrEmpty(serviceUrl))
+        services.Configure<PopulatorOptions>(options =>
         {
-            var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME") ?? "localhost";
-            var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
-            serviceUrl = $"http://{localStackHost}:{edgePort}";
-        }
+            configuration.GetSection(PopulatorOptions.SectionName).Bind(options);
+
+            if (string.IsNullOrEmpty(options.QueueUrl))
+            {
+                var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
+                if (string.IsNullOrEmpty(serviceUrl))
+                {
+                    var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME") ?? "localhost";
+                    var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
+                    serviceUrl = $"http://{localStackHost}:{edgePort}";
+                }
+
+                options.QueueUrl = $"{serviceUrl}/000000000000/populator-queue";
+            }
+        });
+
+        var sp = services.BuildServiceProvider();
+        var opts = sp.GetRequiredService<IOptions<PopulatorOptions>>().Value;
 
         var sqsConfig = new AmazonSQSConfig
         {
-            ServiceURL = serviceUrl,
+            ServiceURL = opts.QueueUrl.Replace("/000000000000/populator-queue", string.Empty), // Extract base URL
             AuthenticationRegion = "us-east-1"
         };
 
         services.AddSingleton<IAmazonSQS>(sp => new AmazonSQSClient(sqsConfig));
+        
+        services.AddScoped<IPopulationService, PopulationService>();
 
         return services;
     }

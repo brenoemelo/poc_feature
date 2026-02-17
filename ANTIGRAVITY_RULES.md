@@ -1,13 +1,14 @@
 # PoC Project - Architecture & Coding Guidelines
 
 ## 1. Overview & Tech Stack
-This project follows an **Event-Driven Microservices Architecture** built upon the .NET 8 ecosystem.
-* **Runtime:** .NET 8 (C# 12)
-* **Database:** Amazon DynamoDB (Single Table Design preferred)
-* **Messaging:** Amazon SNS (Topics) & Amazon SQS (Queues)
-* **Observability:** OpenTelemetry (OTLP), W3C Trace Context
-* **Feature Management:** OpenFeature Standard (Provider: GoFeatureFlag)
-* **Infrastructure:** AWS (LocalStack for Dev) & Docker
+This project follows an **Event-Driven Microservices Architecture** built upon the .NET ecosystem.
+* **Runtime:** Latest Stable .NET (currently .NET 8 / C# 12+). **Always** utilize the most modern language features available.
+* **Database:** Amazon DynamoDB (Single Table Design preferred).
+* **Messaging:** Amazon SNS (Topics) & Amazon SQS (Queues).
+* **Observability:** OpenTelemetry (OTLP), W3C Trace Context.
+* **Feature Management:** OpenFeature Standard (Provider: GoFeatureFlag).
+* **Infrastructure:** AWS (LocalStack for Dev) & Docker.
+* **Currency:** Always use the latest stable tags for Docker images (prefer `alpine` for size/security) and the latest secure versions of NuGet packages.
 
 ## 2. Language & Localization Rules
 **Strict Rule:** English is the sole official language of this project.
@@ -34,6 +35,12 @@ Every line of code must adhere to these principles. Violations are considered im
 * **FluentValidation:** Use `FluentValidation` libraries in the Application layer.
 * **Result Pattern:** Methods should return a `Result<T>` wrapper indicating Success or Failure.
 * **API Errors:** All HTTP APIs must return **RFC 7807 ProblemDetails** for 400-500 errors.
+
+### 3.3. High-Scale Engineering Standards
+* **Security First:** All implementations must be secure by design. Validate all inputs, sanitize all outputs, and strictly follow the Principle of Least Privilege (IAM/Database).
+* **Performance:** Optimize hot paths. Minimize heap allocations. Avoid "Sync-over-Async" at all costs.
+* **Scalability:** Services must be stateless and horizontally scalable.
+* **Robustness:** Assume dependencies (Database, Network, AWS) will fail. Implement Resilience patterns (Retries, Circuit Breakers, Fallbacks) for **every** external call.
 
 ## 4. Microservices Strategy & Boundaries
 
@@ -161,6 +168,10 @@ To maximize AI assistant efficiency (Trae, Cursor, Copilot), we maintain specifi
 ### 15.2. Prompting Strategy
 * **Plan Before Code:** Ask the AI to "Plan first, then implement".
 * **Spec-First:** For complex logic, ask the AI to generate a Gherkin Spec or a Checklist before writing C#.
+
+### 15.3. MCP & Context Retrieval
+* **Context Check:** The AI must always consult the `Personal Context` (Context 7) or equivalent Model Context Protocol tools if available, to ensure the solution aligns with the latest unwritten constraints or user preferences.
+* **Modernity Check:** Before implementing, verify if the proposed solution uses the most current stable libraries and patterns available in the context.
 
 ## 16. Feature Flags (OpenFeature)
 Decouple deployment from release using the **OpenFeature** standard.

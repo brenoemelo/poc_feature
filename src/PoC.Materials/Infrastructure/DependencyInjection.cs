@@ -11,6 +11,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.Configure<MaterialsOptions>(configuration.GetSection(MaterialsOptions.SectionName));
         services.AddAWSService<IAmazonDynamoDB>();
 
         services.AddScoped<IDynamoDBContext, DynamoDBContext>();

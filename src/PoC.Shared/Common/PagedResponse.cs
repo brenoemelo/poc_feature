@@ -2,6 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace PoC.Shared.Common;
 
+public record ApiResponse<T>(
+    [property: JsonPropertyName("data")] T Data,
+    [property: JsonPropertyName("links")] IEnumerable<Link> Links
+);
+
 public record PagedResponse<T>(
     [property: JsonPropertyName("data")] IEnumerable<T> Data,
     [property: JsonPropertyName("meta")] PaginationMeta Meta,

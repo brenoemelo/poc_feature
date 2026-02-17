@@ -14,3 +14,24 @@ price-ingestion:
     disabled: false
   defaultRule:
     variation: disabled
+
+materials-crud:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+
+costing-batch:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+
+population-jobs:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled

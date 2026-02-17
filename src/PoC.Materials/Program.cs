@@ -14,10 +14,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Observability (Serilog + OpenTelemetry)
 builder.AddPoCObservability("PoC-Materials", "1.0.0");
 
-Console.WriteLine("STARTING UP PoC.Materials with REST API");
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
+
+// Feature Flags (OpenFeature + GO Feature Flag)
+builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();
 
