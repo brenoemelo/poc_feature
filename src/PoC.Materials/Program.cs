@@ -36,6 +36,8 @@ app.UsePoCDefaults();
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();
 
+app.MapGet("/health", () => Results.Ok(new { status = "UP", service = "PoC-Materials" }));
+
 app.Run();
 
 /// <summary>

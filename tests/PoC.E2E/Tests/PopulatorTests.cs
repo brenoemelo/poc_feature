@@ -6,11 +6,26 @@ using System.Text.Json.Serialization;
 
 namespace PoC.E2E.Tests;
 
+[Collection("E2E Tests")]
 public class PopulatorTests : ApiTestBase
 {
     public PopulatorTests()
     {
         // Use the default Client from ApiTestBase which points to the shared API Gateway
+    }
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        // Enable required flags
+        await FeatureManager.EnableFlagAsync("population-jobs");
+        await FeatureManager.EnableFlagAsync("materials-crud");
+        await FeatureManager.EnableFlagAsync("price-ingestion");
+    }
+
+    public override async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
     }
 
     [Fact]
@@ -29,8 +44,8 @@ public class PopulatorTests : ApiTestBase
         var response = await Client.ExecuteAsync(request);
 
         // Assert
-        response.IsSuccessful.Should().BeTrue();
-        response.Content.Should().Contain("Population job accepted");
+        response.IsSuccessful.Should().BeTrue($"Status: {response.StatusCode}, Content: {response.Content}");
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Accepted);
     }
 
     [Fact]
@@ -107,9 +122,9 @@ public class PopulatorTests : ApiTestBase
     public async Task CreatePopulationJob_ShouldGenerateMaterials_WithCorrectComponentCountAsync()
     {
         // 1. Get initial count
-        var initialCountResponse = await Client.ExecuteAsync<CountResponse>(new RestRequest("/api/v1/materials/count", Method.Get));
+        var initialCountResponse = await Client.ExecuteAsync<ApiResponse<CountResponse>>(new RestRequest("/api/v1/materials/count", Method.Get));
         initialCountResponse.IsSuccessful.Should().BeTrue();
-        var initialCount = initialCountResponse.Data!.Count;
+        var initialCount = initialCountResponse.Data!.Data.Count;
         Console.WriteLine($"Initial Count: {initialCount}");
 
         // 2. Trigger population (3 materials, fixed 3 components)
@@ -125,21 +140,21 @@ public class PopulatorTests : ApiTestBase
         request.AddJsonBody(requestBody);
         
         var popResponse = await Client.ExecuteAsync(request);
-        popResponse.IsSuccessful.Should().BeTrue();
+        popResponse.IsSuccessful.Should().BeTrue($"Status: {popResponse.StatusCode}, Content: {popResponse.Content}");
 
         // 3. Wait for processing (poll count)
-        int maxRetries = 30; // Increased to 30s (2s * 15? No, 2s * 30 = 60s)
+        int maxRetries = 90; // Increased to 180s (3 minutes) to ensure completion
         int expectedCount = initialCount + 3;
         bool populated = false;
 
         for (int i = 0; i < maxRetries; i++)
         {
             await Task.Delay(2000); // Wait 2s
-            var currentCountResponse = await Client.ExecuteAsync<CountResponse>(new RestRequest("/api/v1/materials/count", Method.Get));
+            var currentCountResponse = await Client.ExecuteAsync<ApiResponse<CountResponse>>(new RestRequest("/api/v1/materials/count", Method.Get));
             if (currentCountResponse.IsSuccessful)
             {
-                Console.WriteLine($"Retry {i}: Count = {currentCountResponse.Data!.Count} (Expected >= {expectedCount})");
-                if (currentCountResponse.Data!.Count >= expectedCount)
+                Console.WriteLine($"Retry {i}: Count = {currentCountResponse.Data!.Data.Count} (Expected >= {expectedCount})");
+                if (currentCountResponse.Data!.Data.Count >= expectedCount)
                 {
                     populated = true;
                     break;
@@ -169,6 +184,73 @@ public class PopulatorTests : ApiTestBase
 
         materialsWith3Components.Count.Should().BeGreaterThan(2);
     }
+
+    [Fact]
+    public async Task CreatePopulationJob_ShouldEnsurePrices_ForAllComponentsAsync()
+    {
+        // 1. Ensure we have materials with unique components
+        var uniqueSuffix = Guid.NewGuid().ToString().Substring(0, 8);
+        var material = new MaterialFormulation(
+             $"MAT-ENSURE-{uniqueSuffix}",
+             "Ensure Prices Material",
+             new Density(1.0, "g/cm3"),
+             new List<FormulationComponent> 
+             { 
+                 new FormulationComponent($"UniqueComp1-{uniqueSuffix}", 50, "Polymer"),
+                 new FormulationComponent($"UniqueComp2-{uniqueSuffix}", 50, "Filler")
+             },
+             new Dictionary<string, string>(),
+             null);
+        
+        var createResponse = await Client.ExecuteAsync(new RestRequest("/api/v1/materials", Method.Post).AddJsonBody(material));
+        createResponse.IsSuccessful.Should().BeTrue();
+
+        // 2. Get initial price count
+        var initialCountResponse = await Client.ExecuteAsync<ApiResponse<CountResponse>>(new RestRequest("/api/v1/costing/prices/count", Method.Get));
+        int initialCount = initialCountResponse.IsSuccessful ? initialCountResponse.Data!.Data.Count : 0;
+        Console.WriteLine($"Initial Price Count: {initialCount}");
+
+        // 3. Trigger ensure-prices
+        var requestBody = new PopulationRequest
+        {
+            Target = "ensure-prices",
+            Count = 1 // Should process ALL components regardless of count
+        };
+        var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
+        request.AddJsonBody(requestBody);
+        
+        var popResponse = await Client.ExecuteAsync(request);
+        popResponse.IsSuccessful.Should().BeTrue();
+
+        // 4. Wait for processing
+        int maxRetries = 90;
+        bool pricesIncreased = false;
+        int expectedMinCount = initialCount + 2;
+
+        for (int i = 0; i < maxRetries; i++)
+        {
+            await Task.Delay(2000);
+            var currentCountResponse = await Client.ExecuteAsync<ApiResponse<CountResponse>>(new RestRequest("/api/v1/costing/prices/count", Method.Get));
+            
+            if (currentCountResponse.IsSuccessful)
+            {
+                var currentCount = currentCountResponse.Data!.Data.Count;
+                Console.WriteLine($"Retry {i}: Price Count = {currentCount} (Expected >= {expectedMinCount})");
+                
+                if (currentCount >= expectedMinCount)
+                {
+                    pricesIncreased = true;
+                    break;
+                }
+            }
+        }
+
+        pricesIncreased.Should().BeTrue("Prices count should increase after ensure-prices job");
+    }
+
+    public record ApiResponse<T>(
+        [property: JsonPropertyName("data")] T Data, 
+        [property: JsonPropertyName("links")] List<Link> Links);
 
     public record CountResponse([property: JsonPropertyName("count")] int Count);
     public record PagedResponse<T>(

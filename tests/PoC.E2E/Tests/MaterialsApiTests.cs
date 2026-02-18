@@ -9,6 +9,7 @@ using RestSharp;
 
 namespace PoC.E2E.Tests;
 
+[Collection("E2E Tests")]
 public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
 {
     private readonly List<string> _createdIds = new();
@@ -35,6 +36,9 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
     [Fact]
     public async Task Materials_Lifecycle_HappyPath_Should_CreateQueryDeleteAndReturn404Async()
     {
+        // Ensure flag is enabled
+        await FeatureManager.EnableFlagAsync("materials-crud");
+
         var materialId = $"e2e-{Guid.NewGuid():N}";
         await InsertMaterialDirectlyAsync(materialId, "E2E Test Material");
         _createdIds.Add(materialId);
@@ -50,11 +54,12 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         listResponse.Data.Data.Should().NotBeEmpty(because: "listing should return at least some materials");
 
         var getRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Get);
-        var getResponse = await Client.ExecuteAsync<MaterialResponse>(getRequest);
+        var getResponse = await Client.ExecuteAsync<ApiResponse<MaterialResponse>>(getRequest);
 
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK, because: $"material {materialId} must exist. Content: {getResponse.Content}");
         getResponse.Data.Should().NotBeNull();
-        getResponse.Data!.MaterialId.Should().Be(materialId);
+        getResponse.Data!.Data.Should().NotBeNull();
+        getResponse.Data!.Data.MaterialId.Should().Be(materialId);
 
         var deleteRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Delete);
         var deleteResponse = await Client.ExecuteAsync(deleteRequest);
@@ -89,13 +94,35 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         response.StatusCode.Should().NotBe(HttpStatusCode.NoContent, because: "must not return 204 when nothing is deleted");
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
-    public async Task DisposeAsync()
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        // Ensure flag is enabled for happy path
+        await FeatureManager.EnableFlagAsync("materials-crud");
+    }
+
+    public override async Task DisposeAsync()
     {
         foreach (var id in _createdIds)
         {
             await DeleteDirectAsync(id);
         }
+
+        await base.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Get_Materials_WhenFlagDisabled_Should_Return_404Async()
+    {
+        // Arrange
+        await FeatureManager.DisableFlagAsync("materials-crud");
+
+        // Act
+        var request = new RestRequest("/api/v1/materials", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "endpoint should be disabled when flag is off");
     }
 
     private async Task InsertMaterialDirectlyAsync(string materialId, string name)
@@ -164,6 +191,10 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         [property: JsonPropertyName("material_id")] string MaterialId,
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("properties")] Dictionary<string, string>? Properties);
+
+    public record ApiResponse<T>(
+        [property: JsonPropertyName("data")] T Data,
+        [property: JsonPropertyName("links")] List<Link> Links);
 
     public record PagedResponse<T>(
         [property: JsonPropertyName("data")] List<T> Data,

@@ -1,0 +1,30 @@
+price-calculation:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+price-ingestion:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+materials-crud:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: disabled
+costing-batch:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled
+population-jobs:
+  variations:
+    enabled: true
+    disabled: false
+  defaultRule:
+    variation: enabled

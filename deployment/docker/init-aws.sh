@@ -28,8 +28,13 @@ awslocal sns subscribe --topic-arn $TOPIC_ARN --protocol sqs --notification-endp
 # Criar Tabela DynamoDB para Materiais
 awslocal dynamodb create-table \
     --table-name materials-table \
-    --attribute-definitions AttributeName=material_id,AttributeType=S \
-    --key-schema AttributeName=material_id,KeyType=HASH \
+    --attribute-definitions \
+        AttributeName=material_id,AttributeType=S \
+        AttributeName=record_type,AttributeType=S \
+    --key-schema \
+        AttributeName=material_id,KeyType=HASH \
+    --global-secondary-indexes \
+        "[{\"IndexName\": \"IX_Materials_By_Type\", \"KeySchema\": [{\"AttributeName\": \"record_type\", \"KeyType\": \"HASH\"}, {\"AttributeName\": \"material_id\", \"KeyType\": \"RANGE\"}], \"Projection\": {\"ProjectionType\": \"ALL\"}, \"ProvisionedThroughput\": {\"ReadCapacityUnits\": 5, \"WriteCapacityUnits\": 5}}]" \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
 
 # Criar Tabela DynamoDB para Preços de Componentes (Costing Engine)
@@ -41,6 +46,12 @@ awslocal dynamodb create-table \
 
 # Criar Bucket S3 para Materiais (evita erro NoSuchBucket)
 awslocal s3 mb s3://poc-materials-data
+
+
+# Create Feature Flags Bucket and File
+awslocal s3 mb s3://flags
+echo '{"population-jobs": {"default": true}}' > /tmp/flags.json
+awslocal s3 cp /tmp/flags.json s3://flags/flags.json
 
 echo "Resources initialized!"
 
@@ -63,7 +74,7 @@ create_lambda() {
       --zip-file "fileb://$zip" \
       --timeout 30 \
       --memory-size 512 \
-      --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+      --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317,OTEL_EXPORTER_OTLP_PROTOCOL=grpc,Otel__Endpoint=http://otel-collector:4317,Otel__Protocol=grpc,OTEL_SERVICE_NAME=$name,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
 
     # Create Function URL
     awslocal lambda create-function-url-config \
@@ -93,7 +104,7 @@ if [ -f "/opt/deploy/PoC.Populator.zip" ]; then
     --zip-file fileb:///opt/deploy/PoC.Populator.zip \
     --timeout 30 \
     --memory-size 512 \
-    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_}"
+    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_SERVICE_NAME=PoC-Populator-Worker,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
 
   # Event source mapping to SQS
   awslocal lambda create-event-source-mapping \
@@ -113,7 +124,7 @@ if [ -f "/opt/deploy/PoC.Materials.zip" ]; then
     --zip-file fileb:///opt/deploy/PoC.Materials.zip \
     --timeout 30 \
     --memory-size 512 \
-    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test}"
+    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_SERVICE_NAME=PoC-Materials-Ingestion,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
 
   # Event source mapping to SQS
   awslocal lambda create-event-source-mapping \

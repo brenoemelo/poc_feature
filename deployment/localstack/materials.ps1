@@ -36,7 +36,7 @@ $ZipPath = Join-Path $RepoRoot $ZipPath
 Write-Log "Starting Build & Package for $FunctionName..." "Info"
 
 if (Test-Path $PublishDir) { Remove-Item -Recurse -Force $PublishDir }
-dotnet publish $ProjectPath -c Release -o $PublishDir -r linux-x64 --self-contained false
+dotnet publish $ProjectPath -c Release -o $PublishDir -r linux-x64 --self-contained false -p:PublishReadyToRun=false
 if ($LASTEXITCODE -ne 0) { throw "Publish failed with exit code $LASTEXITCODE" }
 
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
@@ -96,7 +96,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
     "--memory-size", "512",
-    "--environment", "Variables={MATERIALS_TABLE_NAME=materials-table,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
+    "--environment", "Variables={MATERIALS_TABLE_NAME=materials-table,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,$(Get-CommonEnvVars)}"
 ) | Out-Null
 
 # 2. Create Ingestion Worker Function
@@ -109,7 +109,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "30",
     "--memory-size", "512",
-    "--environment", "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:14318/v1/traces,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://host.docker.internal:14318/v1/traces,Otel__Protocol=http}"
+    "--environment", "Variables={MATERIALS_TABLE_NAME=materials-table,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,$(Get-CommonEnvVars)}"
 ) | Out-Null
 
 # 3. Configure Function URL & Public Access

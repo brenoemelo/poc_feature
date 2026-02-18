@@ -24,7 +24,7 @@ services:
   # Exports to Tempo, Prometheus, Loki
   # -----------------------------------------------------
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.145.0
+    image: otel/opentelemetry-collector-contrib:0.88.0
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
@@ -32,15 +32,21 @@ services:
       - "4317:4317" # OTLP gRPC receiver
       - "4318:4318" # OTLP HTTP receiver
       - "8889:8889" # Prometheus exporter metrics
+      - "13133:13133" # Health check extension
     networks:
       - poc-net
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
 
   # -----------------------------------------------------
   # Tempo (Distributed Tracing Backend)
   # -----------------------------------------------------
   tempo:
-    image: grafana/tempo:2.10.0
+    image: grafana/tempo:2.3.1
     command: [ "-config.file=/etc/tempo.yaml" ]
+    user: root # Avoid permission issues
     volumes:
       - ./docker/observability/tempo.yaml:/etc/tempo.yaml
       - tempo-data:/tmp/tempo
@@ -53,7 +59,7 @@ services:
   # Prometheus (Metrics Backend)
   # -----------------------------------------------------
   prometheus:
-    image: prom/prometheus:v3.1.0
+    image: prom/prometheus:v2.48.0
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
       - --web.enable-remote-write-receiver # Enable pushing metrics from OTel Collector
@@ -70,8 +76,9 @@ services:
   # Loki (Logs Backend)
   # -----------------------------------------------------
   loki:
-    image: grafana/loki:3.6.0
+    image: grafana/loki:2.9.2
     command: -config.file=/etc/loki/local-config.yaml
+    user: root # Avoid permission issues
     volumes:
       - ./docker/observability/loki.yaml:/etc/loki/local-config.yaml
       - loki-data:/loki
@@ -84,13 +91,14 @@ services:
   # Grafana (The UI)
   # -----------------------------------------------------
   grafana:
-    image: grafana/grafana:11.5.2-alpine
+    image: grafana/grafana:10.2.0
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     volumes:
-      - ./docker/observability/provisioning:/etc/grafana/provisioning # Auto-configure datasources
+      - ./docker/observability/provisioning:/etc/grafana/provisioning # Auto-configure datasources and dashboards
+      - ./docker/observability/dashboards:/etc/grafana/dashboards # JSON Dashboards
       - grafana-data:/var/lib/grafana
     ports:
       - "3000:3000"

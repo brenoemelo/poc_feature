@@ -22,6 +22,11 @@ public static class MaterialsEndpoints
              .WithFeatureGate("materials-crud")
              .Produces<ApiResponse<object>>();
 
+        group.MapGet("/components", GetUniqueComponentsAsync)
+             .WithName("GetUniqueComponents")
+             .WithFeatureGate("view-all-components")
+             .Produces<ApiResponse<IEnumerable<string>>>();
+
         group.MapGet("/{id}", GetMaterialByIdAsync)
              .WithName("GetMaterialById")
              .WithFeatureGate("materials-crud")
@@ -79,6 +84,29 @@ public static class MaterialsEndpoints
         var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialCount") ?? "/api/v1/materials/count";
         var response = new ApiResponse<object>(
             new { count = result.Value },
+            [new Link("self", selfUrl, "GET")]);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetUniqueComponentsAsync(
+        IMaterialRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
+        ILogger<Program> logger)
+    {
+        logger.LogInformation("[MaterialQuery] Retrieving unique components");
+        var result = await repository.GetUniqueComponentsAsync();
+
+        if (result.IsFailure)
+        {
+            logger.LogError("[MaterialQuery] Failed to retrieve components: {Error} - {Detail}", result.Error.Code, result.Error.Description);
+            return result.ToProblem();
+        }
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetUniqueComponents") ?? "/api/v1/materials/components";
+        var response = new ApiResponse<IEnumerable<string>>(
+            result.Value,
             [new Link("self", selfUrl, "GET")]);
 
         return Results.Ok(response);

@@ -23,7 +23,7 @@ Assert-NotProduction
 # Resolve paths relative to repo root
 $RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
 $OpenApiFile = Join-Path $RepoRoot "docs/openapi.yaml"
-$TestScriptPath = Join-Path $RepoRoot "test_all_apis.ps1"
+$TestScriptPath = Join-Path $RepoRoot "scripts\tests\test_all_apis.ps1"
 
 # -----------------------------------------------------------------------------
 # API Gateway Deployment

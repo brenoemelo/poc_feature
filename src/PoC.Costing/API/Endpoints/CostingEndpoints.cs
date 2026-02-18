@@ -17,6 +17,14 @@ public static class CostingEndpoints
              .WithName("UpsertPrice")
              .WithFeatureGate("price-ingestion");
 
+        group.MapGet("/prices", GetAllPricesAsync)
+             .WithName("GetAllPrices")
+             .WithFeatureGate("view-all-prices");
+
+        group.MapGet("/prices/count", GetPricesCountAsync)
+             .WithName("GetPricesCount")
+             .WithFeatureGate("count-all-prices");
+
         group.MapPost("/estimations", CalculateCostAsync)
              .WithName("CalculateCost")
              .WithFeatureGate("price-calculation");
@@ -52,6 +60,46 @@ public static class CostingEndpoints
         var response = new ApiResponse<object>(
             new { message = "Price updated successfully", component_name = request.ComponentName },
             [new Link("self", selfUrl, "POST")]);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetAllPricesAsync(
+        [FromServices] ICostingRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
+        [FromServices] ILogger<Program> logger)
+    {
+        logger.LogInformation("Retrieving all component prices");
+        var result = await repository.GetAllPricesAsync();
+
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetAllPrices") ?? "/api/v1/costing/prices";
+        var response = new ApiResponse<IEnumerable<ComponentPriceResponse>>(
+            result.Value,
+            [new Link("self", selfUrl, "GET")]);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetPricesCountAsync(
+        [FromServices] ICostingRepository repository,
+        HttpContext httpContext,
+        LinkGenerator linkGenerator,
+        [FromServices] ILogger<Program> logger)
+    {
+        logger.LogInformation("Retrieving count of component prices");
+        var result = await repository.GetPricesCountAsync();
+
+        if (result.IsFailure)
+            return result.ToProblem();
+
+        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetPricesCount") ?? "/api/v1/costing/prices/count";
+        var response = new ApiResponse<object>(
+            new { count = result.Value },
+            [new Link("self", selfUrl, "GET")]);
 
         return Results.Ok(response);
     }
@@ -94,6 +142,11 @@ public static class CostingEndpoints
         var response = new ApiResponse<CostCalculationResponse>(
             result.Value,
             [new Link("self", selfUrl, "POST")]);
+            
+        logger.LogInformation(
+            "Calculation success. TotalCost: {TotalCost}, BreakdownCount: {Count}",
+            result.Value.TotalCost,
+            result.Value.Breakdown?.Count ?? 0);
 
         return Results.Ok(response);
     }

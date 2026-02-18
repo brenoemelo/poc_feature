@@ -14,7 +14,16 @@ using PoC.Shared.Validators;
 var builder = WebApplication.CreateBuilder(args);
 
 // Observability (Serilog + OpenTelemetry)
+builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
+
 builder.AddPoCObservability("PoC-Costing", "1.0.0");
+
+// Add Custom Meter to OTel
+builder.Services.AddOpenTelemetry()
+   .WithMetrics(metrics => 
+   {
+       metrics.AddMeter(PoC.Costing.Infrastructure.BusinessMetrics.MeterName);
+   });
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 

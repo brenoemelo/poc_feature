@@ -43,7 +43,6 @@ paths:
       description: Stores a new material formulation in the DynamoDB table.
       x-amazon-apigateway-integration:
         uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
-        payloadFormatVersion: "2.0"
         type: aws_proxy
         httpMethod: POST
       requestBody:
@@ -77,9 +76,44 @@ paths:
               schema:
                 type: object
                 properties:
-                  count:
-                    type: integer
-                    example: 42
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 42
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/materials/components:
+    get:
+      summary: Get unique formulation components
+      description: Returns a unique list of all components used across all material formulations.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
+      responses:
+        200:
+          description: List of unique components.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
         500:
           $ref: '#/components/responses/ServerError'
 
@@ -94,7 +128,6 @@ paths:
             type: string
       x-amazon-apigateway-integration:
         uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
-        payloadFormatVersion: "2.0"
         type: aws_proxy
         httpMethod: POST
       responses:
@@ -118,7 +151,6 @@ paths:
             type: string
       x-amazon-apigateway-integration:
         uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Materials/invocations
-        payloadFormatVersion: "2.0"
         type: aws_proxy
         httpMethod: POST
       responses:
@@ -153,6 +185,26 @@ paths:
           $ref: '#/components/responses/ServerError'
 
   /api/v1/costing/prices:
+    get:
+      summary: Get all component prices
+      description: Returns a list of all component prices.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Costing/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
+      responses:
+        200:
+          description: A list of component prices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComponentPriceResponse'
+        500:
+          $ref: '#/components/responses/ServerError'
+
     post:
       summary: Upsert a component price
       description: Creates or updates the price for a component in the costing catalog.
@@ -179,13 +231,42 @@ paths:
         500:
           $ref: '#/components/responses/ServerError'
 
+  /api/v1/costing/prices/count:
+    get:
+      summary: Get total component price count
+      description: Returns the total number of component prices in the database.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Costing/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
+      responses:
+        200:
+          description: Total count of component prices.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 42
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
+        500:
+          $ref: '#/components/responses/ServerError'
+
   /api/v1/costing/estimations:
     post:
       summary: Calculate material cost
       description: Calculates the total cost and breakdown for a material formulation based on component prices.
       x-amazon-apigateway-integration:
         uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-Costing/invocations
-        payloadFormatVersion: "2.0"
         type: aws_proxy
         httpMethod: POST
       requestBody:

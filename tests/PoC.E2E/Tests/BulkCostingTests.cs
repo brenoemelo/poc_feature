@@ -6,10 +6,25 @@ using RestSharp;
 
 namespace PoC.E2E.Tests;
 
+[Collection("E2E Tests")]
 public class BulkCostingTests : ApiTestBase
 {
     private readonly List<string> _createdComponents = new();
     private readonly List<string> _createdMaterials = new();
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        // Enable all required flags
+        await FeatureManager.EnableFlagAsync("materials-crud");
+        await FeatureManager.EnableFlagAsync("price-ingestion");
+        await FeatureManager.EnableFlagAsync("costing-batch");
+    }
+
+    public override async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+    }
 
     [Fact]
     public async Task CalculateAllCosts_Should_Return_Costs_For_All_MaterialsAsync()

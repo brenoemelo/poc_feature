@@ -4,11 +4,13 @@ using Amazon.DynamoDBv2;
 using Amazon.Runtime;
 using FluentAssertions;
 using PoC.E2E.Common;
+using PoC.Shared.Common;
 using RestSharp;
 
 namespace PoC.E2E.Tests;
 
-public class CostingApiTests : ApiTestBase
+[Collection("E2E Tests")]
+public class CostingApiTests : ApiTestBase, IAsyncLifetime
 {
     private readonly List<string> _createdComponents = new();
 
@@ -29,6 +31,38 @@ public class CostingApiTests : ApiTestBase
         };
         var creds = new BasicAWSCredentials("test", "test");
         return new AmazonDynamoDBClient(creds, config);
+    }
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        // Enable required flags
+        await FeatureManager.EnableFlagAsync("price-ingestion");
+        await FeatureManager.EnableFlagAsync("price-calculation");
+    }
+
+    public override async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task UpsertPrice_WhenFlagDisabled_Should_Return_404Async()
+    {
+        await FeatureManager.DisableFlagAsync("price-ingestion");
+
+        var request = new RestRequest("/api/v1/costing/prices", Method.Post);
+        // Add valid body so validation passes and we reach the feature flag check
+        request.AddJsonBody(new
+        {
+            ComponentName = "test-component",
+            UnitPrice = 10.0m,
+            Unit = "kg",
+            Currency = "USD"
+        });
+
+        var response = await Client.ExecuteAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -80,17 +114,24 @@ public class CostingApiTests : ApiTestBase
         var request = new RestRequest("/api/v1/costing/estimations", Method.Post)
             .AddJsonBody(calculationRequest);
 
-        var response = await Client.ExecuteAsync<CostCalculationResponse>(request);
+        var response = await Client.ExecuteAsync<ApiResponse<CostCalculationResponse>>(request);
+
+        if (response.Data?.Data?.Breakdown == null)
+        {
+            throw new Exception($"Breakdown is null. Status: {response.StatusCode}. Content: {response.Content}");
+        }
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Data.Should().NotBeNull();
-        response.Data!.TotalCost.Should().Be(16m); // 4 + 12 = 16
-        response.Data.Breakdown.Should().HaveCount(2);
+        response.Data!.Data.Should().NotBeNull();
+        response.Data.Data.TotalCost.Should().Be(16m); // 4 + 12 = 16
+        response.Data.Data.Breakdown.Should().NotBeNull();
+        response.Data.Data.Breakdown.Should().HaveCount(2);
 
         // Check margin
-        response.Data.Margin.Should().NotBeNull();
+        response.Data.Data.Margin.Should().NotBeNull();
         // 20% margin: Selling Price = Cost / (1 - Margin%) = 16 / 0.8 = 20
-        response.Data.Margin!.SuggestedSellingPrice.Should().Be(20m);
+        response.Data.Data.Margin!.SuggestedSellingPrice.Should().Be(20m);
     }
 
     [Fact]

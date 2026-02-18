@@ -9,6 +9,7 @@ namespace PoC.E2E.Tests;
 /// E2E tests for observability: trace context propagation, OTLP emission, and error correlation.
 /// Uses the "Mock Collector Pattern" with WireMock.Net.
 /// </summary>
+[Collection("E2E Tests")]
 public sealed class ObservabilityTests : ApiTestBase, IDisposable
 {
     private static readonly Regex TraceIdPattern = new(@"^[0-9a-f]{32}$", RegexOptions.Compiled);
@@ -19,6 +20,24 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
     {
         var port = int.Parse(Config["OtlpMockPort"] ?? "14318");
         _mockServer = new OtlpMockServer(port);
+    }
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        // Enable materials-crud for these tests
+        await FeatureManager.EnableFlagAsync("materials-crud");
+    }
+
+    public override async Task DisposeAsync()
+    {
+        _mockServer.Dispose();
+        await base.DisposeAsync();
+    }
+
+    public void Dispose()
+    {
+        _mockServer.Dispose();
     }
 
     /// <summary>
@@ -100,10 +119,5 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
         traceIdValue.Should().NotBeNullOrWhiteSpace();
         TraceIdPattern.IsMatch(traceIdValue!).Should().BeTrue(
             because: $"TraceId '{traceIdValue}' must match W3C format (32 hex chars)");
-    }
-
-    public void Dispose()
-    {
-        _mockServer.Dispose();
     }
 }

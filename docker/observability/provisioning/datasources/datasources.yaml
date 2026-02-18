@@ -16,6 +16,10 @@ datasources:
       httpMethod: GET
       serviceMap:
         datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki
 
   - name: Prometheus
     type: prometheus

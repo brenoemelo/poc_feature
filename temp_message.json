@@ -1,0 +1,6 @@
+{
+  "target": "ensure-prices",
+  "batch_size": 100,
+  "min_components": null,
+  "max_components": null
+}

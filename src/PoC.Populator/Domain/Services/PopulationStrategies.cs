@@ -78,78 +78,45 @@ public sealed class EnsurePricesPopulationStrategy : IPopulationStrategy
 
     public async Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
-        var components = new HashSet<string>();
-        string? cursor = null;
-        var hasMore = true;
-
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-
-        while (hasMore)
+        var url = "api/v1/materials/components";
+        
+        try 
         {
-            var url = "/api/v1/materials?limit=100";
-            if (!string.IsNullOrEmpty(cursor))
+            // Fetch unique components from the new endpoint
+            var json = await context.HttpClient.GetStringAsync(url);
+            // Log the raw JSON to debug
+            Console.WriteLine($"[EnsurePrices] Received JSON from {url}: {json}");
+
+            var response = JsonSerializer.Deserialize<ApiResponse<IEnumerable<string>>>(json, options);
+            
+            if (response?.Data == null || !response.Data.Any())
             {
-                url += $"&cursor={cursor}";
+                Console.WriteLine("[EnsurePrices] No components found in response.");
+                return Enumerable.Empty<object>();
             }
 
-            try 
+            Console.WriteLine($"[EnsurePrices] Found {response.Data.Count()} components.");
+
+            var faker = new Faker();
+            var prices = new List<object>();
+
+            foreach (var componentName in response.Data)
             {
-                // We use PagedResult from PoC.Shared.Common
-                var result = await context.HttpClient.GetFromJsonAsync<PagedResult<MaterialFormulation>>(url, options);
-                
-                if (result?.Items != null)
-                {
-                    foreach (var material in result.Items)
-                    {
-                        foreach (var component in material.Formulation)
-                        {
-                            components.Add(component.Component);
-                        }
-                    }
-
-                    cursor = result.Cursor;
-                    hasMore = !string.IsNullOrEmpty(cursor);
-                }
-                else
-                {
-                    hasMore = false;
-                    // If items null/empty in first page, stop.
-                }
-
-                // Safety break if we have ALOT of components (e.g. 5x requested count)
-                // This is a PoC constraint to avoid infinite loops
-                if (components.Count >= count * 5) hasMore = false;
+                var price = new ComponentPriceRequest(
+                    ComponentName: componentName,
+                    UnitPrice: Math.Round(faker.Random.Decimal(0.5m, 100.0m), 2),
+                    Unit: "kg",
+                    Currency: "USD");
+                prices.Add(price);
             }
-            catch (Exception ex)
-            {
-                context.LogError?.Invoke($"Failed to fetch materials from {url}", ex);
-                hasMore = false;
-            }
-        }
 
-        // If we found NO components, fallback to random generation
-        if (components.Count == 0)
+            return prices;
+        }
+        catch (Exception ex)
         {
-             var fallbackFaker = new Faker();
-             for (int i = 0; i < count; i++) 
-             {
-                 components.Add(fallbackFaker.Commerce.ProductMaterial());
-             }
+            context.LogError?.Invoke($"Failed to fetch unique components from {url}", ex);
+            return Enumerable.Empty<object>();
         }
-
-        var faker = new Faker();
-        var prices = new List<object>();
-
-        foreach (var componentName in components)
-        {
-            var price = new ComponentPriceRequest(
-                ComponentName: componentName,
-                UnitPrice: Math.Round(faker.Random.Decimal(0.5m, 100.0m), 2),
-                Unit: "kg",
-                Currency: "USD");
-            prices.Add(price);
-        }
-
-        return prices;
     }
 }

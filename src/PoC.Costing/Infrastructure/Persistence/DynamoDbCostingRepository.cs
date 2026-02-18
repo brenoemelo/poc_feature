@@ -43,12 +43,18 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
         try
         {
             var batch = context.CreateBatchGet<ComponentPriceEntity>();
-            foreach (var name in componentNames)
+            
+            // Deduplicate keys to avoid DynamoDB error
+            var uniqueNames = componentNames.Distinct().ToList();
+            
+            foreach (var name in uniqueNames)
             {
                 batch.AddKey(name);
             }
 
             await batch.ExecuteAsync();
+
+            logger.LogInformation("[GetPricesAsync] Requested: {Requested}. Found: {Found}", string.Join(",", componentNames), batch.Results.Count);
 
             var result = batch.Results.ToDictionary(
                 p => p.ComponentName,
@@ -59,6 +65,54 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
         catch (Exception ex)
         {
             return Result.Failure<Dictionary<string, (decimal UnitPrice, string Currency)>>(new Error("DynamoDb.Error", ex.Message));
+        }
+    }
+
+    public async Task<Result<IEnumerable<ComponentPriceResponse>>> GetAllPricesAsync()
+    {
+        try
+        {
+            var conditions = new List<ScanCondition>();
+            // ScanAsync returns an AsyncSearch which we need to execute
+            var search = context.ScanAsync<ComponentPriceEntity>(conditions);
+            var prices = await search.GetRemainingAsync();
+            
+            logger.LogInformation("[GetAllPricesAsync] Found: {Found}", prices.Count);
+
+            var result = prices.Select(p => new ComponentPriceResponse(
+                p.ComponentName,
+                p.UnitPrice,
+                p.Unit,
+                p.Currency,
+                p.UpdatedAt));
+            
+            return Result.Success(result);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IEnumerable<ComponentPriceResponse>>(new Error("DynamoDb.Error", ex.Message));
+        }
+    }
+
+    public async Task<Result<int>> GetPricesCountAsync()
+    {
+        try
+        {
+            var conditions = new List<ScanCondition>();
+            // Using ScanAsync to get the count. 
+            // In a real production scenario with large datasets, this should be optimized 
+            // (e.g., keeping a counter, or using a GSI if applicable, or using Select=COUNT).
+            // For this PoC, scanning and counting is acceptable.
+            var search = context.ScanAsync<ComponentPriceEntity>(conditions);
+            var count = await search.GetRemainingAsync();
+            
+            logger.LogInformation("[GetPricesCountAsync] Count: {Count}", count.Count);
+            
+            return Result.Success(count.Count);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<int>(new Error("DynamoDb.Error", ex.Message));
         }
     }
 }

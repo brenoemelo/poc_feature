@@ -6,14 +6,49 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+processors:
+  batch:
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+connectors:
+  spanmetrics:
+    metrics_flush_interval: 15s
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    dimensions:
+      - name: http.method
+      - name: http.status_code
+      - name: http.route
+
+
+    exemplars:
+      enabled: true
+    histogram:
+      explicit:
+        buckets: [2ms, 10ms, 50ms, 100ms, 200ms, 500ms, 1s, 2s, 5s]
+    namespace: traces.span.metrics
+  
+  servicegraph:
+    latency_histogram_buckets: [2ms, 10ms, 50ms, 100ms, 200ms, 500ms, 1s, 2s, 5s]
+    dimensions:
+      - http.method
+      - http.status_code
+      - span.kind
+
 exporters:
   debug:
     verbosity: detailed
   
-  otlphttp/tempo:
-    endpoint: http://tempo:4318
+  otlp/tempo:
+    endpoint: tempo:4317
     tls:
       insecure: true
+
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: "poc"
 
   prometheusremotewrite:
     endpoint: http://prometheus:9090/api/v1/write
@@ -24,19 +59,17 @@ exporters:
       exporter: true
       job: true
 
-processors:
-  batch:
-
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/tempo, debug]
+      exporters: [otlp/tempo, spanmetrics, servicegraph, debug]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, spanmetrics, servicegraph]
       processors: [batch]
-      exporters: [prometheusremotewrite, debug]
+      exporters: [prometheusremotewrite, prometheus, debug]
     logs:
       receivers: [otlp]
       processors: [batch]

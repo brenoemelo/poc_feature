@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.SimpleNotificationService;
@@ -12,6 +13,41 @@ namespace PoC.Populator.Functions;
 
 public class PopulatorWorkerFunction
 {
+    // Phase 2: Static Host Initialization
+    private static readonly Lazy<IHost> _hostLazy = new(
+        () =>
+        {
+            var builder = Host.CreateApplicationBuilder();
+
+            // 1. Observability (Logs, Metrics, Tracing)
+            builder.AddPoCObservability("PoC-Populator-Worker", "1.0.0");
+
+            // 2. AWS Services
+            builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+            
+            // 3. HTTP Client with Resilience
+#pragma warning disable S1075 // URIs should not be hardcoded
+            var materialsUrl = Environment.GetEnvironmentVariable("MATERIALS_API_URL") 
+                               ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
+#pragma warning restore S1075 // URIs should not be hardcoded
+            
+            builder.Services.AddHttpClient("MaterialsClient", client =>
+            {
+                client.BaseAddress = new Uri(materialsUrl);
+            })
+            .AddStandardResilienceHandler(); // Policies for Retries/CircuitBreaker
+
+            var host = builder.Build();
+            host.Start();
+            return host;
+        },
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
+    // Phase 3: Activity Source for Manual Tracing
+    private static readonly ActivitySource _activitySource = new("PoC-Populator-Worker");
+
+    private static IHost HostInstance => _hostLazy.Value;
+
     private readonly ILogger<PopulatorWorkerFunction> _logger;
     private readonly IAmazonSimpleNotificationService _snsClient;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -19,28 +55,7 @@ public class PopulatorWorkerFunction
 
     public PopulatorWorkerFunction()
     {
-        var builder = Host.CreateApplicationBuilder();
-
-        // 1. Observability (Logs, Metrics, Tracing)
-        builder.AddPoCObservability("PoC-Populator-Worker", "1.0.0");
-
-        // 2. AWS Services
-        builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
-        
-        // 3. HTTP Client with Resilience
-#pragma warning disable S1075 // URIs should not be hardcoded
-        var materialsUrl = Environment.GetEnvironmentVariable("MATERIALS_API_URL") 
-                           ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
-#pragma warning restore S1075 // URIs should not be hardcoded
-        
-        builder.Services.AddHttpClient("MaterialsClient", client =>
-        {
-            client.BaseAddress = new Uri(materialsUrl);
-        })
-        .AddStandardResilienceHandler(); // Policies for Retries/CircuitBreaker
-
-        var host = builder.Build();
-
+        var host = HostInstance;
         _logger = host.Services.GetRequiredService<ILogger<PopulatorWorkerFunction>>();
         _snsClient = host.Services.GetRequiredService<IAmazonSimpleNotificationService>();
         _httpClientFactory = host.Services.GetRequiredService<IHttpClientFactory>();
@@ -66,21 +81,63 @@ public class PopulatorWorkerFunction
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
+        if (_logger == null)
+        {
+            Console.WriteLine("CRITICAL: Logger is not initialized!");
+            return;
+        }
+
+        if (ev == null || ev.Records == null)
+        {
+            _logger.LogWarning("Received null event or records");
+            return;
+        }
+
         // We use our own Logger (Serilog), but we can also log to Lambda Context if needed.
         // For consistency, we rely on Serilog which writes to Console (captured by CloudWatch/LocalStack).
         foreach (var message in ev.Records)
         {
+            // Phase 3: Extract Parent Trace Context
+            var parentContext = ExtractParentContext(message);
+
+            // Start a new Activity linked to the parent context
+            using var activity = _activitySource.StartActivity("ProcessSQSMessage", ActivityKind.Consumer, parentContext);
+
+            // Add tags to the activity
+            activity?.SetTag("messaging.system", "aws.sqs");
+            activity?.SetTag("messaging.destination", "populator-queue");
+            activity?.SetTag("messaging.message_id", message.MessageId);
+
             using var scope = _logger.BeginScope(new Dictionary<string, object>
             {
                 ["MessageId"] = message.MessageId,
-                ["ReceiptHandle"] = message.ReceiptHandle ?? string.Empty
+                ["ReceiptHandle"] = message.ReceiptHandle ?? string.Empty,
+                ["TraceId"] = activity?.TraceId.ToString() ?? string.Empty,
+                ["SpanId"] = activity?.SpanId.ToString() ?? string.Empty
             });
 
             try
             {
-                _logger.LogInformation("Received SQS Message Body: {Body}", message.Body);
+                if (string.IsNullOrWhiteSpace(message.Body))
+                {
+                    _logger.LogWarning("Received empty SQS Message Body.");
+                    continue;
+                }
 
-                var job = JsonSerializer.Deserialize<PopulationJob>(message.Body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                // Phase 1: Reduce Log Noise (Info -> Debug)
+                _logger.LogDebug("Received SQS Message Body: {Body}", message.Body);
+
+                PopulationJob? job = null;
+                try
+                {
+                    job = JsonSerializer.Deserialize<PopulationJob>(message.Body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "Failed to deserialize message body.");
+                    continue;
+                }
+
                 if (job == null) 
                 {
                     _logger.LogWarning("Deserialized job is null");
@@ -111,9 +168,13 @@ public class PopulatorWorkerFunction
 
                 var items = await strategy.GenerateAsync(job.BatchSize, popContext, job.MinComponents, job.MaxComponents);
                 
-                var tasks = new List<Task>();
+                var itemList = items.ToList();
+                _logger.LogInformation("Strategy {Strategy} generated {Count} items.", job.Target, itemList.Count);
 
-                foreach (var item in items)
+                var tasks = new List<Task>();
+                var publishedCount = 0;
+
+                foreach (var item in itemList)
                 {
                     string messageBody;
                     string eventType;
@@ -150,13 +211,13 @@ public class PopulatorWorkerFunction
                         }
                     };
                     
-                    _logger.LogInformation("Publishing event to {TopicArn}. Body: {Body}", _topicArn, messageBody);
-
+                    // Phase 1: Reduce Log Noise (Removed inner loop logging)
                     tasks.Add(_snsClient.PublishAsync(publishRequest));
 
                     if (tasks.Count >= 50) 
                     {
                         await Task.WhenAll(tasks);
+                        publishedCount += tasks.Count;
                         tasks.Clear();
                     }
                 }
@@ -164,15 +225,30 @@ public class PopulatorWorkerFunction
                 if (tasks.Count > 0)
                 {
                     await Task.WhenAll(tasks);
+                    publishedCount += tasks.Count;
                 }
 
-                _logger.LogInformation("Successfully published {BatchSize} events for target {Target}.", job.BatchSize, job.Target);
+                _logger.LogInformation("Successfully processed job. Generated and published {PublishedCount} events for target {Target}.", publishedCount, job.Target);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message {MessageId}", message.MessageId);
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw; 
             }
+        }
+
+        static ActivityContext ExtractParentContext(SQSEvent.SQSMessage msg)
+        {
+            if (msg.MessageAttributes != null && 
+                msg.MessageAttributes.TryGetValue("traceparent", out var traceParentAttr) &&
+                !string.IsNullOrEmpty(traceParentAttr.StringValue) &&
+                ActivityContext.TryParse(traceParentAttr.StringValue, null, out var context))
+            {
+                return context;
+            }
+
+            return default;
         }
     }
 

@@ -7,4 +7,6 @@ public interface ICostingRepository
 {
     Task<Result> UpsertPriceAsync(ComponentPriceRequest request);
     Task<Result<Dictionary<string, (decimal UnitPrice, string Currency)>>> GetPricesAsync(IEnumerable<string> componentNames);
+    Task<Result<IEnumerable<ComponentPriceResponse>>> GetAllPricesAsync();
+    Task<Result<int>> GetPricesCountAsync();
 }

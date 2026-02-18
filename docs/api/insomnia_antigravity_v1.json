@@ -1,440 +1,648 @@
-{
-  "_type": "export",
-  "__export_format": 4,
-  "__export_date": "2026-02-14T00:00:00.000Z",
-  "__export_source": "insomnia.desktop.app:v2023.5.8",
-  "resources": [
-    {
-      "_id": "req_materials_get_all",
-      "parentId": "fld_materials",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/materials/",
-      "name": "Get All Materials",
-      "description": "Retrieve a list of all material formulations.",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868800000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_materials_count",
-      "parentId": "fld_materials",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/materials/count",
-      "name": "Get Material Count",
-      "description": "Retrieve the total count of material formulations.",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868750000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_materials_get_by_id",
-      "parentId": "fld_materials",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/materials/mat-001",
-      "name": "Get Material By ID",
-      "description": "Retrieve a specific material formulation by its ID.",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868700000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_materials_create",
-      "parentId": "fld_materials",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/materials/",
-      "name": "Create Material",
-      "description": "Create a new material formulation.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"material_id\": \"mat-001\",\n\t\"name\": \"Super Alloy\",\n\t\"density\": {\n\t\t\"value\": 7.8,\n\t\t\"unit\": \"g/cm3\"\n\t},\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80,\n\t\t\t\"type\": \"Metal\"\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20,\n\t\t\t\"type\": \"Non-Metal\"\n\t\t}\n\t],\n\t\"properties\": {\n\t\t\"hardness\": \"high\"\n\t}\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868600000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_materials_delete",
-      "parentId": "fld_materials",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/materials/mat-001",
-      "name": "Delete Material",
-      "description": "Delete a material formulation by its ID.",
-      "method": "DELETE",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868500000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_costing_upsert_price",
-      "parentId": "fld_costing",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/costing/prices",
-      "name": "Upsert Price",
-      "description": "Create or update a component price.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"component_name\": \"Iron\",\n\t\"unit_price\": 15.50,\n\t\"unit\": \"kg\",\n\t\"currency\": \"USD\"\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868800000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_costing_calculate",
-      "parentId": "fld_costing",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/costing/estimations",
-      "name": "Calculate Cost",
-      "description": "Calculate the cost of a material formulation.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"material_id\": \"mat-001\",\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20\n\t\t}\n\t],\n\t\"desired_margin_percent\": 25.0\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868700000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_costing_calculate_batch",
-      "parentId": "fld_costing",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/costing/estimations/batch",
-      "name": "Calculate Batch Cost",
-      "description": "Calculate costs for all materials in the system.",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868600000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_populator_generate",
-      "parentId": "fld_populator",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/populator/jobs",
-      "name": "Generate Materials",
-      "description": "Trigger a job to generate random material data.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"target\": \"materials\",\n\t\"count\": 10,\n\t\"minComponents\": 10,\n\t\"maxComponents\": 30\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868800000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_populator_ensure_prices",
-      "parentId": "fld_populator",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "{{ _.base_url }}/api/v1/populator/jobs",
-      "name": "Ensure Prices",
-      "description": "Trigger a job to ensure all components in materials have prices.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"target\": \"ensure-prices\",\n\t\"count\": 100\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868750000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "env_local",
-      "parentId": "wrk_1",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "LocalStack Environment",
-      "data": {
-        "base_url": "http://localhost:4566/restapis/material-api/prod/_user_request_"
-      },
-      "dataPropertyOrder": {
-        "&": [
-          "base_url"
-        ]
-      },
-      "color": "#7d69cb",
-      "isPrivate": false,
-      "metaSortKey": 1707868800000,
-      "_type": "environment"
-    },
-    {
-      "_id": "wrk_1",
-      "parentId": null,
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "PoC Feature API",
-      "description": "API collection for PoC Feature microservices.",
-      "scope": "collection",
-      "_type": "workspace"
-    },
-    {
-      "_id": "fld_materials",
-      "parentId": "wrk_1",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "Materials Service",
-      "description": "Endpoints for managing material formulations.",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1707868800000,
-      "_type": "request_group"
-    },
-    {
-      "_id": "fld_costing",
-      "parentId": "wrk_1",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "Costing Service",
-      "description": "Endpoints for cost calculation and pricing.",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1707868700000,
-      "_type": "request_group"
-    },
-    {
-      "_id": "fld_populator",
-      "parentId": "wrk_1",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "Populator Service",
-      "description": "Endpoints for data generation.",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1707868600000,
-      "_type": "request_group"
-    },
-    {
-      "_id": "fld_feature_flags",
-      "parentId": "wrk_1",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "name": "Feature Flags (GoFeatureFlag)",
-      "description": "Management endpoints for the Feature Flag relay proxy.",
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": -1707868500000,
-      "_type": "request_group"
-    },
-    {
-      "_id": "req_ff_health",
-      "parentId": "fld_feature_flags",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "http://localhost:1031/health",
-      "name": "Health Check",
-      "description": "Check if the GoFeatureFlag proxy is running.",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [],
-      "authentication": {},
-      "metaSortKey": -1707868800000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_ff_all_flags",
-      "parentId": "fld_feature_flags",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "http://localhost:1031/v1/allflags",
-      "name": "Get All Flags",
-      "description": "Retrieve the current state of all flags for a specific user.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"user\": {\n\t\t\"key\": \"anonymous\"\n\t}\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868700000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    },
-    {
-      "_id": "req_ff_eval",
-      "parentId": "fld_feature_flags",
-      "modified": 1707868800000,
-      "created": 1707868800000,
-      "url": "http://localhost:1031/v1/feature/price-ingestion/eval",
-      "name": "Evaluate Flag",
-      "description": "Test evaluation of a specific flag.",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"user\": {\n\t\t\"key\": \"test-user\",\n\t\t\"custom\": {\n\t\t\t\"email\": \"test@example.com\"\n\t\t}\n\t},\n\t\"defaultValue\": false\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": -1707868600000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_type": "request"
-    }
-  ]
+﻿{
+    "_type":  "export",
+    "__export_format":  4,
+    "__export_date":  "2026-02-14T00:00:00.000Z",
+    "__export_source":  "insomnia.desktop.app:v2023.5.8",
+    "resources":  [
+                      {
+                          "_id":  "req_materials_get_all",
+                          "parentId":  "fld_materials",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/materials/",
+                          "name":  "Get All Materials",
+                          "description":  "Retrieve a list of all material formulations.",
+                          "method":  "GET",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868800000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_materials_count",
+                          "parentId":  "fld_materials",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/materials/count",
+                          "name":  "Get Material Count",
+                          "description":  "Retrieve the total count of material formulations.",
+                          "method":  "GET",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868750000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_materials_get_by_id",
+                          "parentId":  "fld_materials",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/materials/mat-001",
+                          "name":  "Get Material By ID",
+                          "description":  "Retrieve a specific material formulation by its ID.",
+                          "method":  "GET",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868700000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_materials_create",
+                          "parentId":  "fld_materials",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/materials/",
+                          "name":  "Create Material",
+                          "description":  "Create a new material formulation.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"material_id\": \"mat-001\",\n\t\"name\": \"Super Alloy\",\n\t\"density\": {\n\t\t\"value\": 7.8,\n\t\t\"unit\": \"g/cm3\"\n\t},\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80,\n\t\t\t\"type\": \"Metal\"\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20,\n\t\t\t\"type\": \"Non-Metal\"\n\t\t}\n\t],\n\t\"properties\": {\n\t\t\"hardness\": \"high\"\n\t}\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868600000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_materials_delete",
+                          "parentId":  "fld_materials",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/materials/mat-001",
+                          "name":  "Delete Material",
+                          "description":  "Delete a material formulation by its ID.",
+                          "method":  "DELETE",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868500000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_costing_upsert_price",
+                          "parentId":  "fld_costing",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/costing/prices",
+                          "name":  "Upsert Price",
+                          "description":  "Create or update a component price.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"component_name\": \"Iron\",\n\t\"unit_price\": 15.50,\n\t\"unit\": \"kg\",\n\t\"currency\": \"USD\"\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868800000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_costing_calculate",
+                          "parentId":  "fld_costing",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/costing/estimations",
+                          "name":  "Calculate Cost",
+                          "description":  "Calculate the cost of a material formulation.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"material_id\": \"mat-001\",\n\t\"formulation\": [\n\t\t{\n\t\t\t\"component\": \"Iron\",\n\t\t\t\"percentage\": 80\n\t\t},\n\t\t{\n\t\t\t\"component\": \"Carbon\",\n\t\t\t\"percentage\": 20\n\t\t}\n\t],\n\t\"desired_margin_percent\": 25.0\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868700000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_costing_calculate_batch",
+                          "parentId":  "fld_costing",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/costing/estimations/batch",
+                          "name":  "Calculate Batch Cost",
+                          "description":  "Calculate costs for all materials in the system.",
+                          "method":  "GET",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868600000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_populator_generate",
+                          "parentId":  "fld_populator",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/populator/jobs",
+                          "name":  "Generate Materials",
+                          "description":  "Trigger a job to generate random material data.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"target\": \"materials\",\n\t\"count\": 10,\n\t\"minComponents\": 10,\n\t\"maxComponents\": 30\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868800000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_populator_ensure_prices",
+                          "parentId":  "fld_populator",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "{{ _.base_url }}/api/v1/populator/jobs",
+                          "name":  "Ensure Prices",
+                          "description":  "Trigger a job to ensure all components in materials have prices.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"target\": \"ensure-prices\",\n\t\"count\": 100\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868750000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "env_local",
+                          "parentId":  "wrk_1",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "LocalStack Environment",
+                          "data":  {
+                                       "base_url":  "http://localhost:4566/restapis/material-api/prod/_user_request_"
+                                   },
+                          "dataPropertyOrder":  {
+                                                    "\u0026":  [
+                                                                   "base_url"
+                                                               ]
+                                                },
+                          "color":  "#7d69cb",
+                          "isPrivate":  false,
+                          "metaSortKey":  1707868800000,
+                          "_type":  "environment"
+                      },
+                      {
+                          "_id":  "wrk_1",
+                          "parentId":  null,
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "PoC Feature API",
+                          "description":  "API collection for PoC Feature microservices.",
+                          "scope":  "collection",
+                          "_type":  "workspace"
+                      },
+                      {
+                          "_id":  "fld_materials",
+                          "parentId":  "wrk_1",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "Materials Service",
+                          "description":  "Endpoints for managing material formulations.",
+                          "environment":  {
+
+                                          },
+                          "environmentPropertyOrder":  null,
+                          "metaSortKey":  -1707868800000,
+                          "_type":  "request_group"
+                      },
+                      {
+                          "_id":  "fld_costing",
+                          "parentId":  "wrk_1",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "Costing Service",
+                          "description":  "Endpoints for cost calculation and pricing.",
+                          "environment":  {
+
+                                          },
+                          "environmentPropertyOrder":  null,
+                          "metaSortKey":  -1707868700000,
+                          "_type":  "request_group"
+                      },
+                      {
+                          "_id":  "fld_populator",
+                          "parentId":  "wrk_1",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "Populator Service",
+                          "description":  "Endpoints for data generation.",
+                          "environment":  {
+
+                                          },
+                          "environmentPropertyOrder":  null,
+                          "metaSortKey":  -1707868600000,
+                          "_type":  "request_group"
+                      },
+                      {
+                          "_id":  "fld_feature_flags",
+                          "parentId":  "wrk_1",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "name":  "Feature Flags (GoFeatureFlag)",
+                          "description":  "Management endpoints for the Feature Flag relay proxy.",
+                          "environment":  {
+
+                                          },
+                          "environmentPropertyOrder":  null,
+                          "metaSortKey":  -1707868500000,
+                          "_type":  "request_group"
+                      },
+                      {
+                          "_id":  "req_ff_health",
+                          "parentId":  "fld_feature_flags",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "http://localhost:1031/health",
+                          "name":  "Health Check",
+                          "description":  "Check if the GoFeatureFlag proxy is running.",
+                          "method":  "GET",
+                          "body":  {
+
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868800000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_ff_all_flags",
+                          "parentId":  "fld_feature_flags",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "http://localhost:1031/v1/allflags",
+                          "name":  "Get All Flags",
+                          "description":  "Retrieve the current state of all flags for a specific user.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"user\": {\n\t\t\"key\": \"anonymous\"\n\t}\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868700000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "_id":  "req_ff_eval",
+                          "parentId":  "fld_feature_flags",
+                          "modified":  1707868800000,
+                          "created":  1707868800000,
+                          "url":  "http://localhost:1031/v1/feature/price-ingestion/eval",
+                          "name":  "Evaluate Flag",
+                          "description":  "Test evaluation of a specific flag.",
+                          "method":  "POST",
+                          "body":  {
+                                       "mimeType":  "application/json",
+                                       "text":  "{\n\t\"user\": {\n\t\t\"key\": \"test-user\",\n\t\t\"custom\": {\n\t\t\t\"email\": \"test@example.com\"\n\t\t}\n\t},\n\t\"defaultValue\": false\n}"
+                                   },
+                          "parameters":  [
+
+                                         ],
+                          "headers":  [
+                                          {
+                                              "name":  "Content-Type",
+                                              "value":  "application/json"
+                                          }
+                                      ],
+                          "authentication":  {
+
+                                             },
+                          "metaSortKey":  -1707868600000,
+                          "isPrivate":  false,
+                          "settingStoreCookies":  true,
+                          "settingSendCookies":  true,
+                          "settingDisableRenderRequestBody":  false,
+                          "settingEncodeUrl":  true,
+                          "settingRebuildPath":  true,
+                          "settingFollowRedirects":  "global",
+                          "_type":  "request"
+                      },
+                      {
+                          "created":  1771374009543,
+                          "_type":  "request",
+                          "parentId":  "fld_materials",
+                          "settingEncodeUrl":  true,
+                          "settingSendCookies":  true,
+                          "parameters":  [
+
+                                         ],
+                          "name":  "Get Unique Components",
+                          "authentication":  {
+
+                                             },
+                          "modified":  1771374009543,
+                          "description":  "Retrieve a list of all unique components found in materials.",
+                          "body":  {
+
+                                   },
+                          "_id":  "req_materials_get_components",
+                          "settingFollowRedirects":  "global",
+                          "metaSortKey":  -1707868650000,
+                          "settingDisableRenderRequestBody":  false,
+                          "headers":  [
+
+                                      ],
+                          "settingStoreCookies":  true,
+                          "isPrivate":  false,
+                          "settingRebuildPath":  true,
+                          "url":  "{{ _.base_url }}/api/v1/materials/components",
+                          "method":  "GET"
+                      },
+                      {
+                          "created":  1771374009543,
+                          "_type":  "request",
+                          "parentId":  "fld_costing",
+                          "settingEncodeUrl":  true,
+                          "settingSendCookies":  true,
+                          "parameters":  [
+
+                                         ],
+                          "name":  "Get All Prices",
+                          "authentication":  {
+
+                                             },
+                          "modified":  1771374009543,
+                          "description":  "Retrieve all component prices.",
+                          "body":  {
+
+                                   },
+                          "_id":  "req_costing_get_all_prices",
+                          "settingFollowRedirects":  "global",
+                          "metaSortKey":  -1707868750000,
+                          "settingDisableRenderRequestBody":  false,
+                          "headers":  [
+
+                                      ],
+                          "settingStoreCookies":  true,
+                          "isPrivate":  false,
+                          "settingRebuildPath":  true,
+                          "url":  "{{ _.base_url }}/api/v1/costing/prices",
+                          "method":  "GET"
+                      },
+                      {
+                          "created":  1771374009543,
+                          "_type":  "request",
+                          "parentId":  "fld_costing",
+                          "settingEncodeUrl":  true,
+                          "settingSendCookies":  true,
+                          "parameters":  [
+
+                                         ],
+                          "name":  "Get Prices Count",
+                          "authentication":  {
+
+                                             },
+                          "modified":  1771374009543,
+                          "description":  "Retrieve the total count of component prices.",
+                          "body":  {
+
+                                   },
+                          "_id":  "req_costing_get_prices_count",
+                          "settingFollowRedirects":  "global",
+                          "metaSortKey":  -1707868780000,
+                          "settingDisableRenderRequestBody":  false,
+                          "headers":  [
+
+                                      ],
+                          "settingStoreCookies":  true,
+                          "isPrivate":  false,
+                          "settingRebuildPath":  true,
+                          "url":  "{{ _.base_url }}/api/v1/costing/prices/count",
+                          "method":  "GET"
+                      },
+                      {
+                          "created":  1771374009543,
+                          "_type":  "request",
+                          "parentId":  "fld_populator",
+                          "settingEncodeUrl":  true,
+                          "settingSendCookies":  true,
+                          "parameters":  [
+
+                                         ],
+                          "name":  "Generate Prices",
+                          "authentication":  {
+
+                                             },
+                          "modified":  1771374009543,
+                          "description":  "Trigger price generation for all components.",
+                          "body":  {
+
+                                   },
+                          "_id":  "req_populator_generate",
+                          "settingFollowRedirects":  "global",
+                          "metaSortKey":  -1707868800000,
+                          "settingDisableRenderRequestBody":  false,
+                          "headers":  [
+
+                                      ],
+                          "settingStoreCookies":  true,
+                          "isPrivate":  false,
+                          "settingRebuildPath":  true,
+                          "url":  "{{ _.base_url }}/api/v1/populator/prices/generate",
+                          "method":  "POST"
+                      }
+                  ]
 }

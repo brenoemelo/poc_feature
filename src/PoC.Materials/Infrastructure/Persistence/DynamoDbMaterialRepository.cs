@@ -130,6 +130,56 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
         }
     }
 
+    public async Task<Result<IEnumerable<string>>> GetUniqueComponentsAsync()
+    {
+        try
+        {
+            var tableName = _options.TableName;
+            var request = new QueryRequest
+            {
+                TableName = tableName,
+                IndexName = "IX_Materials_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue> 
+                {
+                    { ":v_type", new AttributeValue { S = "MATERIAL" } }
+                }
+            };
+
+            var uniqueComponents = new HashSet<string>();
+            Dictionary<string, AttributeValue>? lastKey = null;
+
+            do
+            {
+                request.ExclusiveStartKey = lastKey;
+                var response = await client.QueryAsync(request);
+
+                foreach (var item in response.Items)
+                {
+                    var doc = Document.FromAttributeMap(item);
+                    var entity = context.FromDocument<MaterialEntity>(doc);
+                    
+                    if (entity.Formulation != null)
+                    {
+                        var components = entity.Formulation
+                            .Select(f => f.Component)
+                            .Where(c => !string.IsNullOrWhiteSpace(c));
+                        uniqueComponents.UnionWith(components);
+                    }
+                }
+                
+                lastKey = response.LastEvaluatedKey;
+            } 
+            while (lastKey != null && lastKey.Count > 0);
+
+            return Result.Success<IEnumerable<string>>(uniqueComponents);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IEnumerable<string>>(new Error("DynamoDb.Error", ex.Message));
+        }
+    }
+
     public async Task<Result> SaveAsync(MaterialFormulation material)
     {
         try
@@ -175,6 +225,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
         return new MaterialEntity
         {
             MaterialId = domain.MaterialId,
+            RecordType = "MATERIAL",
             Name = domain.Name,
             Density = domain.Density is null ? null : new DensityEntity
             {

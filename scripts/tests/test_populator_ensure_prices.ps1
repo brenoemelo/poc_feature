@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 # Load environment
-$EnvFile = Join-Path $PSScriptRoot ".env.local"
+$EnvFile = Join-Path $PSScriptRoot "../../.env.local"
 if (Test-Path $EnvFile) {
     Get-Content $EnvFile | ForEach-Object {
         if ($_ -match "([^=]+)=(.*)") {

@@ -20,9 +20,9 @@ function Write-Log {
     switch ($Level) {
         "Success" { $color = "Green" }
         "Warning" { $color = "Yellow" }
-        "Error"   { $color = "Red" }
-        "Info"    { $color = "Cyan" }
-        "Debug"   { $color = "Gray" }
+        "Error" { $color = "Red" }
+        "Info" { $color = "Cyan" }
+        "Debug" { $color = "Gray" }
     }
 
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -84,7 +84,8 @@ function Invoke-Aws {
                     return ($stdout | ConvertFrom-Json)
                 }
                 return $stdout
-            } else {
+            }
+            else {
                 # Check if it's a "ResourceNotFound" error which might be acceptable
                 if ($IgnoreError -and ($stderr -match "NotFound" -or $stderr -match "NoSuch" -or $stderr -match "does not exist")) {
                     Write-Log "Ignored error: $stderr" "Debug"
@@ -152,6 +153,13 @@ function Get-RepoRoot {
     return (Resolve-Path "$PSScriptRoot\..\..").Path
 }
 
+function Get-CommonEnvVars {
+    $otel = "OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp"
+    $flags = "FeatureFlags__Endpoint=http://gofeatureflag:1031/,FeatureFlags__TimeoutSeconds=10"
+    $serilog = "Serilog__MinimumLevel=Debug,Serilog__MinimumLevel__Override__PoC=Debug"
+    return "$otel,$flags,$serilog"
+}
+
 # -----------------------------------------------------------------------------
 # Common Resource Helpers
 # -----------------------------------------------------------------------------
@@ -173,7 +181,8 @@ function Ensure-LambdaDeleted {
                 Invoke-Aws -Service "lambda" -Command "delete-event-source-mapping" -Arguments @("--uuid", $mapping.UUID) -IgnoreError $true | Out-Null
             }
         }
-    } catch {
+    }
+    catch {
         Write-Log "Error checking event source mappings by function (ignoring): $_" "Warning"
     }
 
@@ -188,7 +197,8 @@ function Ensure-LambdaDeleted {
                     Invoke-Aws -Service "lambda" -Command "delete-event-source-mapping" -Arguments @("--uuid", $mapping.UUID) -IgnoreError $true | Out-Null
                 }
             }
-        } catch {
+        }
+        catch {
             Write-Log "Error checking event source mappings by source (ignoring): $_" "Warning"
         }
     }
@@ -244,10 +254,12 @@ function Ensure-S3BucketDeleted {
             # Force delete (remove all objects first)
             Invoke-Aws -Service "s3" -Command "rb" -Arguments @("s3://$BucketName", "--force") -IgnoreError $true | Out-Null
             Write-Log "Bucket '$BucketName' deleted." "Success"
-        } else {
+        }
+        else {
             Write-Log "Bucket '$BucketName' does not exist." "Info"
         }
-    } catch {
+    }
+    catch {
         Write-Log "Error deleting bucket '$BucketName': $_" "Warning"
     }
 }

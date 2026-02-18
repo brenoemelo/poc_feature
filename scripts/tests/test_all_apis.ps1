@@ -114,6 +114,15 @@ if ($created) {
     Invoke-Api -Method GET -Path "/api/v1/materials/$materialId" | Out-Null
 }
 
+# 4. Get Unique Components
+$components = Invoke-Api -Method GET -Path "/api/v1/materials/components"
+if ($components -and $components.data) {
+    Write-Host "Found unique components: $($components.data -join ', ')" -ForegroundColor Green
+} else {
+    Write-Host "No components found or invalid response." -ForegroundColor Red
+    Write-Host ($components | ConvertTo-Json -Depth 5)
+}
+
 Write-Host "`n--- Testing PoC.Costing ---" -ForegroundColor Yellow
 # 1. Upsert Price 1
 $price1 = @{
@@ -145,6 +154,12 @@ $calcReq = @{
 } | ConvertTo-Json
 
 Invoke-Api -Method POST -Path "/api/v1/costing/estimations" -Body $calcReq | Out-Null
+
+# 4. Get All Prices
+Invoke-Api -Method GET -Path "/api/v1/costing/prices" | Out-Null
+
+# 5. Get Prices Count
+Invoke-Api -Method GET -Path "/api/v1/costing/prices/count" | Out-Null
 
 
 Write-Host "`n--- Testing PoC.Populator ---" -ForegroundColor Yellow

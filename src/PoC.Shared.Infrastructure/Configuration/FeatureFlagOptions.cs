@@ -14,4 +14,9 @@ public sealed record FeatureFlagOptions
     /// Gets the application name used as the OpenFeature provider domain.
     /// </summary>
     public string AppName { get; init; } = "poc-app";
+
+    /// <summary>
+    /// Gets the timeout in seconds for the provider connection.
+    /// </summary>
+    public int TimeoutSeconds { get; init; } = 5;
 }

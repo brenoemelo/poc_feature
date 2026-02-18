@@ -5,6 +5,13 @@ namespace PoC.Costing.Domain.Services;
 
 public sealed class CostCalculator : ICostCalculator
 {
+    private readonly PoC.Costing.Infrastructure.BusinessMetrics _metrics;
+
+    public CostCalculator(PoC.Costing.Infrastructure.BusinessMetrics metrics)
+    {
+        _metrics = metrics;
+    }
+
     public Result<CostCalculationResponse> Calculate(
         string materialId,
         List<FormulationInput> formulation,
@@ -34,7 +41,10 @@ public sealed class CostCalculator : ICostCalculator
         foreach (var item in formulation)
         {
             var (unitPrice, _) = prices[item.Component];
-            var contribution = (decimal)item.Percentage * unitPrice / 100m; // Assuming percentage is 0-100
+            var contribution = (decimal)item.Percentage * unitPrice / 100m;
+
+            // Round individual contributions for consistency
+            contribution = Math.Round(contribution, 2);
 
             totalCost += contribution;
 
@@ -66,11 +76,13 @@ public sealed class CostCalculator : ICostCalculator
         }
 
         var response = new CostCalculationResponse(
-            materialId,
-            Math.Round(totalCost, 2),
-            currency,
-            breakdown,
-            marginAnalysis);
+            MaterialId: materialId,
+            TotalCost: Math.Round(totalCost, 2),
+            Currency: currency,
+            Breakdown: breakdown,
+            Margin: marginAnalysis);
+
+        _metrics.RecordCalculation((double)totalCost);
 
         return Result.Success(response);
     }
