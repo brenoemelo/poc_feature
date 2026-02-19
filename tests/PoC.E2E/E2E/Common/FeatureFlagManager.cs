@@ -53,10 +53,9 @@ public class FeatureFlagManager
         Console.WriteLine($"[FeatureFlagManager] Setting flag '{flagKey}' to '{targetState}'...");
 
         var request = new RestRequest($"admin/projects/default/features/{flagKey}/environments/development/{targetState}", Method.Post);
-        // Unleash API expects a JSON body even if empty for some endpoints, but for toggle on/off it might just need the endpoint.
-        // Documentation says: POST /api/admin/projects/:projectId/features/:featureName/environments/:environment/on
-        // Body: {} (optional?) - Let's send empty json just in case.
-        request.AddJsonBody(new { });
+        // Unleash API expects a JSON body. The init script sends { "enabled": true } for 'on'.
+        // For 'off', it likely expects { "enabled": false } or just empty object, but let's be consistent.
+        request.AddJsonBody(new { enabled = isEnabled });
 
         var response = await _unleashClient.ExecuteAsync(request);
 
@@ -66,12 +65,6 @@ public class FeatureFlagManager
         }
 
         _modifiedFlags.Add(flagKey);
-
-        // Wait for propagation (poll interval)
-        // Unleash client in the app polls every X seconds (default is often 15s, but we might have configured it lower or it uses push?)
-        // In this PoC, we might need to wait a bit.
-        Console.WriteLine("[FeatureFlagManager] Waiting 2s for app provider to poll changes...");
-        await Task.Delay(2000);
 
         Console.WriteLine($"[FeatureFlagManager] Flag '{flagKey}' successfully updated to '{targetState}'.");
     }

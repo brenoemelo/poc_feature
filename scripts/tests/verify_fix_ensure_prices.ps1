@@ -1,7 +1,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$PopulatorUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_/api/v1/populator/jobs"
+$PopulatorUrl = "http://localhost:4566/_aws/execute-api/material-api/prod/api/v1/populator/jobs"
 
 Write-Host "Triggering Ensure Prices..."
 $Payload = @{

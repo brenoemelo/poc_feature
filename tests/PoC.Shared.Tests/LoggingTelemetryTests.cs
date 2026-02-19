@@ -38,12 +38,6 @@ public class LoggingTelemetryTests : IClassFixture<OtelTestFixture>
         _fixture.ForceFlush();
 
         // Assert
-        var log = _fixture.ExportedLogs
-            .FirstOrDefault(l => l.Body == "TestLogActivity" || l.Body == "Test log message inside activity");
-
-        // Note: OpenTelemetry LogRecord.Body is the formatted message or the state. 
-        // Let's find by checking if any log contains our text.
-        
         // Note: OpenTelemetry LogRecord.Body is the formatted message or the state. 
         // In simple logs, Body often contains the string message.
         

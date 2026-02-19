@@ -4,7 +4,6 @@ using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
 using PoC.Observability.Extensions;
 using PoC.Shared.Events;
-using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
 using System.Text.Json;
 
@@ -19,11 +18,7 @@ public sealed class PriceIngestionFunction
     {
         var builder = Host.CreateApplicationBuilder();
 
-        builder.Services.AddPoCObservability(o =>
-        {
-            o.ServiceName = "PoC.Costing";
-            o.OtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-        });
+        builder.AddPoCObservability("PoC.Costing", "1.0.0");
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
         var host = builder.Build();

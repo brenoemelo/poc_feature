@@ -102,7 +102,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--zip-file", "fileb://$AbsZipPath",
     "--timeout", "60",
     "--memory-size", "1024",
-    "--environment", "Variables={MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_/,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,$(Get-CommonEnvVars)}"
+    "--environment", "Variables={MATERIALS_API_URL=http://localstack:4566/_aws/execute-api/material-api/prod/,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,$(Get-CommonEnvVars)}"
 ) | Out-Null
 
 # 3. Configure Function URL & Public Access

@@ -5,7 +5,7 @@ Decouple the monolithic `PoC.Shared.Infrastructure` project into specialized, in
 
 ## Current State
 *   **PoC.Shared.Infrastructure**: A "kitchen sink" library containing:
-    *   Observability Logic (Serilog, OTel)
+    *   Observability Logic (OTel)
     *   Feature Flag Logic (Unleash)
     *   AWS/LocalStack Helpers
     *   Common behaviors

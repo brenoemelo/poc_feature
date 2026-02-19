@@ -41,14 +41,14 @@ if ($API_FIXED_URL) {
 if (-not $BaseUrl) {
     if ($API_GATEWAY_ID) {
         $ApiId = $API_GATEWAY_ID
-        $DynamicUrl = "http://localhost:4566/restapis/$ApiId/prod/_user_request_"
+        $DynamicUrl = "http://localhost:4566/_aws/execute-api/$ApiId/prod"
         Write-Host "Using API ID from .env.local: $ApiId" -ForegroundColor Cyan
         $BaseUrl = $DynamicUrl
     }
     else {
         # Default fallback
         $ApiId = "material-api"
-        $BaseUrl = "http://localhost:4566/restapis/$ApiId/prod/_user_request_"
+        $BaseUrl = "http://localhost:4566/_aws/execute-api/$ApiId/prod"
         Write-Host "Using Hardcoded API ID: $ApiId" -ForegroundColor Yellow
     }
 }

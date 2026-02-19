@@ -1,6 +1,6 @@
 
 $ErrorActionPreference = "Stop"
-$BaseUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+$BaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
 $Url = "$BaseUrl/api/v1/materials"
 
 Write-Host "Calling GET $Url"

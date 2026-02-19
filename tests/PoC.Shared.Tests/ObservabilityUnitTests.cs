@@ -8,14 +8,14 @@ using Microsoft.Extensions.Hosting;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using Xunit;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Observability.Extensions;
 
 namespace PoC.Shared.Tests;
 
 public class ObservabilityUnitTests
 {
     [Fact]
-    public async Task Histogram_Should_Have_Explicit_Buckets_And_Dimensions()
+    public async Task Histogram_Should_Have_Explicit_Buckets_And_DimensionsAsync()
     {
         // Arrange
         var builder = WebApplication.CreateBuilder();
@@ -25,7 +25,7 @@ public class ObservabilityUnitTests
             {"Otel:Endpoint", "http://localhost:4317"},
             {"Otel:Protocol", "grpc"}
         };
-        builder.Configuration.AddInMemoryCollection(inMemorySettings);
+        builder.Configuration.AddInMemoryCollection(inMemorySettings.Select(x => new KeyValuePair<string, string?>(x.Key, x.Value)));
 
         // Add Observability
         builder.AddPoCObservability("TestService", "1.0.0");
@@ -59,7 +59,7 @@ public class ObservabilityUnitTests
         app.Services.GetRequiredService<MeterProvider>().ForceFlush();
 
         // Assert
-        var metric = exportedItems.FirstOrDefault(m => m.Name == "http.client.request.duration");
+        var metric = exportedItems.Find(m => m.Name == "http.client.request.duration");
         
         // Debug output if null
         if (metric == null)

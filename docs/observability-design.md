@@ -17,7 +17,6 @@ builder.AddPoCObservability("Service-Name", "1.0.0");
 ```
 
 **Key Features:**
-- **Serilog Integration:** Configures structured logging with JSON output.
 - **Log Correlation:** Injects `TraceId` and `SpanId` into every log message to enable "Logs to Traces" navigation in backends.
 - **Resource Detection:** Mapped attributes for vendor compatibility:
   - `service.name`
@@ -94,7 +93,7 @@ For CI/CD and production overrides, use these environment variables:
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Configures Serilog + OTel (Tracing, Metrics, Logs)
+// Configures OpenTelemetry (Tracing, Metrics, Logs)
 builder.AddPoCObservability("PoC-Materials", "1.0.0");
 
 var app = builder.Build();

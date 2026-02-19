@@ -22,10 +22,6 @@ If you cannot publish packages yet, verify you have these dependencies in your p
 
 ```xml
 <ItemGroup>
-  <!-- Serilog -->
-  <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
-  <PackageReference Include="Serilog.Enrichers.OpenTelemetry" Version="1.0.1" />
-  
   <!-- OpenTelemetry -->
   <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.1" />
   <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.11.0" />

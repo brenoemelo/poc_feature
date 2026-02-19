@@ -2,8 +2,8 @@
 # Bypass SSL validation
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 
-$BaseUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
-$PopulatorUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+$BaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
+$PopulatorUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
 
 function Invoke-Api {
     param([string]$Method, [string]$Uri, [string]$Body = $null)
@@ -59,7 +59,7 @@ if ($page1) {
         $nextLink = $nextLinkObj.href
         # Fix LocalStack generated URL
         if ($nextLink -match "^https://localhost:4566/prod") {
-             $nextLink = $nextLink -replace "^https://localhost:4566/prod", "http://localhost:4566/restapis/material-api/prod/_user_request_"
+             $nextLink = $nextLink -replace "^https://localhost:4566/prod", "http://localhost:4566/_aws/execute-api/material-api/prod"
         }
         Write-Host "Next Link found: $nextLink" -ForegroundColor Green
         

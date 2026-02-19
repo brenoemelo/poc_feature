@@ -70,9 +70,17 @@ public class OtelTestFixture : IDisposable
 
     public void Dispose()
     {
-        _tracerProvider?.Dispose();
-        _meterProvider?.Dispose();
-        _loggerFactory?.Dispose();
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _tracerProvider?.Dispose();
+            _meterProvider?.Dispose();
+            _loggerFactory?.Dispose();
+        }
     }
 }

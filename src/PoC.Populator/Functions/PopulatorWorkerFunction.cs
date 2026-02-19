@@ -6,7 +6,6 @@ using Amazon.SimpleNotificationService.Model;
 using PoC.Observability.Extensions;
 using PoC.Populator.Domain.Services;
 using PoC.Shared.Events;
-using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
 using System.Text.Json;
 
@@ -21,11 +20,7 @@ public class PopulatorWorkerFunction
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
-            builder.Services.AddPoCObservability(o =>
-            {
-                o.ServiceName = "PoC.Populator";
-                o.OtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-            });
+            builder.AddPoCObservability("PoC.Populator", "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
@@ -103,8 +98,8 @@ public class PopulatorWorkerFunction
             return;
         }
 
-        // We use our own Logger (Serilog), but we can also log to Lambda Context if needed.
-        // For consistency, we rely on Serilog which writes to Console (captured by CloudWatch/LocalStack).
+        // We use our own Logger, but we can also log to Lambda Context if needed.
+        // For consistency, we rely on standard logging which writes to Console (captured by CloudWatch/LocalStack).
         foreach (var message in ev.Records)
         {
             // Phase 3: Extract Parent Trace Context

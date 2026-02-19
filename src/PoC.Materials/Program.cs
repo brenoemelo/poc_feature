@@ -8,7 +8,6 @@ using PoC.Materials.API.Endpoints;
 using PoC.Materials.Functions;
 using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
-using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Validators;
 using System.Text.Json;
 
@@ -26,19 +25,8 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("MaterialIngestionFunctio
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Observability (Serilog + OpenTelemetry)
 // Observability (Native OTel + ILogger)
-builder.Services.AddStartUpMetrics();
-builder.Services.AddPoCObservability(o =>
-{
-    o.ServiceName = "PoC-Materials";
-    o.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-});
-builder.Logging.AddPoCOTelLogging(o =>
-{
-    o.ServiceName = "PoC-Materials";
-    o.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-});
+builder.AddPoCObservability("PoC-Materials", "1.0.0");
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
@@ -50,6 +38,10 @@ builder.Services.AddPoCFeatureFlags(o =>
     o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
     o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
     o.UnleashAppName = "Default";
+    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+    {
+        o.FetchTogglesIntervalSeconds = interval;
+    }
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();
@@ -62,7 +54,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.UsePoCDefaults();
+app.UsePoCObservability();
 
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();

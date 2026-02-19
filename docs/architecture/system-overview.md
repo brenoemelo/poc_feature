@@ -59,10 +59,14 @@ Services are decoupled and communicate asynchronously via **Integration Events**
 2. `PoC.Costing` (subscribed via `sqs-costing-material-updates`) receives the message.
 3. `PoC.Costing` Lambda wakes up and calculates the new price.
 
-### 2.3. Shared Kernel (`PoC.Shared`)
-To avoid code duplication in cross-cutting concerns, we use a Shared Kernel library.
+### 2.3. Shared Kernel & Specialized Libraries
+To avoid code duplication and monolithic dependencies, we use a modular approach:
 
-- **Contains:** Result Pattern, Base Entities (`IEntity`), Common DTOs, Observability setup, Feature Flag wrappers.
+- **`PoC.Shared`:** Lightweight Kernel. Contains Result Pattern, Base Entities (`IEntity`), Common DTOs. *No heavy dependencies.*
+- **`PoC.Observability`:** Centralized OpenTelemetry (Tracing, Metrics, Logs) configuration.
+- **`PoC.FeatureFlags`:** OpenFeature implementation with Unleash provider.
+
+### 2.4. Domain Logic
 - **Does NOT Contain:** Business logic specific to one domain (e.g., "Pricing Rules").
 
 ## 3. Observability & Telemetry
@@ -71,7 +75,7 @@ The system is fully instrumented using the **OpenTelemetry (OTel)** standard.
 
 - **Tracing:** W3C Trace Context is propagated across API Gateway, Lambda, SNS, and SQS.
 - **Metrics:** Business and technical metrics (e.g., `orders_processed`, `execution_time_ms`) are emitted to the Collector.
-- **Logs:** Structured logs (Serilog) are enriched with `TraceId` and `SpanId` for correlation.
+- **Logs:** Structured logs (Microsoft.Extensions.Logging) are enriched with `TraceId` and `SpanId` for correlation.
 
 **Data Flow:**
 App -> OTel SDK -> OTel Collector (Sidecar) -> Backends (Tempo/Prometheus/Loki)

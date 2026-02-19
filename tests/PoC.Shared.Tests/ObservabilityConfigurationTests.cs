@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Observability.Extensions;
 using Xunit;
 
 namespace PoC.Shared.Tests;
@@ -23,7 +23,7 @@ public class ObservabilityConfigurationTests
             {"Otel:Endpoint", "http://localhost:4317"},
             {"Otel:Protocol", "grpc"}
         };
-        builder.Configuration.AddInMemoryCollection(inMemorySettings);
+        builder.Configuration.AddInMemoryCollection(inMemorySettings.Select(x => new KeyValuePair<string, string?>(x.Key, x.Value)));
 
         // Act
         builder.AddPoCObservability("TestService", "1.0.0");
@@ -42,7 +42,7 @@ public class ObservabilityConfigurationTests
     {
          // Arrange
         var builder = WebApplication.CreateBuilder();
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string>());
+        builder.Configuration.AddInMemoryCollection(new List<KeyValuePair<string, string?>>());
 
         // Act
         builder.AddPoCObservability("TestService", "1.2.3");

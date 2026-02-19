@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 
-namespace PoC.Shared.Infrastructure.Extensions;
+namespace PoC.Observability.Middleware;
 
 /// <summary>
 /// Middleware that injects the current OpenTelemetry TraceId into the HTTP response headers.

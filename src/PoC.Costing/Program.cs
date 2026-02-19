@@ -11,7 +11,6 @@ using PoC.Costing.Infrastructure;
 using PoC.Costing.Infrastructure.ExternalServices;
 using PoC.FeatureFlags.Extensions;
 using PoC.Observability.Extensions;
-using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Validators;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
@@ -29,17 +28,7 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("PriceIngestionFunction")
 var builder = WebApplication.CreateBuilder(args);
 
 // Observability (Native OTel + ILogger)
-builder.Services.AddStartUpMetrics(); // Ensure startup metrics are captured
-builder.Services.AddPoCObservability(o =>
-{
-    o.ServiceName = "PoC-Costing";
-    o.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-});
-builder.Logging.AddPoCOTelLogging(o =>
-{
-    o.ServiceName = "PoC-Costing";
-    o.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-});
+builder.AddPoCObservability("PoC-Costing", "1.0.0");
 
 // Add Custom Meter to OTel
 builder.Services.AddOpenTelemetry()
@@ -59,6 +48,10 @@ builder.Services.AddPoCFeatureFlags(o =>
     o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
     o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
     o.UnleashAppName = "Default";
+    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+    {
+        o.FetchTogglesIntervalSeconds = interval;
+    }
 });
 
 builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
@@ -82,7 +75,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.UsePoCDefaults();
+app.UsePoCObservability();
 
 app.MapGroup("/api/v1/costing")
    .MapCostingEndpoints();

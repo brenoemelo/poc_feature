@@ -3,7 +3,7 @@
 ## 1. Overview & Current State
 The project uses a **centralized observability strategy** defined in `PoC.Shared.Infrastructure`. This ensures consistency across all services.
 
-- **Stack:** Serilog (Logs) + OpenTelemetry (Tracing/Metrics).
+- **Stack:** Microsoft.Extensions.Logging (Logs) + OpenTelemetry (Tracing/Metrics).
 - **Configuration:** Shared extension method `AddPoCObservability`.
 - **Lambda Support:** Explicitly supported.
     - Uses `ExportProcessorType.Simple` (synchronous export) which is correct for Lambda to ensure data is flushed before the execution environment freezes.
@@ -25,7 +25,7 @@ In `PopulatorWorkerFunction.cs`, there is a `foreach` loop processing items from
 // Processing job...
 // Publishing event...
 ```
-- **Synchronous Locking:** Serilog's Console Sink (used in Lambda) writes synchronously.
+- **Synchronous Locking:** Console Sink (used in Lambda) writes synchronously.
 - **Volume:** If a job requests 1,000 items, the Lambda attempts to write 2,000+ log lines to CloudWatch *synchronously*.
 - **Consequence:** This I/O overhead likely causes the Lambda to time out before completing the batch, especially if the `BatchSize` is large.
 

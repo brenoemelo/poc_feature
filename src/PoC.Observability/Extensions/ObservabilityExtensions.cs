@@ -1,21 +1,19 @@
-using System.Diagnostics.Metrics;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Exporter;
-using OpenTelemetry.Logs;
+using OpenTelemetry;
 using OpenTelemetry.Instrumentation.AWSLambda;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using PoC.Observability.Configuration;
 using PoC.Observability.Diagnostics;
 
 namespace PoC.Observability.Extensions;
 
 public static class ObservabilityExtensions
 {
-    private const string OtlpTimeoutEnvVar = "OTEL_EXPORTER_OTLP_TIMEOUT";
-
     public static IServiceCollection AddStartUpMetrics(this IServiceCollection services)
     {
         services.AddSingleton<StartupTimer>();
@@ -24,118 +22,92 @@ public static class ObservabilityExtensions
     }
 
     /// <summary>
-    /// Adds OpenTelemetry Observability (Tracing, Metrics, and Native Logging).
+    /// Configures OpenTelemetry Observability (Logging, Tracing, Metrics) for Web Applications.
     /// </summary>
-    public static IServiceCollection AddPoCObservability(
-        this IServiceCollection services,
-        Action<ObservabilityOptions> configureOptions)
+    public static WebApplicationBuilder AddPoCObservability(
+        this WebApplicationBuilder builder,
+        string serviceName,
+        string serviceVersion)
     {
-        var options = new ObservabilityOptions { ServiceName = "Unknown" };
-        configureOptions(options);
+        ConfigureObservability(builder.Services, builder.Logging, serviceName, serviceVersion);
+        return builder;
+    }
 
-        // 1. Build Resource
+    /// <summary>
+    /// Configures OpenTelemetry Observability (Logging, Tracing, Metrics) for Worker/Lambda Hosts.
+    /// </summary>
+    public static HostApplicationBuilder AddPoCObservability(
+        this HostApplicationBuilder builder,
+        string serviceName,
+        string serviceVersion)
+    {
+        ConfigureObservability(builder.Services, builder.Logging, serviceName, serviceVersion);
+        return builder;
+    }
+
+    private static void ConfigureObservability(
+        IServiceCollection services,
+        ILoggingBuilder loggingBuilder,
+        string serviceName,
+        string serviceVersion)
+    {
+        var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
+
+        // 0. Add Startup Metrics
+        services.AddStartUpMetrics();
+
+        // 1. Definir o Resource Builder centralizado para garantir metadados idênticos em Logs, Metrics e Traces
         var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion)
-            .AddTelemetrySdk()
-            .AddEnvironmentVariableDetector();
+            .AddService(serviceName: serviceName, serviceVersion: serviceVersion);
 
-        // 2. Configure OpenTelemetry (Tracing & Metrics)
-        var otel = services.AddOpenTelemetry()
+        // 2. Configure Logging (Substituindo o Serilog pelo ILogger Nativo Integrado ao OTel)
+        loggingBuilder.ClearProviders(); // Opcional: remove logs padrão de console do .NET para evitar duplicidade
+        loggingBuilder.AddOpenTelemetry(logging =>
+        {
+            logging.SetResourceBuilder(resourceBuilder);
+            logging.IncludeFormattedMessage = true;
+            logging.IncludeScopes = true;
+            logging.AddOtlpExporter();
+        });
+
+        // 3. Configure OpenTelemetry (Tracing & Metrics)
+        services.AddOpenTelemetry()
             .WithTracing(tracing =>
             {
                 tracing
                     .SetResourceBuilder(resourceBuilder)
-                    .AddSource(options.ServiceName)
+                    .AddSource(serviceName)
                     .AddHttpClientInstrumentation()
-                    .AddAspNetCoreInstrumentation(o => o.RecordException = true) // Capture exceptions
-                    .AddAWSInstrumentation() // AWS SDK
-                    .AddAWSLambdaConfigurations(o => o.DisableAwsXRayContextExtraction = true); // Lambda
+                    .AddAspNetCoreInstrumentation()
+                    .AddAWSInstrumentation(); // Habilitado: Essencial para propagar contexto no SQS, SNS e S3
 
-                if (!string.IsNullOrEmpty(options.OtlpEndpoint))
+                if (isLambda)
                 {
-                    tracing.AddOtlpExporter(o => ConfigureOtlp(o, options.OtlpEndpoint));
+                    tracing.AddAWSLambdaConfigurations(options =>
+                    {
+                        options.DisableAwsXRayContextExtraction = true; // Use OTel W3C propagation
+                    });
                 }
-                
-                if (options.EnableConsoleLogging)
+
+                tracing.AddOtlpExporter(options =>
                 {
-                    // tracing.AddConsoleExporter(); // Optional: Traces in console are verbose
-                }
+                    if (isLambda)
+                    {
+                        // Em Lambdas, o processador "Simple" garante o envio imediato para o sidecar
+                        // antes que a AWS congele o ambiente de execução.
+                        options.ExportProcessorType = ExportProcessorType.Simple;
+                    }
+                });
             })
             .WithMetrics(metrics =>
             {
                 metrics
                     .SetResourceBuilder(resourceBuilder)
+                    .AddMeter(serviceName)
                     .AddHttpClientInstrumentation()
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation() // GC, Memory
-                    .AddMeter(options.ServiceName);
+                    .AddAspNetCoreInstrumentation();
 
-                if (!string.IsNullOrEmpty(options.OtlpEndpoint))
-                {
-                    metrics.AddOtlpExporter(o => ConfigureOtlp(o, options.OtlpEndpoint));
-                }
+                metrics.AddOtlpExporter();
             });
-
-        // 3. Configure Native Logging (ILogger -> OTLP)
-        services.Configure<OpenTelemetryLoggerOptions>(opt =>
-        {
-            opt.SetResourceBuilder(resourceBuilder);
-            opt.IncludeScopes = true;
-            opt.ParseStateValues = true;
-            opt.IncludeFormattedMessage = true;
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Configures the logging builder to export to OpenTelemetry.
-    /// </summary>
-    public static ILoggingBuilder AddPoCOTelLogging(
-        this ILoggingBuilder builder,
-        Action<ObservabilityOptions> configureOptions)
-    {
-        var options = new ObservabilityOptions { ServiceName = "Unknown", EnableConsoleLogging = true };
-        configureOptions(options);
-
-        builder.ClearProviders(); // Start clean (removes default Console/Debug)
-        
-        if (options.EnableConsoleLogging)
-        {
-            builder.AddConsole();
-        }
-
-        builder.AddOpenTelemetry(logging =>
-        {
-            if (!string.IsNullOrEmpty(options.OtlpEndpoint))
-            {
-                logging.AddOtlpExporter(o => ConfigureOtlp(o, options.OtlpEndpoint));
-            }
-        });
-
-        return builder;
-    }
-
-    private static void ConfigureOtlp(OtlpExporterOptions o, string endpoint)
-    {
-        o.Endpoint = new Uri(endpoint);
-        o.Protocol = OtlpExportProtocol.Grpc; // Defaulting to gRPC for performance
-
-        // Handle HTTP/Protobuf if endpoint implies it (simple heuristic)
-        if (endpoint.Contains("http") && (endpoint.EndsWith("/v1/logs") || endpoint.EndsWith("/v1/traces") || endpoint.EndsWith("/v1/metrics")))
-        {
-             o.Protocol = OtlpExportProtocol.HttpProtobuf;
-        }
-        else if (endpoint.Contains(":4318")) // Standard HTTP port
-        {
-             o.Protocol = OtlpExportProtocol.HttpProtobuf;
-        }
-
-        // Optimize for Lambda: Short timeout to flush before freeze
-        // But respect env var if set
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(OtlpTimeoutEnvVar)))
-        {
-            o.TimeoutMilliseconds = 1000; 
-        }
     }
 }

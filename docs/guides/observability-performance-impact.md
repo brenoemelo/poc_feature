@@ -3,7 +3,7 @@
 ## 🎯 Objective
 Measure the **overhead** introduced by OpenTelemetry (OTLP) on **AWS Lambda Cold Starts** (Warm-up) and **Memory Consumption**.
 
-Adding observability libraries (Serilog + OTel) increases the deployment package size and initialization time. This guide defines a **standardized, automated process** to quantify this impact and decide on optimizations (e.g., AOT, Trimming).
+Adding observability libraries (OTel) increases the deployment package size and initialization time. This guide defines a **standardized, automated process** to quantify this impact and decide on optimizations (e.g., AOT, Trimming).
 
 ---
 

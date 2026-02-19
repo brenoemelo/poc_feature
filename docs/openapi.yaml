@@ -4,7 +4,7 @@ info:
   description: API for managing and querying material formulations for the POC.
   version: 1.1.0
 servers:
-  - url: http://localhost:4566/restapis/{api_id}/prod/_user_request_/
+  - url: http://localhost:4566/_aws/execute-api/{api_id}/prod/
     description: LocalStack REST API (Replace {api_id} with the ID from `aws apigateway get-rest-apis`)
 
 paths:

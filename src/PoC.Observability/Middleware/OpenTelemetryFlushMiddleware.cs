@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-namespace PoC.Shared.Infrastructure.Middleware;
+namespace PoC.Observability.Middleware;
 
 /// <summary>
 /// Middleware to force flush OpenTelemetry providers (Tracer and Meter) at the end of the request.

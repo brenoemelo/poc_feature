@@ -2,7 +2,7 @@
 
 ## 1. Overview & Tech Stack
 This project follows an **Event-Driven Microservices Architecture** built upon the .NET ecosystem.
-* **Runtime:** Latest Stable .NET (currently .NET 8 / C# 12+). **Always** utilize the most modern language features available.
+* **Runtime:** Latest Stable .NET (currently .NET 10 / C# 14+). **Always** utilize the most modern language features available.
 * **Database:** Amazon DynamoDB (Single Table Design preferred).
 * **Messaging:** Amazon SNS (Topics) & Amazon SQS (Queues).
 * **Observability:** OpenTelemetry (OTLP), W3C Trace Context.
@@ -58,10 +58,13 @@ Every line of code must adhere to these principles. Violations are considered im
 * **Synchronous:** Use HTTP/gRPC sparingly (Queries only), wrapped in **Polly Policies**.
 
 ### 4.4. Shared Kernel Strategy
-* **Reusability:** Common infrastructure logic (Observability, Feature Flags, Resilience) must be centralized in `PoC.Shared` (or `PoC.Kernel`).
+* **Reusability:** Common infrastructure logic must be modularized into specialized libraries to avoid bloating the kernel:
+    *   `PoC.Shared`: Core domain primitives (Result, IEntity, DTOs). *Zero heavy dependencies.*
+    *   `PoC.Observability`: OpenTelemetry & Logging configuration.
+    *   `PoC.FeatureFlags`: Feature Management (Unleash).
 * **No Domain Leakage:** The Shared Kernel must contain **ONLY** infrastructure concerns. It must never contain business rules or domain entities.
 
-## 5. Internal Service Architecture (.NET 8)
+## 5. Internal Service Architecture (.NET 10)
 
 ### 5.1. Project Structure (Clean Architecture)
 * **src/Core (Domain):** Entities, Interfaces. *Zero dependencies.*
@@ -85,8 +88,8 @@ The system must be fully observable via **OpenTelemetry (OTLP)** and **Vendor Ag
 
 ### 7.1. OTLP & Vendor Neutrality
 * **Protocol:** All telemetry (Logs, Metrics, Traces) must be exported via **OTLP** (gRPC or HTTP/Protobuf).
-* **No Vendor SDKs:** Do not use proprietary SDKs (e.g., Datadog.Trace, NewRelic.Agent) inside the application code.
-* **Configuration:** Endpoints and Headers must be configurable via `appsettings.json` to allow switching backends (e.g., Grafana Cloud <-> Datadog) without code changes.
+* **No Vendor SDKs:** Do not use proprietary SDKs inside the application code.
+* **Configuration:** Endpoints and Headers must be configurable via `appsettings.json` to allow switching backends without code changes.
 
 ### 7.2. Metrics & Warm-up
 * **Startup Tracking:** All services must measure and emit `app.startup_duration_ms` to monitor Cold Starts.
@@ -94,8 +97,24 @@ The system must be fully observable via **OpenTelemetry (OTLP)** and **Vendor Ag
 
 ### 7.3. Distributed Tracing
 * **W3C Standard:** Use **W3C Trace Context** for propagation.
-* **Correlation:** Ensure `TraceId` is injected into Logs (Serilog `LogContext`) and HTTP Response Headers for easier debugging.
+* **Correlation:** Ensure `TraceId` is injected into Logs (via `Activity.Current` or `ILogger` scopes) and HTTP Response Headers for easier debugging.
 * **AWS Instrumentation:** Must instrument AWS SDK calls (DynamoDB, SNS, SQS) to visualize the full dependency chain.
+
+### 7.4. Logging Standards (ILogger API)
+We strictly use the native `Microsoft.Extensions.Logging.ILogger` integrated directly with the OpenTelemetry Logger Provider via `PoC.Observability`.
+* **No Serilog:** Serilog has been **REMOVED** to reduce overhead and align with Cloud-Native standards. Do not add it back.
+* **Structured Logging (No Interpolation):** It is **STRICTLY FORBIDDEN** to use string interpolation (`$""`) in log messages. Always use message templates to preserve property names for querying in backends like Loki/Elasticsearch.
+    * 🔴 *Bad:* `_logger.LogInformation($"User {userId} processed order {orderId}.");`
+    * 🟢 *Good:* `_logger.LogInformation("User {UserId} processed order {OrderId}.", userId, orderId);`
+* **High-Performance Logging (Source Generators):** For hot paths or highly frequent operations, you **MUST** use the `[LoggerMessage]` attribute to generate compile-time logging methods, avoiding boxing and allocation overhead.
+* **Semantic Log Levels:**
+    * `Trace` / `Debug`: Detailed flow and troubleshooting. Disabled in Production.
+    * `Information`: Significant business events (e.g., "OrderCreated", "PaymentProcessed"). Do not log every step of a function.
+    * `Warning`: Handled exceptions, retries (e.g., Polly retry), or unexpected but recoverable states.
+    * `Error`: Unhandled exceptions or failures that interrupt a business flow. (Triggers alerts).
+    * `Critical`: System crashes, infrastructure offline, out of memory. (Wakes up the SRE team).
+* **Scoping (`BeginScope`):** Use `_logger.BeginScope` to attach ambient context (e.g., `TenantId`, `CorrelationId`) to a block of code, ensuring all inner logs inherit these properties.
+* **Security & Compliance:** It is **STRICTLY FORBIDDEN** to log Personally Identifiable Information (PII), passwords, secrets, or raw API tokens.
 
 ## 8. Version Control & Commits
 * **Conventional Commits:** Follow the standard (e.g., `feat(cart): add item limit`).

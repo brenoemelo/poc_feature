@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Each microservice in the PoC project originally implemented its own observability logic (Serilog configuration, exception handling, and basic logging). This led to:
+Each microservice in the PoC project originally implemented its own observability logic (Logging configuration, exception handling, and basic logging). This led to:
 1.  **Code Duplication:** Substantial boilerplate in `Program.cs` for every service.
 2.  **Inconsistency:** Variations in logging formats and metrics implementation.
 3.  **Vendor Lock-in Risk:** Hardcoding specifics for logging backends within services.

@@ -7,7 +7,6 @@ using PoC.Observability.Extensions;
 using PoC.Populator.API.Endpoints;
 using PoC.Populator.Functions;
 using PoC.Populator.Infrastructure;
-using PoC.Shared.Infrastructure.Extensions;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
@@ -23,12 +22,8 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("PopulatorWorkerFunction"
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Observability (Serilog + OpenTelemetry)
-builder.Services.AddPoCObservability(o =>
-{
-    o.ServiceName = "PoC.Populator";
-    o.OtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-});
+// Observability (Native OTel + ILogger)
+builder.AddPoCObservability("PoC.Populator", "1.0.0");
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
@@ -42,6 +37,10 @@ builder.Services.AddPoCFeatureFlags(options =>
     options.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "default:development.unleash-insecure-api-token";
     options.UnleashAppName = "PoC-Populator";
     options.UnleashInstanceId = "populator-1";
+    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+    {
+        options.FetchTogglesIntervalSeconds = interval;
+    }
 });
 
 // JSON Configuration
@@ -52,7 +51,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.UsePoCDefaults();
+app.UsePoCObservability();
 
 app.MapGroup("/api/v1/populator")
    .MapPopulatorEndpoints();

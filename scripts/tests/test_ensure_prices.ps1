@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Continue"
 
 # Setup Base URL
-$BaseUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+$BaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
 Write-Host "Using API Gateway Base URL: $BaseUrl" -ForegroundColor Cyan
 
 function Invoke-Api {

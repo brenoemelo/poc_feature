@@ -22,7 +22,7 @@ public static class FeatureFlagsExtensions
         services.AddSingleton<IUnleash>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<IUnleash>>();
-            logger.LogInformation("Initializing Unleash Provider. URL: {Url}", options.UnleashApiUrl);
+            logger.LogInformation("Initializing Unleash Provider. URL: {Url}. Interval: {Interval}s", options.UnleashApiUrl, options.FetchTogglesIntervalSeconds);
 
             if (options.UnleashApiUrl?.Contains("fake", StringComparison.OrdinalIgnoreCase) == true)
             {
