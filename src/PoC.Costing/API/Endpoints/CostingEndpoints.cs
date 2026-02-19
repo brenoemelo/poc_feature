@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Domain.Services;
 
+using PoC.FeatureFlags.Extensions;
 using PoC.Shared.Common;
 using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;

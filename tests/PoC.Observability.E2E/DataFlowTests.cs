@@ -2,8 +2,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
-using System.Net;
-using Xunit;
 
 namespace PoC.Observability.E2E;
 

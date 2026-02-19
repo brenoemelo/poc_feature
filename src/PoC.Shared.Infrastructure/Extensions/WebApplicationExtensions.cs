@@ -6,8 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PoC.Shared.Infrastructure.Middleware;
-using Serilog;
-
 namespace PoC.Shared.Infrastructure.Extensions;
 
 /// <summary>
@@ -24,7 +22,6 @@ public static class WebApplicationExtensions
     {
         app.UseMiddleware<TraceIdResponseMiddleware>();
         app.UseMiddleware<OpenTelemetryFlushMiddleware>();
-        app.UseSerilogRequestLogging();
 
         app.UseExceptionHandler(exceptionHandlerApp =>
         {

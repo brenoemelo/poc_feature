@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using PoC.FeatureFlags.Extensions;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Infrastructure.Extensions;

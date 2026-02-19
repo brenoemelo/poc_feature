@@ -53,37 +53,16 @@ function Run-DeployScript {
 }
 
 # 2. Execute in dependency order with SkipBuild
+# 2. Execute in dependency order
 # Materials must go first to set up shared SNS topics
-Run-DeployScript "materials.ps1 -SkipBuild"
+$BuildFlag = if ($SkipBuild) { "-SkipBuild" } else { "" }
+Run-DeployScript "materials.ps1 $BuildFlag"
 
-Write-Log "Starting Parallel Deployment for Costing and Populator..." "Info"
+# 3. Compile and Deploy Remaining Services (Sequential)
+Write-Log "Starting Sequential Deployment for Costing and Populator..." "Info"
 
-# Run Costing and Populator in parallel using Start-Process
-$costingPath = Join-Path $ScriptDir "costing.ps1"
-$populatorPath = Join-Path $ScriptDir "populator.ps1"
-
-$p1 = Start-Process -FilePath "powershell" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $costingPath, "-SkipBuild" -PassThru -NoNewWindow
-$p2 = Start-Process -FilePath "powershell" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $populatorPath, "-SkipBuild" -PassThru -NoNewWindow
-
-# Wait for both
-$procs = @($p1, $p2)
-$procs | Wait-Process
-
-# Check Exit Codes
-$failed = $false
-foreach ($p in $procs) {
-    if ($p.ExitCode -ne 0) {
-        Write-Log "Process $($p.Id) failed with exit code $($p.ExitCode)." "Error"
-        $failed = $true
-    }
-}
-
-if ($failed) {
-    Write-Log "Parallel deployment failed." "Error"
-    exit 1
-}
-
-# Gateway depends on all Lambdas
+Run-DeployScript "costing.ps1 $BuildFlag"
+Run-DeployScript "populator.ps1 $BuildFlag"
 Run-DeployScript "gateway.ps1"
 
 Write-Log "----------------------------------------------------------------" "Debug"

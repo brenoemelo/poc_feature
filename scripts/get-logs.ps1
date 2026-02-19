@@ -1,5 +1,6 @@
 
-$logGroup = "/aws/lambda/PoC-Materials"
+param([string]$FunctionName = "PoC-Materials")
+$logGroup = "/aws/lambda/$FunctionName"
 $stream = aws --endpoint-url http://localhost:4566 logs describe-log-streams --log-group-name $logGroup --order-by LastEventTime --descending --limit 1 | ConvertFrom-Json
 $streamName = $stream.logStreams[0].logStreamName
 Write-Host "Fetching logs from stream: $streamName"

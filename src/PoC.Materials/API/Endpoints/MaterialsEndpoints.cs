@@ -1,7 +1,7 @@
 using FluentValidation;
+using PoC.FeatureFlags.Extensions;
 using PoC.Materials.API.Extensions;
 using PoC.Materials.Domain.Interfaces;
-
 using PoC.Shared.Common;
 using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;

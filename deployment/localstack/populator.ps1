@@ -83,7 +83,7 @@ Write-Log "--- CLEANUP COMPLETED ---" "Success"
 Write-Log "Creating Lambda function: $FunctionName" "Info"
 Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--function-name", $FunctionName,
-    "--runtime", "dotnet8",
+    "--runtime", "dotnet10",
     "--handler", "PoC.Populator",
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",
@@ -96,7 +96,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
 Write-Log "Creating Worker function: $WorkerFunctionName" "Info"
 Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--function-name", $WorkerFunctionName,
-    "--runtime", "dotnet8",
+    "--runtime", "dotnet10",
     "--handler", "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler",
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",

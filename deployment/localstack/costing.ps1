@@ -89,7 +89,7 @@ Invoke-Aws -Service "dynamodb" -Command "create-table" -Arguments @(
 Write-Log "Creating Lambda function: $FunctionName" "Info"
 Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--function-name", $FunctionName,
-    "--runtime", "dotnet8",
+    "--runtime", "dotnet10",
     "--handler", "PoC.Costing",
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",
@@ -102,7 +102,7 @@ Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
 Write-Log "Creating Price Ingestion function: $IngestionFunctionName" "Info"
 Invoke-Aws -Service "lambda" -Command "create-function" -Arguments @(
     "--function-name", $IngestionFunctionName,
-    "--runtime", "dotnet8",
+    "--runtime", "dotnet10",
     "--handler", "PoC.Costing::PoC.Costing.Functions.PriceIngestionFunction::FunctionHandler",
     "--role", "arn:aws:iam::000000000000:role/lambda-role",
     "--zip-file", "fileb://$AbsZipPath",

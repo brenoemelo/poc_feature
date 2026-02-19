@@ -3,6 +3,7 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
+using PoC.Observability.Extensions;
 using PoC.Populator.Domain.Services;
 using PoC.Shared.Events;
 using PoC.Shared.Infrastructure.Extensions;
@@ -20,7 +21,11 @@ public class PopulatorWorkerFunction
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
-            builder.AddPoCObservability("PoC-Populator-Worker", "1.0.0");
+            builder.Services.AddPoCObservability(o =>
+            {
+                o.ServiceName = "PoC.Populator";
+                o.OtlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+            });
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();

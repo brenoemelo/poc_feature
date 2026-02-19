@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: localstack/localstack:4.1.0
+    image: localstack/localstack:4.13.0
     ports:
       - 4566:4566 # LocalStack Gateway
       - 4510-4559:4510-4559 # external services port range
@@ -126,7 +126,7 @@ services:
     networks:
       - poc-net
     healthcheck:
-      test: ["CMD", "pg_isready", "--username", "unleash_user"]
+      test: [ "CMD", "pg_isready", "--username", "unleash_user" ]
       interval: 10s
       timeout: 5s
       retries: 5
