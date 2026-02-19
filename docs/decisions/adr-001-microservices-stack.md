@@ -25,8 +25,8 @@ We chose the following stack:
 - **Why not CloudWatch X-Ray?** Vendor lock-in.
 - **Why OTel?** Industry standard. Allows us to switch backends (e.g., to Datadog or Grafana Tempo) by changing configuration, not code.
 
-### 4. Feature Flags: OpenFeature + GoFeatureFlag
-- **Why?** Decouples deployment from release. Vendor-agnostic standard (OpenFeature) prevents lock-in to expensive SaaS providers.
+### 4. Feature Flags: OpenFeature + Unleash
+- **Why?** Decouples deployment from release. Vendor-agnostic standard (OpenFeature). Unleash provides a rich UI and enterprise features.
 
 ## Consequences
 - **Positive:** extremely low idle cost, high performance, standardized observability.

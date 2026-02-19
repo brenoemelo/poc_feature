@@ -81,22 +81,15 @@ public sealed class EnsurePricesPopulationStrategy : IPopulationStrategy
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
         var url = "api/v1/materials/components";
         
-        try 
+        try
         {
             // Fetch unique components from the new endpoint
-            var json = await context.HttpClient.GetStringAsync(url);
-            // Log the raw JSON to debug
-            Console.WriteLine($"[EnsurePrices] Received JSON from {url}: {json}");
-
-            var response = JsonSerializer.Deserialize<ApiResponse<IEnumerable<string>>>(json, options);
+            var response = await context.HttpClient.GetFromJsonAsync<ApiResponse<IEnumerable<string>>>(url, options);
             
             if (response?.Data == null || !response.Data.Any())
             {
-                Console.WriteLine("[EnsurePrices] No components found in response.");
                 return Enumerable.Empty<object>();
             }
-
-            Console.WriteLine($"[EnsurePrices] Found {response.Data.Count()} components.");
 
             var faker = new Faker();
             var prices = new List<object>();

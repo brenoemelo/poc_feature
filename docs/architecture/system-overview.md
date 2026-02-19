@@ -27,11 +27,11 @@ graph LR
     
     subgraph "Sidecars (Docker/ECS)"
         OTEL[OTel Collector]
-        GOFF[GoFeatureFlag]
+        UNLEASH[Unleash]
     end
 
     Lambda -.->|gRPC/HTTP| OTEL
-    Lambda -.->|HTTP| GOFF
+    Lambda -.->|HTTP| UNLEASH
 ```
 
 ## 2. Core Architectural Patterns
@@ -80,7 +80,7 @@ App -> OTel SDK -> OTel Collector (Sidecar) -> Backends (Tempo/Prometheus/Loki)
 
 We use **OpenFeature** to decouple deployment from release.
 
-- **Provider:** GoFeatureFlag (sidecar/container).
+- **Provider:** Unleash (container).
 - **Mechanism:** Flags are evaluated **in-process** (e.g., inside the Lambda/Container) using cached rules polled from the provider.
 - **Fail-Safe:** If the provider is unreachable, flags default to `false` (Disabled).
 

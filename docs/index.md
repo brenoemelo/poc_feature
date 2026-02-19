@@ -22,7 +22,7 @@ Welcome to the **Material Formulation System** documentation. This project is a 
 - [Setup Local Environment](guides/setup-local-environment.md) - Get started with LocalStack
 - [Deployment Health Check](guides/deployment-health.md) - Verify deployment status and logs
 - [Observability Guide](guides/observability.md) - Monitoring, Tracing, and Logging walkthrough
-- [Feature Flags Guide](feature-flags.md) - OpenFeature + GO Feature Flag integration
+- [Feature Flags Guide](guides/feature-flags.md) - OpenFeature + Unleash integration
 
 ### API Documentation
 
@@ -65,7 +65,7 @@ dotnet test tests/PoC.E2E/PoC.E2E.csproj
 - **Event-Driven Architecture** - Decoupled services using SNS/SQS
 - **FluentValidation** - Business rule enforcement
 - **RFC 7807 ProblemDetails** - Standardized error responses
-- [x] Feature Flags - Vendor-agnostic endpoint toggling with OpenFeature & GO Feature Flag
+- [x] Feature Flags - Vendor-agnostic endpoint toggling with OpenFeature & Unleash
 
 ## 🔗 Related Resources
 

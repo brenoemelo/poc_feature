@@ -18,7 +18,7 @@ builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
-// Feature Flags (OpenFeature + GO Feature Flag)
+// Feature Flags (OpenFeature + Unleash)
 builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();

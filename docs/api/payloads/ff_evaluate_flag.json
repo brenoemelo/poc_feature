@@ -1,0 +1,10 @@
+{
+    "user": {
+        "key": "test-user",
+        "custom": {
+            "email": "test@example.com",
+            "department": "R&D"
+        }
+    },
+    "defaultValue": false
+}

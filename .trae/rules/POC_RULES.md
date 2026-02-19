@@ -6,7 +6,7 @@ This project follows an **Event-Driven Microservices Architecture** built upon t
 * **Database:** Amazon DynamoDB (Single Table Design preferred).
 * **Messaging:** Amazon SNS (Topics) & Amazon SQS (Queues).
 * **Observability:** OpenTelemetry (OTLP), W3C Trace Context.
-* **Feature Management:** OpenFeature Standard (Provider: GoFeatureFlag).
+* **Feature Management:** OpenFeature Standard (Provider: Unleash).
 * **Infrastructure:** AWS (LocalStack for Dev) & Docker.
 * **Currency:** Always use the latest stable tags for Docker images (prefer `alpine` for size/security) and the latest secure versions of NuGet packages.
 
@@ -177,10 +177,10 @@ To maximize AI assistant efficiency (Trae, Cursor, Copilot), we maintain specifi
 Decouple deployment from release using the **OpenFeature** standard.
 
 ### 16.1. Implementation Standard
-* **Provider:** Use **GoFeatureFlag** (running in Docker sidecar) as the backend provider.
+* **Provider:** Use **Unleash** (Self-Hosted via Docker) as the backend provider.
 * **Clean Code:** Avoid polluting Controllers with `if (feature.IsEnabled)`.
 * **Attribute-Based:** Use the `[FeatureGate("flag-key")]` attribute to secure endpoints.
 
 ### 16.2. Lifecycle Management
 * **Debt:** Feature flags are technical debt. Once a feature is stable, the flag and the attribute **MUST** be removed.
-* **UI:** Manage flags via the GoFeatureFlag Dashboard (Docker) or YAML file. Do not hardcode values in C#.
+* **UI:** Manage flags via the **Unleash Dashboard**. Do not hardcode values in C#.

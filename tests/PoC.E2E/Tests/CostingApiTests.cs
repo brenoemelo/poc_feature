@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Serialization;
 using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using FluentAssertions;
 using PoC.E2E.Common;
@@ -43,6 +44,25 @@ public class CostingApiTests : ApiTestBase, IAsyncLifetime
 
     public override async Task DisposeAsync()
     {
+        if (_createdComponents.Count > 0)
+        {
+            using var client = CreateDynamoClient();
+            foreach (var component in _createdComponents)
+            {
+                try
+                {
+                    await client.DeleteItemAsync("costing-prices-table", new Dictionary<string, AttributeValue>
+                    {
+                        { "ComponentName", new AttributeValue { S = component } }
+                    });
+                }
+                catch
+                {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+
         await base.DisposeAsync();
     }
 
@@ -53,16 +73,16 @@ public class CostingApiTests : ApiTestBase, IAsyncLifetime
 
         var request = new RestRequest("/api/v1/costing/prices", Method.Post);
         // Add valid body so validation passes and we reach the feature flag check
-        request.AddJsonBody(new
-        {
-            ComponentName = "test-component",
-            UnitPrice = 10.0m,
-            Unit = "kg",
-            Currency = "USD"
-        });
+        var requestBody = new ComponentPriceRequest(
+            ComponentName: "test-component",
+            UnitPrice: 10.0m,
+            Unit: "kg",
+            Currency: "USD");
+        
+        request.AddJsonBody(requestBody);
 
         var response = await Client.ExecuteAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, "because flag is disabled");
     }
 
     [Fact]
@@ -82,7 +102,7 @@ public class CostingApiTests : ApiTestBase, IAsyncLifetime
 
         var response = await Client.ExecuteAsync(request);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "because creation should succeed");
         // Depending on API response structure, we might parse it. 
         // The endpoint returns { message = "Price updated successfully" }
         response.Content.Should().Contain("Price updated successfully");

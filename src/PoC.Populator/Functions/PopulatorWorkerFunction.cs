@@ -29,6 +29,11 @@ public class PopulatorWorkerFunction
 #pragma warning disable S1075 // URIs should not be hardcoded
             var materialsUrl = Environment.GetEnvironmentVariable("MATERIALS_API_URL") 
                                ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
+            
+            if (!materialsUrl.EndsWith('/'))
+            {
+                materialsUrl += "/";
+            }
 #pragma warning restore S1075 // URIs should not be hardcoded
             
             builder.Services.AddHttpClient("MaterialsClient", client =>

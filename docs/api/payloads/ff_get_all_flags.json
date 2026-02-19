@@ -1,0 +1,8 @@
+{
+    "user": {
+        "key": "anonymous",
+        "custom": {
+            "environment": "local"
+        }
+    }
+}

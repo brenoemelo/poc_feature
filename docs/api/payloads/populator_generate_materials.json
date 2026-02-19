@@ -1,0 +1,6 @@
+{
+    "target": "materials",
+    "count": 10,
+    "minComponents": 10,
+    "maxComponents": 30
+}

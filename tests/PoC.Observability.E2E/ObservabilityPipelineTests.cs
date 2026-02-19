@@ -56,13 +56,14 @@ public class ObservabilityPipelineTests
         }
 
         // Allow some time for export/scrape (default scrape interval 15s)
-        await Task.Delay(5000); 
+        // Prometheus scrape interval is 15s, so we must wait at least that.
+        await Task.Delay(20000); 
 
         // 2. Assertion: Query Prometheus
         // Query: http_server_request_duration_count{http_route="/api/v1/materials/count"} or similar
         // Note: OTel semantic conventions rename metrics sometimes. 
         // usually: http_server_request_duration_seconds_count
-        var query = "poc_http_server_request_duration_seconds_count{http_route=\"/api/v1/materials/count\", http_response_status_code=\"200\"}";
+        var query = "http_server_request_duration_seconds_count{http_route=\"/api/v1/materials/count\", http_response_status_code=\"200\"}";
         
         // Retry logic is inside ObservabilityClient?
         // We might need a "Polly" wrap here to wait for the value to appear/update if we are strict.

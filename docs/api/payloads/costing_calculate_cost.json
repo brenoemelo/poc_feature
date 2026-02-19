@@ -1,0 +1,14 @@
+{
+    "material_id": "mat-001",
+    "formulation": [
+        {
+            "component": "Iron",
+            "percentage": 80
+        },
+        {
+            "component": "Carbon",
+            "percentage": 20
+        }
+    ],
+    "desired_margin_percent": 25.0
+}

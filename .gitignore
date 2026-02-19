@@ -87,3 +87,5 @@ coverage/
 tmp/
 .env
 .env.*
+stderr.tmp
+stdout.tmp

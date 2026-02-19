@@ -3,24 +3,26 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenFeature;
-using OpenFeature.Providers.GOFeatureFlag;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PoC.Shared.Infrastructure.Configuration;
 using PoC.Shared.Infrastructure.Diagnostics;
+using PoC.Shared.Infrastructure.FeatureFlag;
 using Serilog;
 using Serilog.Enrichers.OpenTelemetry;
 using Serilog.Formatting.Compact;
+using Unleash;
 
 namespace PoC.Shared.Infrastructure.Extensions;
 
 /// <summary>
 /// Extensions for <see cref="IServiceCollection"/> and <see cref="WebApplicationBuilder"/> to configure
-/// observability (Serilog + OpenTelemetry) and feature flags (OpenFeature + GO Feature Flag).
+/// observability (Serilog + OpenTelemetry) and feature flags (OpenFeature + Unleash).
 /// </summary>
 public static class ServiceCollectionExtensions
 {
@@ -49,10 +51,7 @@ public static class ServiceCollectionExtensions
             var otelOptions = context.Configuration.GetSection("Otel").Get<OtelOptions>() ?? new OtelOptions();
             if (!string.IsNullOrEmpty(otelOptions.Endpoint))
             {
-                // Use the parameterless version to rely on standard environment variables
-                // (OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME, etc.)
-                // This is more robust in Lambda/Docker as it handles protocol/path defaults.
-                loggerConfiguration.WriteTo.OpenTelemetry();
+                loggerConfiguration.WriteTo.OpenTelemetry(options => ConfigureSerilogOtlp(options, otelOptions, serviceName, serviceVersion, context.HostingEnvironment.EnvironmentName));
             }
 
             // Imp-3: Reduce noise (Programmatic overrides if not in appsettings)
@@ -95,23 +94,7 @@ public static class ServiceCollectionExtensions
             var otelOptions = config.GetSection("Otel").Get<OtelOptions>() ?? new OtelOptions();
             if (!string.IsNullOrEmpty(otelOptions.Endpoint))
             {
-                loggerConfiguration.WriteTo.OpenTelemetry(options =>
-                {
-                    options.Endpoint = otelOptions.Endpoint;
-                    options.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
-                    options.ResourceAttributes = new Dictionary<string, object>
-                    {
-                        ["service.name"] = serviceName,
-                        ["service.version"] = serviceVersion,
-                        // Worker might not have HostingEnvironment easily accessible in this context, 
-                        // but we can try to get it or just use the config/defaults.
-                        // For now, let's omit env if not easily available or assume "Production" if not set.
-                        // Actually, builder.Environment is available in the IHostApplicationBuilder, but here we are in the lambda.
-                        // Let's check where `config` comes from. It is `services.GetRequiredService<IConfiguration>()`.
-                        // We can get IHostEnvironment too.
-                        ["deployment.environment"] = services.GetService<IHostEnvironment>()?.EnvironmentName ?? "Unknown"
-                    };
-                });
+                loggerConfiguration.WriteTo.OpenTelemetry(options => ConfigureSerilogOtlp(options, otelOptions, serviceName, serviceVersion, services.GetService<IHostEnvironment>()?.EnvironmentName ?? "Unknown"));
             }
 
             // Imp-3: Reduce noise
@@ -127,7 +110,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures Feature Flags using OpenFeature + GO Feature Flag provider.
+    /// Configures Feature Flags using OpenFeature + Unleash provider.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
@@ -139,26 +122,31 @@ public static class ServiceCollectionExtensions
         var options = configuration.GetSection("FeatureFlags").Get<FeatureFlagOptions>() ?? new FeatureFlagOptions();
         services.Configure<FeatureFlagOptions>(configuration.GetSection("FeatureFlags"));
 
-        var providerOptions = new GOFeatureFlagProviderOptions
+        var settings = new UnleashSettings
         {
-            Endpoint = options.Endpoint,
-            Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
-            // Ensure quick propagation of flag changes
-            FlagChangePollingIntervalMs = TimeSpan.FromSeconds(1)
+            AppName = options.UnleashAppName,
+            InstanceTag = options.UnleashInstanceId,
+            UnleashApi = new Uri(options.UnleashApiUrl),
+            CustomHttpHeaders = new Dictionary<string, string>
+            {
+                { "Authorization", options.UnleashApiKey ?? string.Empty }
+            }
         };
 
-        var provider = new GOFeatureFlagProvider(providerOptions);
+        var unleashClient = new DefaultUnleash(settings);
+        var provider = new UnleashProvider(unleashClient);
+        var providerName = "Unleash";
 
         try
         {
 #pragma warning disable VSTHRD002
             Api.Instance.SetProviderAsync(options.AppName, provider).GetAwaiter().GetResult();
 #pragma warning restore VSTHRD002
-            Log.Information("Feature Flags configured with GO Feature Flag at '{Endpoint}'.", options.Endpoint);
+            Log.Information("Feature Flags configured with provider '{Provider}'.", providerName);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to initialize Feature Flags provider at '{Endpoint}'. Application will start with default values.", options.Endpoint);
+            Log.Error(ex, "Failed to initialize Feature Flags provider '{Provider}'. Application will start with default values.", providerName);
         }
 
         var client = Api.Instance.GetClient(options.AppName);
@@ -243,7 +231,11 @@ public static class ServiceCollectionExtensions
                     .SetResourceBuilder(resourceBuilder)
                     .AddSource(serviceName) // Enable custom tracing for this service
                     .AddHttpClientInstrumentation(o => o.FilterHttpRequestMessage = httpFilter)
-                    .AddAWSInstrumentation();
+                    .AddAWSInstrumentation()
+                    .AddAWSLambdaConfigurations(options =>
+                    {
+                        options.DisableAwsXRayContextExtraction = true;
+                    });
 
                 if (isWeb)
                 {
@@ -270,8 +262,21 @@ public static class ServiceCollectionExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddRuntimeInstrumentation()
+                    .AddProcessInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddMeter("app.startup");
+                    .AddMeter("app.startup")
+                    .AddView(
+                        "http.server.request.duration",
+                        new ExplicitBucketHistogramConfiguration
+                        {
+                            Boundaries = new double[] { 0, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 }
+                        })
+                    .AddView(
+                        "http.client.request.duration",
+                        new ExplicitBucketHistogramConfiguration
+                        {
+                            Boundaries = new double[] { 0, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 }
+                        });
 
                 if (isWeb)
                 {
@@ -284,7 +289,18 @@ public static class ServiceCollectionExtensions
                 }
                 else
                 {
-                    metrics.AddOtlpExporter(o => ConfigureOtlpExporter(o, options, otlpEndpoint, isLambda, OtlpSignal.Metrics));
+                    metrics.AddOtlpExporter((o, m) => 
+                    {
+                        ConfigureOtlpExporter(o, options, otlpEndpoint, isLambda, OtlpSignal.Metrics);
+                        if (isLambda)
+                        {
+                            // In Lambda, background threads may not run reliably. 
+                            // We set a very short interval to increase the chance of export before freeze.
+                            // Ideally, we should use AWS Lambda instrumentation wrapper or ForceFlush.
+                            m.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 100;
+                            m.PeriodicExportingMetricReaderOptions.ExportTimeoutMilliseconds = 1000;
+                        }
+                    });
                 }
             })
             .WithLogging(logging =>
@@ -301,6 +317,81 @@ public static class ServiceCollectionExtensions
                     logging.AddOtlpExporter(o => ConfigureOtlpExporter(o, options, otlpEndpoint, isLambda, OtlpSignal.Logs));
                 }
             });
+    }
+
+    private static void ConfigureSerilogOtlp(
+        Serilog.Sinks.OpenTelemetry.BatchedOpenTelemetrySinkOptions options, 
+        OtelOptions otelOptions,
+        string serviceName,
+        string serviceVersion,
+        string environment)
+    {
+        // 1. Protocol
+        options.Protocol = otelOptions.Protocol?.ToLowerInvariant() == "http" 
+            ? Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf 
+            : Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
+
+        // 2. Endpoint
+        if (options.Protocol == Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf && !string.IsNullOrEmpty(otelOptions.Endpoint))
+        {
+            var uriBuilder = new UriBuilder(otelOptions.Endpoint);
+            // Serilog requires full path for HTTP (e.g., http://host:4318/v1/logs)
+            if (!uriBuilder.Path.EndsWith("/v1/logs"))
+            {
+                var path = uriBuilder.Path.TrimEnd('/');
+                uriBuilder.Path = $"{path}/v1/logs";
+                options.Endpoint = uriBuilder.Uri.ToString();
+            }
+            else
+            {
+                options.Endpoint = otelOptions.Endpoint;
+            }
+        }
+        else
+        {
+            options.Endpoint = otelOptions.Endpoint;
+        }
+
+        // 3. Headers
+        if (!string.IsNullOrEmpty(otelOptions.Headers))
+        {
+            var headers = new Dictionary<string, string>();
+            foreach (var header in otelOptions.Headers.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = header.Split('=', 2);
+                if (parts.Length == 2)
+                {
+                    headers[parts[0].Trim()] = parts[1].Trim();
+                }
+            }
+
+            options.Headers = headers;
+        }
+
+        // 4. Resources
+        var envName = otelOptions.Environment ?? environment;
+        Console.WriteLine($"[ConfigureSerilogOtlp] Setting ResourceAttributes for {serviceName}");
+
+        var resources = new Dictionary<string, object>
+        {
+            ["service.name"] = serviceName,
+            ["service_name"] = serviceName,
+            ["service.version"] = serviceVersion,
+            ["deployment.environment"] = envName
+        };
+
+        if (options.ResourceAttributes != null)
+        {
+            foreach (var kv in options.ResourceAttributes)
+            {
+                if (!resources.ContainsKey(kv.Key))
+                {
+                    resources[kv.Key] = kv.Value;
+                }
+            }
+        }
+
+        options.ResourceAttributes = resources;
     }
 
     private enum OtlpSignal

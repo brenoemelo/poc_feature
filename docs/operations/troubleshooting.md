@@ -34,12 +34,13 @@ docker exec poc_feature-localstack-1 awslocal sqs list-queues
 
 ### Scenario A: Feature Flags System Failure
 **Symptom:** Logs show `Failed to evaluate feature flag`. Users see `404 Not Found` on new features.
-**Cause:** The `GoFeatureFlag` sidecar is down or unreachable.
+**Cause:** The `Unleash` container is down or unreachable.
 **Resolution:**
-1. Check container status: `docker ps | grep gofeatureflag`.
-2. check logs: `docker logs gofeatureflag`.
-3. Restart: `docker compose -f docker/feature-flags/docker-compose.yaml restart`.
-4. **Behavior:** The system is fail-safe; flags default to `false`.
+1. Check container status: `docker ps | grep unleash`.
+2. check logs: `docker logs poc_feature-unleash-1`.
+3. Restart: `docker compose restart unleash`.
+4. **Verification:** Access the dashboard at `http://localhost:4242` (User: `admin2` or `admin`, Pass: `password`).
+5. **Behavior:** The system is fail-safe; flags default to `false`.
 
 ### Scenario B: DynamoDB Throttling
 **Symptom:** High API latency, logs show `ProvisionedThroughputExceededException`.

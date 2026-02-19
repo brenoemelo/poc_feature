@@ -10,6 +10,7 @@ services:
       - AWS_DEFAULT_REGION=us-east-1
       - EDGE_PORT=4566
       - TZ=Etc/UTC
+      - LAMBDA_DOCKER_NETWORK=poc_feature_poc-net
     volumes:
       - ${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
@@ -24,7 +25,7 @@ services:
   # Exports to Tempo, Prometheus, Loki
   # -----------------------------------------------------
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.88.0
+    image: otel/opentelemetry-collector-contrib:0.100.0
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
@@ -109,6 +110,62 @@ services:
       - prometheus
       - loki
 
+  # -----------------------------------------------------
+  # Feature Flag Management (Unleash + PostgreSQL)
+  # Self-hosted Unleash instance with PostgreSQL backend
+  # Access dashboard at http://localhost:4242
+  # -----------------------------------------------------
+  postgres:
+    image: postgres:15.5-alpine
+    environment:
+      POSTGRES_USER: unleash_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: unleash
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - poc-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username", "unleash_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  unleash:
+    image: unleashorg/unleash-server:latest
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: unleash
+      DATABASE_USERNAME: unleash_user
+      DATABASE_PASSWORD: password
+      DATABASE_SSL: "false"
+      LOG_LEVEL: warn
+      INIT_CLIENT_API_TOKENS: "*:development.unleash-insecure-api-token"
+      INIT_ADMIN_API_TOKENS: "*:*.admin-token"
+      UNLEASH_DEFAULT_ADMIN_PASSWORD: "password"
+    ports:
+      - "4242:4242"
+    networks:
+      - poc-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # -----------------------------------------------------
+  # Unleash Initialization
+  # Auto-configures Strategies and Flags
+  # -----------------------------------------------------
+  unleash-init:
+    image: badouralix/curl-jq
+    volumes:
+      - ./scripts/init-unleash.sh:/init.sh
+      - ./src:/src
+    command: [ "sh", "/init.sh" ]
+    networks:
+      - poc-net
+    depends_on:
+      - unleash
+
 networks:
   poc-net:
     driver: bridge
@@ -118,3 +175,4 @@ volumes:
   prometheus-data:
   loki-data:
   grafana-data:
+  postgres-data:

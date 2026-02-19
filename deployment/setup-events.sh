@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # Execute inside LocalStack container
-docker exec poc_feature-localstack-1 awslocal sns create-topic --name material-events
-docker exec poc_feature-localstack-1 awslocal sqs create-queue --queue-name material-ingestion-queue
+docker exec poc_feature-localstack-1 awslocal sns create-topic --name material-events &
+docker exec poc_feature-localstack-1 awslocal sqs create-queue --queue-name material-ingestion-queue &
+
+wait
 
 # Get ARNs
 TOPIC_ARN=$(docker exec poc_feature-localstack-1 awslocal sns list-topics --query "Topics[?contains(TopicArn, 'material-events')].TopicArn" --output text)

@@ -16,7 +16,7 @@ builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 // Dependency Injection
 builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 
-// Feature Flags (OpenFeature + GO Feature Flag)
+// Feature Flags (OpenFeature + Unleash)
 builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
 // JSON Configuration

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PoC.Shared.Infrastructure.Middleware;
 using Serilog;
 
 namespace PoC.Shared.Infrastructure.Extensions;
@@ -22,6 +23,7 @@ public static class WebApplicationExtensions
     public static WebApplication UsePoCDefaults(this WebApplication app)
     {
         app.UseMiddleware<TraceIdResponseMiddleware>();
+        app.UseMiddleware<OpenTelemetryFlushMiddleware>();
         app.UseSerilogRequestLogging();
 
         app.UseExceptionHandler(exceptionHandlerApp =>

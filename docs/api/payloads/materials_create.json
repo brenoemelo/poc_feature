@@ -1,0 +1,24 @@
+{
+    "material_id": "mat-001",
+    "name": "Super Alloy",
+    "density": {
+        "value": 7.8,
+        "unit": "g/cm3"
+    },
+    "formulation": [
+        {
+            "component": "Iron",
+            "percentage": 80,
+            "type": "Metal"
+        },
+        {
+            "component": "Carbon",
+            "percentage": 20,
+            "type": "Non-Metal"
+        }
+    ],
+    "properties": {
+        "hardness": "high",
+        "corrosion_resistance": "excellent"
+    }
+}

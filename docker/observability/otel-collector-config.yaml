@@ -48,11 +48,8 @@ exporters:
 
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: "poc"
+    # namespace removed to match standard dashboards
 
-  prometheusremotewrite:
-    endpoint: http://prometheus:9090/api/v1/write
-    
   loki:
     endpoint: http://loki:3100/loki/api/v1/push
     default_labels_enabled:
@@ -69,7 +66,7 @@ service:
     metrics:
       receivers: [otlp, spanmetrics, servicegraph]
       processors: [batch]
-      exporters: [prometheusremotewrite, prometheus, debug]
+      exporters: [prometheus, debug]
     logs:
       receivers: [otlp]
       processors: [batch]

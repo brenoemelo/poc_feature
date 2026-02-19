@@ -13,7 +13,6 @@ A microservices-based proof-of-concept for managing material formulations, built
 ### 2. Start Infrastructure
 ```bash
 docker compose -f docker-compose.yml up -d
-docker compose -f docker/feature-flags/docker-compose.yaml up -d
 docker compose -f docker/observability/docker-compose.yaml up -d
 ```
 
@@ -49,7 +48,7 @@ A: DynamoDB scans are expensive. We use **Cursor-based pagination** (Continuous 
 A: Use the `traceId` from the error response and search for it in **Grafana Tempo** (`http://localhost:3000`). See the [Observability Guide](docs/guides/observability.md).
 
 **Q: What happens if Feature Flags go offline?**
-A: The system is fail-safe. If the GoFeatureFlag container is unreachable, all flags default to `false` (Disabled), and the app remains operational.
+A: The system is fail-safe. If the Unleash container is unreachable, all flags default to `false` (Disabled), and the app remains operational.
 
 ## 🏗️ Project Structure
 ```text

@@ -13,7 +13,8 @@ param(
     [string]$ZipPath = "PoC.Materials.zip",
     [string]$FunctionName = "PoC-Materials",
     [string]$EndpointUrl = "http://localhost:4566",
-    [string]$Region = "us-east-1"
+    [string]$Region = "us-east-1",
+    [switch]$SkipBuild
 )
 
 # Load shared utilities
@@ -33,17 +34,23 @@ $ZipPath = Join-Path $RepoRoot $ZipPath
 # -----------------------------------------------------------------------------
 # Build & Package
 # -----------------------------------------------------------------------------
-Write-Log "Starting Build & Package for $FunctionName..." "Info"
+if (-not $SkipBuild) {
+    Write-Log "Starting Build & Package for $FunctionName..." "Info"
 
-if (Test-Path $PublishDir) { Remove-Item -Recurse -Force $PublishDir }
-dotnet publish $ProjectPath -c Release -o $PublishDir -r linux-x64 --self-contained false -p:PublishReadyToRun=false
-if ($LASTEXITCODE -ne 0) { throw "Publish failed with exit code $LASTEXITCODE" }
+    if (Test-Path $PublishDir) { Remove-Item -Recurse -Force $PublishDir }
+    dotnet publish $ProjectPath -c Release -o $PublishDir -r linux-x64 --self-contained false -p:PublishReadyToRun=false
+    if ($LASTEXITCODE -ne 0) { throw "Publish failed with exit code $LASTEXITCODE" }
 
-if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
-Compress-Archive -Path "$PublishDir\*" -DestinationPath $ZipPath
-$AbsZipPath = (Resolve-Path $ZipPath).Path
+    if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
+    Compress-Archive -Path "$PublishDir\*" -DestinationPath $ZipPath
+    $AbsZipPath = (Resolve-Path $ZipPath).Path
 
-Write-Log "Build successful. Artifact: $AbsZipPath" "Success"
+    Write-Log "Build successful. Artifact: $AbsZipPath" "Success"
+}
+else {
+    Write-Log "Skipping Build & Package for $FunctionName (using existing artifacts)..." "Info"
+    $AbsZipPath = (Resolve-Path $ZipPath).Path
+}
 
 # -----------------------------------------------------------------------------
 # Cleanup (Clean Slate Strategy)

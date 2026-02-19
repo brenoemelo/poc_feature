@@ -69,13 +69,16 @@ function Invoke-Aws {
                 $Command
             ) + $Arguments
 
-            $process = Start-Process -FilePath "aws" -ArgumentList $finalArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput "stdout.tmp" -RedirectStandardError "stderr.tmp"
+            $stdoutFile = "stdout_$($PID)_$($retryCount).tmp"
+            $stderrFile = "stderr_$($PID)_$($retryCount).tmp"
+
+            $process = Start-Process -FilePath "aws" -ArgumentList $finalArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
             
-            $stdout = if (Test-Path "stdout.tmp") { Get-Content "stdout.tmp" -Raw } else { "" }
-            $stderr = if (Test-Path "stderr.tmp") { Get-Content "stderr.tmp" -Raw } else { "" }
+            $stdout = if (Test-Path $stdoutFile) { Get-Content $stdoutFile -Raw } else { "" }
+            $stderr = if (Test-Path $stderrFile) { Get-Content $stderrFile -Raw } else { "" }
             
-            Remove-Item "stdout.tmp" -ErrorAction SilentlyContinue
-            Remove-Item "stderr.tmp" -ErrorAction SilentlyContinue
+            Remove-Item $stdoutFile -ErrorAction SilentlyContinue
+            Remove-Item $stderrFile -ErrorAction SilentlyContinue
 
             if ($process.ExitCode -eq 0) {
                 $success = $true
@@ -155,7 +158,7 @@ function Get-RepoRoot {
 
 function Get-CommonEnvVars {
     $otel = "OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp"
-    $flags = "FeatureFlags__Endpoint=http://gofeatureflag:1031/,FeatureFlags__TimeoutSeconds=10"
+    $flags = "FeatureFlags__Provider=Unleash,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,FeatureFlags__UnleashApiKey=*:development.unleash-insecure-api-token,FeatureFlags__UnleashAppName=poc-app,FeatureFlags__UnleashInstanceId=local-lambda,FeatureFlags__TimeoutSeconds=10"
     $serilog = "Serilog__MinimumLevel=Debug,Serilog__MinimumLevel__Override__PoC=Debug"
     return "$otel,$flags,$serilog"
 }
@@ -175,7 +178,8 @@ function Ensure-LambdaDeleted {
     # Check by Function Name
     try {
         $mappings = Invoke-Aws -Service "lambda" -Command "list-event-source-mappings" -Arguments @("--function-name", $FunctionName) -JsonOutput $true -IgnoreError $true
-        if ($mappings -and $mappings.PSObject.Properties.Match('EventSourceMappings').Count) {
+        
+        if ($mappings -and $mappings.EventSourceMappings) {
             foreach ($mapping in $mappings.EventSourceMappings) {
                 Write-Log "Deleting event source mapping (by function): $($mapping.UUID)" "Info"
                 Invoke-Aws -Service "lambda" -Command "delete-event-source-mapping" -Arguments @("--uuid", $mapping.UUID) -IgnoreError $true | Out-Null
@@ -191,7 +195,7 @@ function Ensure-LambdaDeleted {
         try {
             $mappings = Invoke-Aws -Service "lambda" -Command "list-event-source-mappings" -Arguments @("--event-source-arn", $EventSourceArn) -JsonOutput $true -IgnoreError $true
             
-            if ($mappings -and $mappings.PSObject.Properties.Match('EventSourceMappings').Count) {
+            if ($mappings -and $mappings.EventSourceMappings) {
                 foreach ($mapping in $mappings.EventSourceMappings) {
                     Write-Log "Deleting event source mapping (by source): $($mapping.UUID)" "Info"
                     Invoke-Aws -Service "lambda" -Command "delete-event-source-mapping" -Arguments @("--uuid", $mapping.UUID) -IgnoreError $true | Out-Null
