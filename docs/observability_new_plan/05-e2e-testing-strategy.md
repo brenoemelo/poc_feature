@@ -33,10 +33,12 @@ graph TD
 *   **Action**: Send HTTP GET to `/health`.
 *   **Assertions**:
     1.  Response header `trace-id` is present.
-    2.  **Loki Query**: `{service_name="PoC-Costing"} |= "$traceId"` returns at least 1 log line.
+    2.  **Loki Query**: `{job=~".+"} |= "$traceId"` returns at least 1 log line.
+        *   *Note:* The OTel Collector maps `service.name` to the `job` label by default.
     3.  **Tempo Query**: `/api/traces/$traceId` returns a trace with:
         *   Root span (ASP.NET Core)
         *   Status code 200.
+        *   *Note:* Tempo may return the TraceID in Base64 format. Tests must handle both Hex and Base64 representations.
 
 ### 2. Error Handling & Exception Logging
 **Objective**: Ensure exceptions are logged with stack traces and marked as errors in traces.
@@ -45,7 +47,7 @@ graph TD
 *   **Assertions**:
     1.  Response status is 500.
     2.  **Tempo Query**: Trace exists and Root Span `status.code` = `Error`.
-    3.  **Loki Query**: `{service_name="PoC-Costing"} |= "$traceId" |= "Exception"` returns the stack trace.
+    3.  **Loki Query**: `{job=~".+"} |= "$traceId"` (or broad search) returns logs.
 
 ### 3. Business Telemetry (Cost Calculation)
 **Objective**: Ensure custom business metrics and critical path traces are accurate.

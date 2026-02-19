@@ -1,43 +1,47 @@
 # PoC Feature - Material Formulation System
 
-Welcome to the **Material Formulation System** documentation. This project is a proof-of-concept for managing material formulations in an engineering context, built with a microservices architecture on AWS Lambda.
+Welcome to the **Material Formulation System** documentation. This project is a proof-of-concept for managing material formulations in an engineering context, built with a microservices architecture on AWS Lambda/REST API.
 
 ## 📚 Documentation Structure
 
 ### Architecture Decision Records (ADR)
 
-- [ADR 001: Event-Driven Population Architecture](adr/001-event-driven-population.md)
-- [ADR 002: Costing Engine Architecture](adr/002-costing-engine-architecture.md)
-- [ADR 0001: Use DynamoDB](adr/0001-use-dynamodb.md)
-- [ADR 0002: Use Clean Architecture](adr/0002-use-clean-architecture.md)
-- [ADR 003: Shared Observability Library](adr/003-shared-observability-library.md)
+- [ADR 001: Event-Driven Population Architecture](decisions/001-event-driven-population.md)
+- [ADR 002: Costing Engine Architecture](decisions/002-costing-engine-architecture.md)
+- [ADR 0001: Use DynamoDB](decisions/0001-use-dynamodb.md)
+- [ADR 0002: Use Clean Architecture](decisions/0002-use-clean-architecture.md)
+- [ADR 003: Shared Observability Library](decisions/003-shared-observability-library.md)
+- [ADR 004: Modular Shared Libraries](decisions/004-modular-shared-libs.md)
 
 ### Concepts
 
-- [Gravity Field](concepts/GravityField.md) - Understanding the domain model
-- [Anti-Matter Unit](concepts/AntiMatterUnit.md) - Core business entities
+- [Gravity Field](architecture/concepts/GravityField.md)
+- [Anti-Matter Unit](architecture/concepts/AntiMatterUnit.md)
 
 ### Guides
 
-- [Setup Local Environment](guides/setup-local-environment.md) - Get started with LocalStack
-- [Deployment Health Check](guides/deployment-health.md) - Verify deployment status and logs
-- [Observability Guide](guides/observability.md) - Monitoring, Tracing, and Logging walkthrough
-- [Feature Flags Guide](guides/feature-flags.md) - OpenFeature + Unleash integration
+- [Setup Local Environment](guides/getting-started.md)
+- [Observability Guide](guides/observability.md)
+- [Feature Flags Guide](guides/feature-flags.md)
 
 ### API Documentation
 
-- [OpenAPI Specification](openapi.yaml) - REST API contract
-- [Insomnia Collection](api/insomnia_antigravity_v1.json) - Ready-to-use API requests
+- [OpenAPI Specification](openapi.yaml)
+- [Insomnia Collection](api/insomnia_antigravity_v1.json)
 
 ## 🏗️ System Architecture
 
-The system consists of three main microservices exposed via a unified **API Gateway**:
+The system consists of specialized microservices exposed via **API Gateway**:
 
-1. **PoC.Materials** - Material management and query operations
-2. **PoC.Populator** - Synthetic data generation for testing
-3. **PoC.Costing** - Cost calculation and pricing engine
+1. **PoC.Materials** - Material management and query operations.
+2. **PoC.Populator** - Synthetic data generation for testing.
+3. **PoC.Costing** - Cost calculation and pricing engine.
 
-All services follow the **Data Sovereignty** principle and communicate via **SNS/SQS** for asynchronous operations.
+### Shared Infrastructure
+We use a modular approach for cross-cutting concerns:
+- **`PoC.Observability`**: Centralized OTel configuration.
+- **`PoC.FeatureFlags`**: Feature management via Unleash.
+- **`PoC.Shared`**: Common domain contracts.
 
 ## 🚀 Quick Start
 
@@ -50,23 +54,20 @@ docker-compose up -d
 
 # Run API Tests
 ./scripts/tests/test_all_apis.ps1
-
-# Run E2E Tests
-dotnet test tests/PoC.E2E/PoC.E2E.csproj
 ```
 
 ## 📖 Key Features
 
-- **Material Formulation Management** - Create and query material compositions
-- **Pagination & HATEOAS** - Cursor-based navigation for large datasets
-- [x] Automated Data Population - Generate thousands of test records
-- [x] Vendor-Agnostic Observability - Centralized monitoring with OpenTelemetry & OTLP
-- [x] Cost Calculation Engine - Calculate material costs with margin analysis
-- **Event-Driven Architecture** - Decoupled services using SNS/SQS
-- **FluentValidation** - Business rule enforcement
-- **RFC 7807 ProblemDetails** - Standardized error responses
-- [x] Feature Flags - Vendor-agnostic endpoint toggling with OpenFeature & Unleash
+- **Material Formulation Management** - Create and query material compositions.
+- **Pagination & HATEOAS** - Cursor-based navigation.
+- [x] Automated Data Population - Generate thousands of test records.
+- [x] Native Observability - Centralized monitoring with OpenTelemetry (No Serilog).
+- [x] Cost Calculation Engine - Calculate material costs with margin analysis.
+- **Event-Driven Architecture** - Decoupled services using SNS/SQS.
+- **FluentValidation** - Business rule enforcement.
+- [x] Feature Flags - Endpoint toggling with OpenFeature & Unleash.
 
 ## 🔗 Related Resources
 
-- [ANTIGRAVITY_RULES.md](../ANTIGRAVITY_RULES.md) - Project coding standards and architectural guidelines
+- [ANTIGRAVITY_RULES.md](../ANTIGRAVITY_RULES.md) - Project coding standards and architectural guidelines.
+- **[WALKTHROUGH.md](../../.gemini/antigravity/brain/a2b7b68f-f412-4760-bb1d-4552b7600b71/walkthrough.md)** - Project refactoring walkthrough.
