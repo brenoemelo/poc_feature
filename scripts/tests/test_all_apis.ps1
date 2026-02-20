@@ -188,11 +188,14 @@ Invoke-Api -Method POST -Path "/api/v1/populator/jobs" -Body $popReq | Out-Null
 # 4. Calculate Batch Cost
 Write-Host "Testing Batch Cost..." -NoNewline
 $batch = Invoke-Api -Method GET -Path "/api/v1/costing/estimations/batch"
-if ($batch -and $batch.Count -ge 0) {
-    Write-Host " OK - Calculated costs for $($batch.Count) materials" -ForegroundColor Green
-}
-else {
+if ($batch -and $batch.data -and @($batch.data).Count -gt 0) {
+    Write-Host " OK ($(@($batch.data).Count) items)" -ForegroundColor Green
+} else {
     Write-Host " FAILED or Empty" -ForegroundColor Red
+    if ($batch) { 
+        Write-Host "Batch content:"
+        Write-Host ($batch | ConvertTo-Json -Depth 5) 
+    }
 }
 
 Write-Host "`n--- Tests Completed ---" -ForegroundColor Green

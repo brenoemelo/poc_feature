@@ -1,14 +1,12 @@
-# CI/CD Refactoring: Modular Automation Framework
+# Automation Framework Guide
 
-**Role:** Principal DevOps Engineer & SRE
-**Date:** 2026-02-20
-**Status:** Implemented
-**Goal:** A highly modular, reusable, and service-isolated automation framework for LocalStack and AWS.
+**Role:** DevOps & SRE Documentation
+**Status:** Active
+**Scope:** LocalStack & AWS Deployment
 
-## 1. Executive Summary
+## 1. Overview
 
-We have transitioned from monolithic scripts to a **Service-Isolated Automation Framework**.
-This framework treats infrastructure scripts as production software, enforcing DRY principles, robust error handling, and strict isolation.
+The project uses a **Service-Isolated Automation Framework** to manage the lifecycle of microservices. This framework treats infrastructure scripts as production software, enforcing DRY principles, robust error handling, and strict isolation.
 
 ### Key Features
 *   **PowerShell Core (`pwsh`):** Cross-platform compatibility (Windows/Linux/Mac).
@@ -85,24 +83,46 @@ Located in `scripts/utils/logger.ps1`.
 *   **Rotation:** Automatically deletes logs older than 7 days.
 *   **Location:** `scripts/logs/`.
 
-## 4. Usage
+## 4. Usage Instructions
 
-### Deploy All (LocalStack)
+### Deploy All Services (LocalStack)
+This is the standard command to deploy the entire environment.
+
 ```powershell
 cd deployment/localstack
 .\deploy-all.ps1
-# OR with SkipBuild
-.\deploy-all.ps1 -SkipBuild
 ```
 
-### Deploy Single Service
+**Options:**
+- `-SkipBuild`: Skips the `dotnet publish` step. Use this if you have already built the artifacts and just want to redeploy infrastructure/code.
+  ```powershell
+  .\deploy-all.ps1 -SkipBuild
+  ```
+
+### Deploy a Single Service
+Useful for iterating on a specific service without redeploying everything.
+
 ```powershell
 cd scripts/services/materials
 .\pipeline.ps1
-# OR
-.\pipeline.ps1 -SkipBuild
 ```
 
-## 5. Next Steps
-*   **Parallel Execution:** Enable parallel execution for independent services (Costing/Populator) in `deploy-all.ps1`.
-*   **Container Support:** Extend `docker_helpers.ps1` for container-based services (Observability).
+**Options:**
+- `-SkipBuild`: Same as above.
+
+### Run E2E Tests
+Runs the comprehensive API test suite against the deployed environment.
+
+```powershell
+.\scripts\tests\test_all_apis.ps1
+```
+
+## 5. Adding a New Service
+
+To add a new service (e.g., `PoC.NewService`):
+
+1.  Create `scripts/services/newservice/`.
+2.  Copy the structure from `materials/` or another existing service.
+3.  Update `config.local.ps1` with the new service name, ports, and resource names.
+4.  Customize `04-deploy.ps1` for specific AWS resources (DynamoDB tables, SNS topics, etc.).
+5.  Add the new service to the `$Services` list in `deployment/localstack/deploy-all.ps1`.

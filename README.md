@@ -42,8 +42,11 @@ The project has been refactored into modular libraries to ensure granular depend
   /PoC.Shared.Infrastructure # Shared Kernel extension & composition root
   
 /docker                 # Infrastructure (OTel, Prometheus, Grafana, Unleash)
-/deployment             # LocalStack Deployment Scripts (using REST API source)
-/scripts                # Test & Utility Scripts
+/deployment             # Master Orchestration Scripts (LocalStack)
+/scripts                # Service Pipelines & Automation Utilities
+  /config               # Global Environment Configs
+  /services             # Per-Service Deployment Pipelines
+  /utils                # Shared Automation Helpers
 /docs                   # Documentation & Architectural Decisions (ADRs)
 ```
 
@@ -52,6 +55,7 @@ The project has been refactored into modular libraries to ensure granular depend
 | Section | Content |
 |---|---|
 | **[Architecture](docs/architecture/system-overview.md)** | Diagrams, Layers, Data Flow, Concepts |
+| **[Automation Framework](docs/guides/automation-framework.md)** | **New:** Detailed guide on the service-isolated CI/CD pipelines. |
 | **[Observability](docs/guides/observability.md)** | **Rule:** All OTel code remains in `PoC.Observability`. No Serilog; use Native ILogger. |
 | **[Feature Flags](docs/guides/feature-flags.md)** | Usage of `WithFeatureGate` and Unleash integration. |
 | **[Decisions (ADRs)](docs/decisions/)** | ADR 004: Modular Shared Libraries (Refactored from monolithic Infra) |

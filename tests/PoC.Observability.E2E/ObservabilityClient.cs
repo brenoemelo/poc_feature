@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Polly;
 using Polly.Retry;
 using RestSharp;
-using System.Net;
 
 namespace PoC.Observability.E2E;
 
