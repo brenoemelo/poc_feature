@@ -119,22 +119,28 @@ public sealed class MaterialIngestionFunction
             materialEvent.Material.Name,
             materialEvent.Material.MaterialId);
 
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await _repository.SaveAsync(materialEvent.Material);
+        stopwatch.Stop();
+        _metrics.RecordProcessingDuration(stopwatch.Elapsed.TotalMilliseconds);
 
         if (result.IsFailure)
         {
             // Idempotency: version conflict means item already exists — safe to skip.
             if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
             {
+                _metrics.RecordIngestion("skipped_idempotent");
                 _logger.LogWarning(
                     "[MaterialIngestion] Material {MaterialId} skipped due to Optimistic Locking conflict (idempotent)",
                     materialEvent.Material.MaterialId);
                 return;
             }
 
+            _metrics.RecordIngestion("failed");
             throw new InvalidOperationException($"Failed to ingest material: {result.Error.Code} - {result.Error.Description}");
         }
 
+        _metrics.RecordIngestion("success");
         _logger.LogInformation("[MaterialIngestion] Successfully ingested material {MaterialId}", materialEvent.Material.MaterialId);
     }
 }

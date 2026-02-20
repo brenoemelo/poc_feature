@@ -2,6 +2,7 @@ using FluentValidation;
 using PoC.FeatureFlags.Extensions;
 using PoC.Materials.API.Extensions;
 using PoC.Materials.Domain.Interfaces;
+using PoC.Materials.Infrastructure;
 using PoC.Shared.Common;
 using PoC.Shared.Infrastructure.Extensions;
 using PoC.Shared.Models;
@@ -140,6 +141,7 @@ public static class MaterialsEndpoints
         MaterialFormulation input,
         IMaterialRepository repository,
         IValidator<MaterialFormulation> validator,
+        MaterialsMetrics metrics,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
         ILogger<Program> logger)
@@ -149,20 +151,28 @@ public static class MaterialsEndpoints
             input.Name,
             input.MaterialId);
 
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         var validationResult = await validator.ValidateAsync(input);
         if (!validationResult.IsValid)
         {
             logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
+            metrics.RecordIngestion("validation_failed");
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
         var result = await repository.SaveAsync(input);
         
+        stopwatch.Stop();
+        metrics.RecordProcessingDuration(stopwatch.Elapsed.TotalMilliseconds);
+
         if (result.IsFailure)
         {
+             metrics.RecordIngestion("failed");
              return result.ToProblem();
         }
 
+        metrics.RecordIngestion("success");
         logger.LogInformation("[MaterialCreation] Successfully saved material {MaterialId}", input.MaterialId);
 
         var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialById", new { id = input.MaterialId })

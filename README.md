@@ -12,8 +12,7 @@ A microservices-based proof-of-concept for managing material formulations, built
 
 ### 2. Start Infrastructure
 ```bash
-docker compose -f docker-compose.yml up -d
-docker compose -f docker/observability/docker-compose.yaml up -d
+docker compose up -d
 ```
 
 ### 3. Deploy Services (LocalStack)

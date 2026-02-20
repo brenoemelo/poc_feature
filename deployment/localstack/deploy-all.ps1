@@ -1,70 +1,70 @@
 # -----------------------------------------------------------------------------
-# Master Deployment Script
-# Orchestrates the deployment of all microservices to LocalStack.
+# Master Deployment Script (Modular Framework)
+# Orchestrates the deployment of all microservices using isolated pipelines.
 # -----------------------------------------------------------------------------
 
 param(
     [switch]$SkipBuild
 )
 
-# Load shared utilities
-. "$PSScriptRoot\utils.ps1"
+$ErrorActionPreference = "Stop"
 
-# Initialize environment for master script logging
-Initialize-Environment
-Assert-AwsConnection
-Assert-NotProduction
+# 1. Load Shared Utilities
+$ScriptsRoot = Resolve-Path "$PSScriptRoot/../../scripts"
+. "$ScriptsRoot/utils/logger.ps1"
+. "$ScriptsRoot/utils/common.ps1"
+. "$ScriptsRoot/utils/aws_helpers.ps1"
 
-Write-Log "Starting Full Deployment for LocalStack..." "Success"
+# 2. Initialize Logging
+$LogFile = Init-Log -ServiceName "Master-Deploy"
 
-$ScriptDir = $PSScriptRoot
+Write-Log ">>> STARTING MASTER DEPLOYMENT <<<" -Level INFO
+Write-Log "Parameters: SkipBuild=$SkipBuild" -Level INFO
 
-function Run-DeployScript {
-    param($ScriptName)
+# 3. Validation
+try {
+    Write-Log "STEP 1: Global Validation" -Level INFO
+    Assert-AwsConnection
     
-    $ScriptPath = Join-Path $ScriptDir $ScriptName
-    # Check if $ScriptName has arguments (simple heuristic)
-    if ($ScriptName -match " ") {
-        # Split command and arguments
-        $parts = $ScriptName -split " ", 2
-        $file = Join-Path $ScriptDir $parts[0]
-        $argsList = $parts[1]
-        $ScriptPath = "$file $argsList"
-    }
+    # 4. Execute Service Pipelines
+    # Order matters: Materials (Shared SNS) -> Costing/Populator -> Gateway
+    
+    # Define Services
+    $Services = @(
+        @{ Name = "PoC.Materials"; Path = "materials/pipeline.ps1" },
+        @{ Name = "PoC.Costing";   Path = "costing/pipeline.ps1" },
+        @{ Name = "PoC.Populator"; Path = "populator/pipeline.ps1" },
+        @{ Name = "PoC.Gateway";   Path = "gateway/pipeline.ps1" }
+    )
 
-    Write-Log "----------------------------------------------------------------" "Debug"
-    Write-Log "Executing: $ScriptName" "Info"
-    Write-Log "----------------------------------------------------------------" "Debug"
-    
-    # Initialize LASTEXITCODE to avoid "not defined" errors in some environments
-    $global:LASTEXITCODE = 0
-    
-    try {
-        Invoke-Expression "& $ScriptPath"
-        if ($global:LASTEXITCODE -ne 0) {
-            throw "Script $ScriptName exited with code $global:LASTEXITCODE"
+    foreach ($Service in $Services) {
+        Write-Log "--------------------------------------------------" -Level INFO
+        Write-Log "Deploying Service: $($Service.Name)" -Level INFO
+        Write-Log "--------------------------------------------------" -Level INFO
+        
+        $PipelinePath = Join-Path "$ScriptsRoot/services" $Service.Path
+        
+        # Build Arguments
+        $ArgsList = @("-ExecutionPolicy", "Bypass", "-File", "$PipelinePath")
+        if ($SkipBuild) { $ArgsList += "-SkipBuild" }
+        
+        # Execute Pipeline in Isolated Process
+        Write-Log "Executing: powershell $ArgsList" -Level INFO
+        
+        & powershell @ArgsList
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Pipeline for $($Service.Name) failed with exit code $LASTEXITCODE"
         }
     }
-    catch {
-        Write-Log "Deployment failed at $ScriptName" "Error"
-        Write-Log $_.Exception.Message "Error"
-        exit 1
-    }
+
+    Write-Log ">>> MASTER DEPLOYMENT COMPLETED SUCCESSFULLY <<<" -Level SUCCESS
+
+} catch {
+    Write-Log ">>> MASTER DEPLOYMENT FAILED <<<" -Level ERROR
+    Write-Log "$_" -Level ERROR
+    Write-Log $($_.Exception | Out-String) -Level ERROR
+    exit 1
+} finally {
+    Stop-Transcript -ErrorAction SilentlyContinue
 }
-
-# 2. Execute in dependency order with SkipBuild
-# 2. Execute in dependency order
-# Materials must go first to set up shared SNS topics
-$BuildFlag = if ($SkipBuild) { "-SkipBuild" } else { "" }
-Run-DeployScript "materials.ps1 $BuildFlag"
-
-# 3. Compile and Deploy Remaining Services (Sequential)
-Write-Log "Starting Sequential Deployment for Costing and Populator..." "Info"
-
-Run-DeployScript "costing.ps1 $BuildFlag"
-Run-DeployScript "populator.ps1 $BuildFlag"
-Run-DeployScript "gateway.ps1"
-
-Write-Log "----------------------------------------------------------------" "Debug"
-Write-Log "Full Deployment Completed Successfully!" "Success"
-Write-Log "----------------------------------------------------------------" "Debug"

@@ -1,4 +1,12 @@
 #!/bin/bash
+# Source configuration
+if [ -f /etc/localstack/infra-config.env ]; then
+    source /etc/localstack/infra-config.env
+    echo "Loaded configuration from /etc/localstack/infra-config.env"
+else
+    echo "Warning: /etc/localstack/infra-config.env not found. Ensure docker-compose mount is correct."
+fi
+
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_DEFAULT_REGION=us-east-1
@@ -9,6 +17,14 @@ echo "Initializing LocalStack resources..."
 awslocal() {
     aws --endpoint-url=http://localhost:4566 "$@"
 }
+
+# Construct Common Environment Variables String for Lambda
+# Note: We concatenate variables comma-separated for the --environment Variables={...} parameter
+BASE_ENV="AWS_ENDPOINT_URL=$AWS_ENDPOINT_URL,AWS_REGION=$AWS_REGION,AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+OTEL_ENV="OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_PROTOCOL=$OTEL_EXPORTER_OTLP_PROTOCOL,Otel__Endpoint=$Otel__Endpoint,Otel__Protocol=$Otel__Protocol,OTEL_METRICS_EXPORTER=$OTEL_METRICS_EXPORTER,OTEL_LOGS_EXPORTER=$OTEL_LOGS_EXPORTER,OTEL_RESOURCE_ATTRIBUTES=$OTEL_RESOURCE_ATTRIBUTES"
+FF_ENV="FeatureFlags__Provider=$FeatureFlags__Provider,FeatureFlags__UnleashApiUrl=$FeatureFlags__UnleashApiUrl,FeatureFlags__UnleashApiKey=$FeatureFlags__UnleashApiKey,FeatureFlags__UnleashAppName=$FeatureFlags__UnleashAppName,FeatureFlags__UnleashInstanceId=$FeatureFlags__UnleashInstanceId"
+
+COMMON_ENV_VARS="$BASE_ENV,$OTEL_ENV,$FF_ENV"
 
 # Criar Tópico SNS
 awslocal sns create-topic --name poc-topic
@@ -74,7 +90,7 @@ create_lambda() {
       --zip-file "fileb://$zip" \
       --timeout 30 \
       --memory-size 512 \
-      --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317,OTEL_EXPORTER_OTLP_PROTOCOL=grpc,Otel__Endpoint=http://otel-collector:4317,Otel__Protocol=grpc,OTEL_SERVICE_NAME=$name,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
+      --environment "Variables={$COMMON_ENV_VARS,OTEL_SERVICE_NAME=$name}"
 
     # Create Function URL
     awslocal lambda create-function-url-config \
@@ -104,7 +120,7 @@ if [ -f "/opt/deploy/PoC.Populator.zip" ]; then
     --zip-file fileb:///opt/deploy/PoC.Populator.zip \
     --timeout 30 \
     --memory-size 512 \
-    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_SERVICE_NAME=PoC-Populator-Worker,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
+    --environment "Variables={$COMMON_ENV_VARS,OTEL_SERVICE_NAME=PoC-Populator-Worker,SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:material-events,MATERIALS_API_URL=http://localstack:4566/restapis/material-api/prod/_user_request_}"
 
   # Event source mapping to SQS
   awslocal lambda create-event-source-mapping \
@@ -124,7 +140,7 @@ if [ -f "/opt/deploy/PoC.Materials.zip" ]; then
     --zip-file fileb:///opt/deploy/PoC.Materials.zip \
     --timeout 30 \
     --memory-size 512 \
-    --environment "Variables={AWS_ENDPOINT_URL=http://localstack:4566,AWS_REGION=us-east-1,AWS_ACCESS_KEY_ID=test,AWS_SECRET_ACCESS_KEY=test,OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_SERVICE_NAME=PoC-Materials-Ingestion,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp}"
+    --environment "Variables={$COMMON_ENV_VARS,OTEL_SERVICE_NAME=PoC-Materials-Ingestion}"
 
   # Event source mapping to SQS
   awslocal lambda create-event-source-mapping \

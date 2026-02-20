@@ -36,7 +36,17 @@ public class OpenTelemetryFlushMiddleware
             // We can check environment variable to be safe.
             if (IsLambdaEnvironment())
             {
-                FlushProviders(context.RequestServices);
+                try
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    FlushProviders(context.RequestServices);
+                    sw.Stop();
+                    _logger.LogDebug("OpenTelemetry flush took {Duration}ms", sw.ElapsedMilliseconds);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to flush OpenTelemetry providers");
+                }
             }
         }
     }

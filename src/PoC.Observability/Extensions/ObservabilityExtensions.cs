@@ -84,7 +84,7 @@ public static class ObservabilityExtensions
             .AddService(serviceName: serviceName, serviceVersion: serviceVersion);
 
         // 2. Configure Logging (Substituindo o Serilog pelo ILogger Nativo Integrado ao OTel)
-        loggingBuilder.ClearProviders(); // Opcional: remove logs padrão de console do .NET para evitar duplicidade
+        // loggingBuilder.ClearProviders(); // Keep default providers (Console) for debugging in Lambda
         loggingBuilder.AddOpenTelemetry(logging =>
         {
             logging.SetResourceBuilder(resourceBuilder);
@@ -126,13 +126,21 @@ public static class ObservabilityExtensions
             {
                 metrics
                     .SetResourceBuilder(resourceBuilder)
-                    .AddMeter(serviceName)
-                    .AddMeter("app.startup")
-                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation();
-
-                metrics.AddOtlpExporter();
+                    .AddHttpClientInstrumentation()
+                    .AddMeter(serviceName) // Métricas de Negócio
+                    .AddMeter("app.startup") // Métricas de Startup
+                    .AddConsoleExporter() // Debug: Ver se métricas são geradas
+                    .AddOtlpExporter(options =>
+                    {
+                        if (isLambda)
+                    {
+                        // Para Lambda, usamos o endpoint HTTP/Protobuf para evitar problemas com gRPC
+                        // A configuração vem das variáveis de ambiente (OTEL_EXPORTER_OTLP_ENDPOINT/PROTOCOL)
+                        options.ExportProcessorType = ExportProcessorType.Simple;
+                    }
+                    });
             });
     }
 }

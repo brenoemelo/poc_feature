@@ -13,12 +13,12 @@ public class InstrumentationSource : IHostedService, IDisposable
         _startupTimer = startupTimer;
         _meter = new Meter("app.startup", "1.0.0");
 
-        _meter.CreateObservableGauge("app.startup_duration_ms", () => _startupTimer.Elapsed.TotalMilliseconds);
+        _meter.CreateObservableGauge("app.startup_duration_ms", () => _startupTimer.ElapsedMilliseconds);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Metric is created in constructor, nothing to do here explicitly
+        _startupTimer.Stop();
         return Task.CompletedTask;
     }
 

@@ -1,6 +1,7 @@
 services:
   localstack:
     image: localstack/localstack:4.13.0
+    container_name: localstack
     ports:
       - 4566:4566 # LocalStack Gateway
       - 4510-4559:4510-4559 # external services port range
@@ -11,10 +12,12 @@ services:
       - EDGE_PORT=4566
       - TZ=Etc/UTC
       - LAMBDA_DOCKER_NETWORK=poc_feature_poc-net
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=60 # Increase startup timeout for .NET
     volumes:
       - ${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
       - ./deployment/docker/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh # Script de inicialização
+      - ./deployment/docker/infra-config.env:/etc/localstack/infra-config.env # Shared configuration
       - ./deploy:/opt/deploy # Artifacts zipped for Lambda creation
     networks:
       - poc-net
@@ -26,7 +29,7 @@ services:
   # -----------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.100.0
-    container_name: otel-collector-1
+    container_name: otel-collector
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
@@ -47,6 +50,7 @@ services:
   # -----------------------------------------------------
   tempo:
     image: grafana/tempo:2.7.1
+    container_name: tempo
     command: [ "-config.file=/etc/tempo.yaml" ]
     user: root # Avoid permission issues
     volumes:
@@ -63,6 +67,7 @@ services:
   # -----------------------------------------------------
   prometheus:
     image: prom/prometheus:v3.1.0
+    container_name: prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
       - --web.enable-remote-write-receiver # Enable pushing metrics from OTel Collector
@@ -81,6 +86,7 @@ services:
   # -----------------------------------------------------
   loki:
     image: grafana/loki:3.6.6
+    container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
     user: root # Avoid permission issues
     volumes:
@@ -96,6 +102,7 @@ services:
   # -----------------------------------------------------
   grafana:
     image: grafana/grafana:latest
+    container_name: grafana
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
@@ -120,6 +127,7 @@ services:
   # -----------------------------------------------------
   postgres:
     image: postgres:15.5-alpine
+    container_name: postgres
     environment:
       POSTGRES_USER: unleash_user
       POSTGRES_PASSWORD: password
@@ -136,6 +144,7 @@ services:
 
   unleash:
     image: unleashorg/unleash-server:latest
+    container_name: unleash
     environment:
       DATABASE_HOST: postgres
       DATABASE_NAME: unleash
@@ -160,6 +169,7 @@ services:
   # -----------------------------------------------------
   unleash-init:
     image: badouralix/curl-jq
+    container_name: unleash-init
     volumes:
       - ./scripts/init-unleash.sh:/init.sh
       - ./src:/src

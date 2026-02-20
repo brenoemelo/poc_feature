@@ -77,11 +77,21 @@ scratchpad/
 scratchpad/*
 !scratchpad/.gitkeep
 
+# Automation Logs
+scripts/logs/*.log
+!scripts/logs/.gitkeep
+
+# Automation Tmp
+scripts/tmp/*
+!scripts/tmp/.gitkeep
+
+# Service Artifacts
+*.zip
+publish/
+
 # ide Files
 trunk/
 trunk/*
-publish/
-*.zip
 .idea/
 coverage/
 tmp/

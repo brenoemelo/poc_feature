@@ -1,5 +1,13 @@
 $ErrorActionPreference = "Continue"
 
+# 0. Initialize Logging (Modular Framework)
+try {
+    . "$PSScriptRoot/../utils/logger.ps1"
+    $LogFile = Init-Log -ServiceName "E2E_Tests"
+} catch {
+    Write-Warning "Logger not found or failed to initialize. Continuing without file logging."
+}
+
 # 1. Try to load from environment file
 $EnvFile = Join-Path $PSScriptRoot "../../.env.local"
 if (Test-Path $EnvFile) {
@@ -70,13 +78,18 @@ function Invoke-Api {
             Method      = $Method
             Uri         = $Uri
             ContentType = "application/json"
+            TimeoutSec  = 30 # Fail fast if Lambda takes too long (matching Lambda timeout)
         }
         if ($Body) {
             $params.Body = $Body
         }
         
+        Write-Host " (Waiting...)" -NoNewline -ForegroundColor DarkGray
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
         $response = Invoke-RestMethod @params
-        Write-Host " - OK" -ForegroundColor Green
+        $sw.Stop()
+        
+        Write-Host " - OK ($($sw.ElapsedMilliseconds)ms)" -ForegroundColor Green
         return $response
     }
     catch {
