@@ -32,6 +32,10 @@ datasources:
     editable: false
     apiVersion: 1
     uid: prometheus
+    jsonData:
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
 
   - name: Loki
     type: loki

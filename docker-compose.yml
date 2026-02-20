@@ -45,7 +45,7 @@ services:
   # Tempo (Distributed Tracing Backend)
   # -----------------------------------------------------
   tempo:
-    image: grafana/tempo:2.3.1
+    image: grafana/tempo:2.7.1
     command: [ "-config.file=/etc/tempo.yaml" ]
     user: root # Avoid permission issues
     volumes:
@@ -53,6 +53,7 @@ services:
       - tempo-data:/tmp/tempo
     ports:
       - "3200:3200" # Tempo HTTP
+      - "4319:4317" # OTLP gRPC (Mapped to 4319 to avoid conflict with Collector)
     networks:
       - poc-net
 
@@ -60,11 +61,12 @@ services:
   # Prometheus (Metrics Backend)
   # -----------------------------------------------------
   prometheus:
-    image: prom/prometheus:v2.48.0
+    image: prom/prometheus:v3.1.0
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
       - --web.enable-remote-write-receiver # Enable pushing metrics from OTel Collector
       - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
     volumes:
       - ./docker/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
       - prometheus-data:/prometheus
@@ -77,7 +79,7 @@ services:
   # Loki (Logs Backend)
   # -----------------------------------------------------
   loki:
-    image: grafana/loki:2.9.2
+    image: grafana/loki:3.6.6
     command: -config.file=/etc/loki/local-config.yaml
     user: root # Avoid permission issues
     volumes:
@@ -92,7 +94,7 @@ services:
   # Grafana (The UI)
   # -----------------------------------------------------
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:latest
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
@@ -126,7 +128,7 @@ services:
     networks:
       - poc-net
     healthcheck:
-      test: [ "CMD", "pg_isready", "--username", "unleash_user" ]
+      test: [ "CMD", "pg_isready", "--username", "unleash_user", "--dbname", "unleash" ]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -33,7 +33,9 @@ public class ObservabilityClient
         // Increased retry for eventual consistency (especially Loki which can be slow)
         _retryPolicy = Policy
             .Handle<Exception>()
-            .OrResult<RestResponse>(r => !r.IsSuccessful && r.StatusCode != HttpStatusCode.NotFound) 
+            // We retry on NotFound as well because in eventual consistency (Tempo/Loki), 
+            // the resource might not be available yet.
+            .OrResult<RestResponse>(r => !r.IsSuccessful) 
             .WaitAndRetryAsync(30, retryAttempt => TimeSpan.FromSeconds(2), (outcome, timeSpan, retryCount, context) =>
             {
                 // Console.WriteLine($"Retry {retryCount} due to {outcome.Exception?.Message ?? outcome.Result.StatusCode.ToString()}");
@@ -59,6 +61,14 @@ public class ObservabilityClient
     public async Task<string?> QueryTempoAsync(string traceId)
     {
         var request = new RestRequest($"/api/traces/{traceId}", Method.Get);
+
+        return await ExecuteWithRetryAsync(_tempoClient, request);
+    }
+
+    public async Task<string?> QueryTempoSearchAsync(string traceqlQuery)
+    {
+        var request = new RestRequest("/api/search", Method.Get);
+        request.AddQueryParameter("q", traceqlQuery);
 
         return await ExecuteWithRetryAsync(_tempoClient, request);
     }

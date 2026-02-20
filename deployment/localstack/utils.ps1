@@ -159,8 +159,7 @@ function Get-RepoRoot {
 function Get-CommonEnvVars {
     $otel = "OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318,OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,Otel__Endpoint=http://otel-collector:4318,Otel__Protocol=http,OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,OTEL_METRICS_EXPORTER=otlp,OTEL_LOGS_EXPORTER=otlp"
     $flags = "FeatureFlags__Provider=Unleash,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,FeatureFlags__UnleashApiKey=*:development.unleash-insecure-api-token,FeatureFlags__UnleashAppName=poc-app,FeatureFlags__UnleashInstanceId=local-lambda,FeatureFlags__FetchTogglesIntervalSeconds=1,FeatureFlags__TimeoutSeconds=10"
-    $serilog = "Serilog__MinimumLevel=Debug,Serilog__MinimumLevel__Override__PoC=Debug"
-    return "$otel,$flags,$serilog"
+    return "$otel,$flags"
 }
 
 # -----------------------------------------------------------------------------

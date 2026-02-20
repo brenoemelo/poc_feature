@@ -11,14 +11,14 @@ All observability logic is centralized in the **`PoC.Observability`** library.
 
 ## 2. The Stack (Local)
 
-We use a pre-configured Docker stack (`docker/observability/docker-compose.yaml`):
+We use a pre-configured Docker stack (part of the root `docker-compose.yml`):
 
 | Component | Role | Port |
 |---|---|---|
 | **OTel Collector** | The "Router". Receives telemetry from apps and forwards it. | `:4317` (gRPC), `:4318` (HTTP) |
-| **Tempo** | **Distributed Tracing** backend (stores traces). | Internal |
-| **Prometheus** | **Metrics** backend (stores time-series data). | `:9090` |
-| **Loki** | **Logging** backend (stores logs). | `:3100` |
+| **Tempo** | **Distributed Tracing** backend (stores traces). [See Tempo Guide](tempo.md) | Internal |
+| **Prometheus** | **Metrics** backend (stores time-series data). [See Prometheus Guide](prometheus.md) | `:9090` |
+| **Loki** | **Logging** backend (stores logs). [See Loki Guide](loki.md) | `:3100` |
 | **Grafana** | **Visualization** UI. | [`http://localhost:3000`](http://localhost:3000) |
 
 ## 3. How to: Find a Trace
