@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using PoC.Observability.Extensions;
 
 namespace PoC.Observability.Middleware;
 
@@ -47,17 +48,6 @@ public class OpenTelemetryFlushMiddleware
 
     private void FlushProviders(IServiceProvider services)
     {
-        try
-        {
-            var tracerProvider = services.GetService<TracerProvider>();
-            tracerProvider?.ForceFlush();
-
-            var meterProvider = services.GetService<MeterProvider>();
-            meterProvider?.ForceFlush();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to flush OpenTelemetry providers.");
-        }
+        services.FlushOpenTelemetryProviders();
     }
 }

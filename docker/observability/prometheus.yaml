@@ -11,4 +11,4 @@ scrape_configs:
     # Scrape OTel Collector metrics endpoint
     scrape_interval: 10s
     static_configs:
-      - targets: ['otel-collector:8889']
+      - targets: ['otel-collector-1:8889']

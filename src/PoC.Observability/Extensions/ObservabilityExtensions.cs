@@ -14,10 +14,33 @@ namespace PoC.Observability.Extensions;
 
 public static class ObservabilityExtensions
 {
+    /// <summary>
+    /// Flushes the OpenTelemetry providers (Tracer, Meter, and Logger).
+    /// </summary>
+    /// <param name="services">The service provider to retrieve providers from.</param>
+    public static void FlushOpenTelemetryProviders(this IServiceProvider services)
+    {
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("OpenTelemetryFlusher");
+        try
+        {
+            var tracerProvider = services.GetService<TracerProvider>();
+            tracerProvider?.ForceFlush();
+
+            var meterProvider = services.GetService<MeterProvider>();
+            meterProvider?.ForceFlush();
+
+            var loggerProvider = services.GetService<LoggerProvider>();
+            loggerProvider?.ForceFlush();
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to flush OpenTelemetry providers.");
+        }
+    }
     public static IServiceCollection AddStartUpMetrics(this IServiceCollection services)
     {
         services.AddSingleton<StartupTimer>();
-        services.AddSingleton<InstrumentationSource>();
+        services.AddHostedService<InstrumentationSource>();
         return services;
     }
 
@@ -104,8 +127,10 @@ public static class ObservabilityExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddMeter(serviceName)
+                    .AddMeter("app.startup")
                     .AddHttpClientInstrumentation()
-                    .AddAspNetCoreInstrumentation();
+                    .AddAspNetCoreInstrumentation()
+                    .AddRuntimeInstrumentation();
 
                 metrics.AddOtlpExporter();
             });

@@ -90,7 +90,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_publish_duration_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_publish_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "{{service_name}} P95",
                     "refId": "A"
                 }
@@ -128,7 +128,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_receive_duration_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_receive_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "{{service_name}} P95 (Proxy for Lag)",
                     "refId": "A"
                 }
@@ -166,7 +166,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_process_duration_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(messaging_process_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "{{service_name}} P95",
                     "refId": "A"
                 }

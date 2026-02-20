@@ -38,7 +38,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum by (http_route) (rate(http_server_request_duration_count{service_name=~\"$service\"}[1m]))",
+                    "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[1m]))",
                     "legendFormat": "{{http_route}}",
                     "refId": "A"
                 }
@@ -64,7 +64,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum(rate(http_server_request_duration_count{error_type!=\"\", service_name=~\"$service\"}[1m])) / sum(rate(http_server_request_duration_count{service_name=~\"$service\"}[1m])) * 100",
+                    "expr": "sum(rate(http_server_request_duration_seconds_count{error_type!=\"\", service_name=~\"$service\"}[1m])) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[1m])) * 100",
                     "legendFormat": "Error Rate %",
                     "refId": "A"
                 }
@@ -90,7 +90,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum by (le) (rate(http_server_request_duration_bucket{service_name=~\"$service\"}[1m]))",
+                    "expr": "sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[1m]))",
                     "format": "heatmap",
                     "refId": "A"
                 }
@@ -116,7 +116,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le, peer_service) (rate(http_client_request_duration_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le, peer_service) (rate(http_client_request_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "{{peer_service}} (External API/Service)",
                     "refId": "A"
                 },
@@ -125,7 +125,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "DynamoDB/Database",
                     "refId": "B"
                 }

@@ -28,6 +28,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Observability (Native OTel + ILogger)
 builder.AddPoCObservability("PoC-Materials", "1.0.0");
 
+builder.Services.AddOpenTelemetry()
+   .WithMetrics(metrics => metrics.AddMeter(MaterialsMetrics.MeterName));
+
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);

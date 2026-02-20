@@ -12,56 +12,78 @@ public sealed class MaterialIngestionFunction
 {
     private readonly IMaterialRepository _repository;
     private readonly ILogger<MaterialIngestionFunction> _logger;
+    private readonly MaterialsMetrics _metrics;
+    private readonly IHost? _host;
 
     public MaterialIngestionFunction()
     {
         var builder = Host.CreateApplicationBuilder();
 
         builder.AddPoCObservability("PoC.Materials", "1.0.0");
+        builder.Services.AddOpenTelemetry().WithMetrics(m => m.AddMeter(MaterialsMetrics.MeterName));
         builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
         var host = builder.Build();
 
         _repository = host.Services.GetRequiredService<IMaterialRepository>();
         _logger = host.Services.GetRequiredService<ILogger<MaterialIngestionFunction>>();
+        _metrics = host.Services.GetRequiredService<MaterialsMetrics>();
+        _host = host;
     }
 
-    public MaterialIngestionFunction(IMaterialRepository repository, ILogger<MaterialIngestionFunction> logger)
+    public MaterialIngestionFunction(IMaterialRepository repository, ILogger<MaterialIngestionFunction> logger, MaterialsMetrics metrics)
     {
         _repository = repository;
         _logger = logger;
+        _metrics = metrics;
     }
 
 #pragma warning disable VSTHRD200
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        var batchResponse = new SQSBatchResponse();
-
-        _logger.LogInformation("[MaterialIngestion] Processing {Count} SQS messages", sqsEvent.Records.Count);
-
-        foreach (var record in sqsEvent.Records)
+        try
         {
-            try
+            var batchResponse = new SQSBatchResponse();
+
+            _logger.LogInformation("[MaterialIngestion] Processing {Count} SQS messages", sqsEvent.Records.Count);
+
+            foreach (var record in sqsEvent.Records)
             {
-                await ProcessSqsRecordAsync(record);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[MaterialIngestion] Failed to process record {MessageId}", record.MessageId);
-                batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string status = "success";
+                try
                 {
-                    ItemIdentifier = record.MessageId
-                });
+                    await ProcessSqsRecordAsync(record);
+                }
+                catch (Exception ex)
+                {
+                    status = "failure";
+                    _logger.LogError(ex, "[MaterialIngestion] Failed to process record {MessageId}", record.MessageId);
+                    batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                    {
+                        ItemIdentifier = record.MessageId
+                    });
+                }
+                finally
+                {
+                    sw.Stop();
+                    _metrics.RecordIngestion(status);
+                    _metrics.RecordProcessingDuration(sw.Elapsed.TotalMilliseconds);
+                }
             }
+
+            _logger.LogInformation(
+                "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}",
+                sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
+                batchResponse.BatchItemFailures.Count);
+
+            return batchResponse;
         }
-
-        _logger.LogInformation(
-            "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}",
-            sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
-            batchResponse.BatchItemFailures.Count);
-
-        return batchResponse;
+        finally
+        {
+            _host?.Services.FlushOpenTelemetryProviders();
+        }
     }
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)

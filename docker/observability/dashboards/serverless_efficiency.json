@@ -87,7 +87,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "rate(faas_execution_duration_sum[1m]) / rate(faas_execution_duration_count[1m])",
+                    "expr": "rate(faas_invoke_duration_seconds_sum[1m]) / rate(faas_invoke_duration_seconds_count[1m])",
                     "legendFormat": "{{service_name}} Actual Duration",
                     "refId": "A"
                 },
@@ -96,7 +96,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "ceil(rate(faas_execution_duration_sum[1m]) / rate(faas_execution_duration_count[1m]) * 1000) / 1000",
+                    "expr": "ceil(rate(faas_invoke_duration_seconds_sum[1m]) / rate(faas_invoke_duration_seconds_count[1m]) * 1000) / 1000",
                     "legendFormat": "{{service_name}} Billed (Est.)",
                     "refId": "B"
                 }

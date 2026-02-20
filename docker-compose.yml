@@ -26,6 +26,7 @@ services:
   # -----------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.100.0
+    container_name: otel-collector-1
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml

@@ -80,7 +80,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "business_costing_value_avg",
+                    "expr": "rate(poc_business_costing_value_sum[1m]) / rate(poc_business_costing_value_count[1m])",
                     "legendFormat": "Avg Cost Value",
                     "refId": "A"
                 }
@@ -168,7 +168,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le) (rate(business_materials_processing_duration_bucket[5m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le) (rate(poc_business_materials_processing_duration_bucket[5m])))",
                     "legendFormat": "Processing Time P95",
                     "refId": "A"
                 }

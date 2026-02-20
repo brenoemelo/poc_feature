@@ -53,7 +53,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "sum(rate(db_client_response_time_count{error_code=~\"ThrottlingException|ProvisionedThroughputExceededException\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(db_client_operation_duration_seconds_count{error_code=~\"ThrottlingException|ProvisionedThroughputExceededException\", service_name=~\"$service\"}[1m]))",
                     "legendFormat": "Throttling Events",
                     "range": true,
                     "refId": "A"
@@ -121,7 +121,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.99, sum by (db_operation, le) (rate(db_client_response_time_bucket{service_name=~\"$service\"}[1m])))",
+                    "expr": "histogram_quantile(0.99, sum by (db_operation, le) (rate(db_client_operation_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
                     "legendFormat": "{{db_operation}} P99",
                     "refId": "A"
                 }
@@ -177,7 +177,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum(rate(db_client_response_time_count{error_code=\"ConditionalCheckFailedException\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(db_client_operation_duration_seconds_count{error_code=\"ConditionalCheckFailedException\", service_name=~\"$service\"}[1m]))",
                     "legendFormat": "Conditional Failures",
                     "refId": "A"
                 }

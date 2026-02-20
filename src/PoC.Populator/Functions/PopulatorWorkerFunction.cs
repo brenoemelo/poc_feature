@@ -86,22 +86,24 @@ public class PopulatorWorkerFunction
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        if (_logger == null)
+        try
         {
-            Console.WriteLine("CRITICAL: Logger is not initialized!");
-            return;
-        }
+            if (_logger == null)
+            {
+                Console.WriteLine("CRITICAL: Logger is not initialized!");
+                return;
+            }
 
-        if (ev == null || ev.Records == null)
-        {
-            _logger.LogWarning("Received null event or records");
-            return;
-        }
+            if (ev == null || ev.Records == null)
+            {
+                _logger.LogWarning("Received null event or records");
+                return;
+            }
 
-        // We use our own Logger, but we can also log to Lambda Context if needed.
-        // For consistency, we rely on standard logging which writes to Console (captured by CloudWatch/LocalStack).
-        foreach (var message in ev.Records)
-        {
+            // We use our own Logger, but we can also log to Lambda Context if needed.
+            // For consistency, we rely on standard logging which writes to Console (captured by CloudWatch/LocalStack).
+            foreach (var message in ev.Records)
+            {
             // Phase 3: Extract Parent Trace Context
             var parentContext = ExtractParentContext(message);
 
@@ -241,6 +243,11 @@ public class PopulatorWorkerFunction
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw; 
             }
+        }
+        }
+        finally
+        {
+            HostInstance.Services.FlushOpenTelemetryProviders();
         }
 
         static ActivityContext ExtractParentContext(SQSEvent.SQSMessage msg)

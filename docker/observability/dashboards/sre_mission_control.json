@@ -62,7 +62,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "sum(rate(http_server_request_duration_count{service_name=~\"$service\", http_status_code=~\"2..|3..\"}[5m])) / sum(rate(http_server_request_duration_count{service_name=~\"$service\"}[5m])) * 100",
+                    "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\", http_status_code=~\"2..|3..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) * 100",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -129,7 +129,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "100 - (sum(rate(http_server_request_duration_count{service_name=~\"$service\", http_status_code=~\"5..\"}[30d])) / sum(rate(http_server_request_duration_count{service_name=~\"$service\"}[30d])) * 100)",
+                    "expr": "100 - (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\", http_status_code=~\"5..\"}[30d])) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[30d])) * 100)",
                     "legendFormat": "Error Budget Remaining",
                     "refId": "A"
                 }
@@ -195,7 +195,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "topk(5, sum by (service_name) (rate(http_server_request_duration_count{http_status_code=~\"5..\", service_name=~\"$service\"}[5m])))",
+                    "expr": "topk(5, sum by (service_name) (rate(http_server_request_duration_seconds_count{http_status_code=~\"5..\", service_name=~\"$service\"}[5m])))",
                     "legendFormat": "{{service_name}}",
                     "refId": "A"
                 }
@@ -231,7 +231,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum(rate(http_server_request_duration_count{http_status_code=~\"5..\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(http_server_request_duration_seconds_count{http_status_code=~\"5..\", service_name=~\"$service\"}[1m]))",
                     "format": "heatmap",
                     "refId": "A"
                 }
@@ -288,7 +288,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_bucket{service_name=~\"$service\"}[5m])) by (le))",
+                    "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
                     "legendFormat": "P99 Latency",
                     "refId": "A"
                 }
@@ -319,7 +319,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "topk(10, histogram_quantile(0.99, sum by (peer_service, le) (rate(http_client_request_duration_bucket{service_name=~\"$service\"}[5m]))))",
+                    "expr": "topk(10, histogram_quantile(0.99, sum by (peer_service, le) (rate(http_client_request_duration_seconds_bucket{service_name=~\"$service\"}[5m]))))",
                     "format": "table",
                     "legendFormat": "{{peer_service}}",
                     "refId": "A"

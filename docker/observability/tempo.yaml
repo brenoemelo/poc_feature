@@ -1,5 +1,10 @@
 server:
   http_listen_port: 3200
+  grpc_listen_port: 9095
+
+query_frontend:
+  search:
+    max_duration: 0
 
 distributor:
   receivers:

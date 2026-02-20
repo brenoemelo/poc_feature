@@ -16,6 +16,7 @@ public static class DependencyInjection
 
         services.AddScoped<IDynamoDBContext, DynamoDBContext>();
         services.AddScoped<IMaterialRepository, DynamoDbMaterialRepository>();
+        services.AddSingleton<MaterialsMetrics>();
 
         return services;
     }
