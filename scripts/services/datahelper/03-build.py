@@ -27,6 +27,9 @@ def build():
     aws_helpers.write_log("Cleaning .NET Project...", "INFO")
     subprocess.check_call(["dotnet", "clean", project_path, "-c", "Release"])
 
+    if os.path.exists(publish_dir):
+        shutil.rmtree(publish_dir)
+
     aws_helpers.write_log("Publishing .NET Project...", "INFO")
     subprocess.check_call(
         [

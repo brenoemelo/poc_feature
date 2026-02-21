@@ -46,9 +46,10 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
             }
 
             var response = await client.QueryAsync(request);
-            
+
             var items = new List<MaterialFormulation>();
-            foreach (var item in response.Items)
+            var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
+            foreach (var item in dynamoItems)
             {
                 var doc = Document.FromAttributeMap(item);
                 var entity = context.FromDocument<MaterialEntity>(doc);
@@ -112,7 +113,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
             {
                 request.ExclusiveStartKey = currentKey;
                 var response = await client.QueryAsync(request);
-                totalCount += response.Count;
+                totalCount += response.Count ?? 0;
                 currentKey = response.LastEvaluatedKey;
             }
             while (currentKey != null && currentKey.Count > 0);
@@ -147,8 +148,8 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
             {
                 request.ExclusiveStartKey = lastKey;
                 var response = await client.QueryAsync(request);
-
-                foreach (var item in response.Items)
+                var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
+                foreach (var item in dynamoItems)
                 {
                     var doc = Document.FromAttributeMap(item);
                     var entity = context.FromDocument<MaterialEntity>(doc);

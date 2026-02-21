@@ -17,12 +17,13 @@ except ImportError:
 def main():
     parser = argparse.ArgumentParser(description="Master Deployment Script (Python)")
     parser.add_argument("--skip-build", action="store_true", help="Skip build stage")
+    parser.add_argument("--skip-test", action="store_true", help="Skip test stage")
     args = parser.parse_args()
 
     # Initialize Logging
     init_log("Master-Deploy", clean_all=True)
     write_log(">>> STARTING MASTER DEPLOYMENT <<<", "INFO")
-    write_log(f"Parameters: SkipBuild={args.skip_build}", "INFO")
+    write_log(f"Parameters: SkipBuild={args.skip_build} SkipTest={args.skip_test}", "INFO")
 
     # 1. Validation
     write_log("STEP 1: Global Validation", "INFO")
@@ -45,7 +46,7 @@ def main():
     services = [
         "materials",
         "costing",
-        #"populator",
+        "populator",
         "gateway",
         "datahelper"
     ]
@@ -67,9 +68,8 @@ def main():
         if args.skip_build:
             cmd.append("--skip-build")
         
-        # Skip tests during individual pipeline execution
-        # We will run them all at the end when the full environment is ready
-        cmd.append("--skip-test")
+        if args.skip_test:
+            cmd.append("--skip-test")
             
         write_log(f"Executing: {' '.join(cmd)}", "INFO")
         
@@ -81,26 +81,23 @@ def main():
             write_log(f"Pipeline for {service} failed with exit code {e.returncode}", "ERROR")
             sys.exit(1)
             
-    # 4. Run Smoke Tests
-    write_log("-" * 50, "INFO")
-    write_log("Running Smoke Tests for All Services", "INFO")
-    write_log("-" * 50, "INFO")
-    
-    for service in services:
-        write_log(f"Testing Service: {service}", "INFO")
-        test_script = os.path.join(script_root, service, "05-test.py")
+    if not args.skip_test:
+        write_log("-" * 50, "INFO")
+        write_log("Running Smoke Tests for All Services", "INFO")
+        write_log("-" * 50, "INFO")
         
-        if os.path.exists(test_script):
-            try:
-                subprocess.check_call([sys.executable, test_script])
-            except subprocess.CalledProcessError as e:
-                write_log(f"Smoke Test for {service} failed with exit code {e.returncode}", "ERROR")
-                # We continue testing other services or exit? 
-                # Usually better to fail fast or collect all failures. 
-                # For now, fail fast.
-                sys.exit(1)
-        else:
-             write_log(f"No test script for {service}", "WARN")
+        for service in services:
+            write_log(f"Testing Service: {service}", "INFO")
+            test_script = os.path.join(script_root, service, "05-test.py")
+            
+            if os.path.exists(test_script):
+                try:
+                    subprocess.check_call([sys.executable, test_script])
+                except subprocess.CalledProcessError as e:
+                    write_log(f"Smoke Test for {service} failed with exit code {e.returncode}", "ERROR")
+                    sys.exit(1)
+            else:
+                 write_log(f"No test script for {service}", "WARN")
 
     write_log(">>> MASTER DEPLOYMENT COMPLETED SUCCESSFULLY <<<", "SUCCESS")
 
