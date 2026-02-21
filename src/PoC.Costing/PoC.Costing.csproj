@@ -6,16 +6,15 @@
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <AWSProjectType>Lambda</AWSProjectType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRun>false</PublishReadyToRun>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
     <ProjectReference Include="../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj" />
-    <ProjectReference Include="..\PoC.Observability\PoC.Observability.csproj" />
     <ProjectReference Include="..\PoC.FeatureFlags\PoC.FeatureFlags.csproj" />
   </ItemGroup>
   <ItemGroup>

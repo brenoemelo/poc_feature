@@ -308,6 +308,27 @@ paths:
         500:
           $ref: '#/components/responses/ServerError'
 
+  /api/v1/datahelper/version:
+    get:
+      summary: Get DataHelper build version
+      description: Returns the InformationalVersion (build timestamp) emitted by PoC.DataHelper.
+      x-amazon-apigateway-integration:
+        uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:000000000000:function:PoC-DataHelper/invocations
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
+      responses:
+        200:
+          description: Build version information.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "Build-2026-02-21 12:34:56 UTC"
+
 
 components:
   schemas:

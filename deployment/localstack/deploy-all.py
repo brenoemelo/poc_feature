@@ -45,8 +45,9 @@ def main():
     services = [
         "materials",
         "costing",
-        "populator",
-        "gateway"
+        #"populator",
+        "gateway",
+        "datahelper"
     ]
     
     script_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/services'))

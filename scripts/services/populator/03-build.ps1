@@ -1,5 +1,5 @@
 # 03-build.ps1
-param([string]$LogFile)
+param([string]$LogFile, [string]$ArtifactPath)
 . "$PSScriptRoot/../../utils/common.ps1"
 $Global:CurrentLogFile = $LogFile
 
@@ -19,7 +19,7 @@ dotnet publish $ServiceConfig.ProjectPath -c Release -o $PublishDir -r linux-x64
 if ($LASTEXITCODE -ne 0) { throw "Dotnet Publish Failed" }
 
 # Zip Artifact
-$ZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
+$ZipPath = if ([string]::IsNullOrEmpty($ArtifactPath)) { "$PSScriptRoot/../../../$($ServiceConfig.Name).zip" } else { $ArtifactPath }
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
 Compress-Archive -Path "$PublishDir/*" -DestinationPath $ZipPath -Force

@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 
 # Add utils to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../utils')))
@@ -7,11 +8,22 @@ import aws_helpers
 from config import SERVICE_CONFIG
 
 def deploy():
+    parser = argparse.ArgumentParser(description="Deploy Service")
+    parser.add_argument("--artifact-path", help="Path to the artifact zip file")
+    args = parser.parse_args()
+
     aws_helpers.write_log("STEP 4: Deploy Populator Service", "INFO")
     
-    if not os.path.exists(SERVICE_CONFIG["ZipPath"]):
-        raise Exception(f"Build artifact not found: {SERVICE_CONFIG['ZipPath']}")
-        
+    if args.artifact_path:
+        zip_path = args.artifact_path
+    else:
+        zip_path = SERVICE_CONFIG["ZipPath"]
+
+    if not os.path.exists(zip_path):
+        raise Exception(f"Build artifact not found: {zip_path}")
+    
+    aws_helpers.write_log(f"Using Artifact: {zip_path}", "INFO")
+
     # 1. SNS Topic
     topic_arn = aws_helpers.ensure_sns_topic(SERVICE_CONFIG['SnsTopic'])
     
@@ -37,7 +49,7 @@ def deploy():
         name=SERVICE_CONFIG['Name'],
         handler="PoC.Populator",
         role_arn="arn:aws:iam::000000000000:role/lambda-role",
-        zip_path=SERVICE_CONFIG['ZipPath'],
+        zip_path=zip_path,
         timeout=30,
         memory_size=1024,
         env_vars=main_env_vars
@@ -63,7 +75,7 @@ def deploy():
         name=SERVICE_CONFIG['WorkerFunctionName'],
         handler="PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler",
         role_arn="arn:aws:iam::000000000000:role/lambda-role",
-        zip_path=SERVICE_CONFIG['ZipPath'],
+        zip_path=zip_path,
         timeout=60,
         memory_size=1024,
         env_vars=worker_env_vars
