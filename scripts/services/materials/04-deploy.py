@@ -44,7 +44,7 @@ def deploy():
     aws_helpers.ensure_dynamodb_table(table_def)
     
     # 2. SNS Topic
-    aws_helpers.ensure_sns_topic(SERVICE_CONFIG['SnsTopic'])
+    topic_arn = aws_helpers.ensure_sns_topic(SERVICE_CONFIG['SnsTopic'])
     
     # 3. Lambda Function
     common_env = aws_helpers.get_common_env_vars()
@@ -69,6 +69,41 @@ def deploy():
         statement_id="apigateway-invoke",
         principal="apigateway.amazonaws.com",
         source_arn=f"arn:aws:execute-api:us-east-1:000000000000:{SERVICE_CONFIG['CustomApiId']}/*/*/*"
+    )
+
+    # 5. Ingestion Queue
+    queue_url = aws_helpers.ensure_sqs_queue(SERVICE_CONFIG['IngestionQueueName'])
+    queue_arn = f"arn:aws:sqs:{SERVICE_CONFIG['Region']}:000000000000:{SERVICE_CONFIG['IngestionQueueName']}"
+    
+    # 6. Subscribe Queue to Topic
+    aws_helpers.ensure_sns_subscription(
+        topic_arn=topic_arn,
+        protocol="sqs",
+        endpoint=queue_arn
+    )
+
+    # 7. Ingestion Lambda
+    ingestion_env_vars = {
+        "Materials__TableName": SERVICE_CONFIG['DynamoTable'],
+        "OTEL_SERVICE_NAME": SERVICE_CONFIG['IngestionFunctionName'],
+        **common_env
+    }
+
+    aws_helpers.ensure_lambda_function(
+        name=SERVICE_CONFIG['IngestionFunctionName'],
+        handler="PoC.Materials::PoC.Materials.Functions.MaterialIngestionFunction::FunctionHandler",
+        role_arn="arn:aws:iam::000000000000:role/lambda-role",
+        zip_path=SERVICE_CONFIG['ZipPath'],
+        timeout=30,
+        memory_size=1024,
+        env_vars=ingestion_env_vars
+    )
+
+    # 8. Event Source Mapping
+    aws_helpers.ensure_event_source_mapping(
+        function_name=SERVICE_CONFIG['IngestionFunctionName'],
+        event_source_arn=queue_arn,
+        batch_size=10
     )
     
     aws_helpers.write_log("Deployment Successful.", "SUCCESS")

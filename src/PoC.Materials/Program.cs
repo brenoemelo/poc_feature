@@ -25,6 +25,7 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("MaterialIngestionFunctio
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+builder.Services.AddProblemDetails();
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 

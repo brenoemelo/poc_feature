@@ -22,13 +22,19 @@ def deploy():
         
     apigateway = aws_helpers.get_boto3_client("apigateway")
     
-    with open(SERVICE_CONFIG["OpenApiPath"], 'rb') as f:
+    with open(SERVICE_CONFIG["OpenApiPath"], 'r', encoding='utf-8') as f:
         openapi_content = f.read()
+
+    # Replace function names
+    openapi_content = openapi_content.replace("PoC-Materials", SERVICE_CONFIG["LambdaFunctions"]["Materials"])
+    openapi_content = openapi_content.replace("PoC-Costing", SERVICE_CONFIG["LambdaFunctions"]["Costing"])
+    openapi_content = openapi_content.replace("PoC-Populator", SERVICE_CONFIG["LambdaFunctions"]["Populator"])
+    openapi_content = openapi_content.replace("PoC-DataHelper", SERVICE_CONFIG["LambdaFunctions"]["DataHelper"])
         
     apigateway.put_rest_api(
         restApiId=api_id,
         mode='overwrite',
-        body=openapi_content
+        body=openapi_content.encode('utf-8')
     )
     aws_helpers.write_log("API Definition Updated.", "SUCCESS")
     

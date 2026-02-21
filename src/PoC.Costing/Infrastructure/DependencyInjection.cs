@@ -28,6 +28,8 @@ public static class DependencyInjection
 
         services.AddAWSService<IAmazonDynamoDB>();
 
+        services.Configure<CostingOptions>(configuration.GetSection(CostingOptions.SectionName));
+
         services.AddScoped<IDynamoDBContext, DynamoDBContext>();
         services.AddScoped<ICostingRepository, DynamoDbCostingRepository>();
 

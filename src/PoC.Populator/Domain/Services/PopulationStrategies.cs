@@ -1,6 +1,9 @@
 using Bogus;
+using Microsoft.Extensions.Options;
+using PoC.Populator.Infrastructure;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace PoC.Populator.Domain.Services;
@@ -17,9 +20,9 @@ public interface IPopulationStrategy
     Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null);
 }
 
-public sealed class MaterialPopulationStrategy : IPopulationStrategy
+public sealed class MaterialPopulationStrategy(IOptions<PopulatorOptions> options) : IPopulationStrategy
 {
-    public string TargetTable => "materials-table";
+    public string TargetTable => options.Value.MaterialsTableName;
 
     public Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
@@ -51,20 +54,15 @@ public sealed class MaterialPopulationStrategy : IPopulationStrategy
     }
 }
 
-public sealed class PricePopulationStrategy : IPopulationStrategy
+public sealed class PricePopulationStrategy(IOptions<PopulatorOptions> options) : IPopulationStrategy
 {
-    public string TargetTable => "prices-table";
-    private readonly Faker<ComponentPriceRequest> _faker;
-
-    public PricePopulationStrategy()
-    {
-         _faker = new Faker<ComponentPriceRequest>()
+    public string TargetTable => options.Value.PricesTableName;
+    private readonly Faker<ComponentPriceRequest> _faker = new Faker<ComponentPriceRequest>()
              .CustomInstantiator(f => new ComponentPriceRequest(
                  ComponentName: f.Commerce.ProductMaterial(),
                  UnitPrice: Math.Round(f.Random.Decimal(0.5m, 100.0m), 2),
                  Unit: "kg",
                  Currency: "USD"));
-    }
 
     public Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
@@ -72,19 +70,19 @@ public sealed class PricePopulationStrategy : IPopulationStrategy
     }
 }
 
-public sealed class EnsurePricesPopulationStrategy : IPopulationStrategy
+public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> options) : IPopulationStrategy
 {
-    public string TargetTable => "prices-table";
+    public string TargetTable => options.Value.PricesTableName;
 
     public async Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
-        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
         var url = "api/v1/materials/components";
         
         try
         {
             // Fetch unique components from the new endpoint
-            var response = await context.HttpClient.GetFromJsonAsync<ApiResponse<IEnumerable<string>>>(url, options);
+            var response = await context.HttpClient.GetFromJsonAsync<ApiResponse<IEnumerable<string>>>(url, jsonOptions);
             
             if (response?.Data == null || !response.Data.Any())
             {

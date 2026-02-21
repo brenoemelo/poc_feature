@@ -64,10 +64,14 @@ def deploy():
     )
     
     # 6. Worker Lambda
+    output_topic_arn = f"arn:aws:sns:{SERVICE_CONFIG['Region']}:000000000000:{SERVICE_CONFIG['OutputSnsTopic']}"
+    
     worker_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['WorkerFunctionName'],
         "MATERIALS_API_URL": SERVICE_CONFIG['MaterialsApiUrl'],
-        "SNS_TOPIC_ARN": topic_arn,
+        "Populator__MaterialsTableName": SERVICE_CONFIG['MaterialsTableName'],
+        "Populator__PricesTableName": SERVICE_CONFIG['PricesTableName'],
+        "Populator__OutputTopicArn": output_topic_arn,
         **common_env
     }
     

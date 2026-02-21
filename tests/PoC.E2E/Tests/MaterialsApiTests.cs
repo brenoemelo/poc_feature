@@ -116,6 +116,9 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
     {
         // Arrange
         await FeatureManager.DisableFlagAsync("materials-crud");
+        
+        // Wait for the flag change to propagate (Lambda polls every 1s in test env)
+        await Task.Delay(2000);
 
         // Act
         var request = new RestRequest("/api/v1/materials", Method.Get);

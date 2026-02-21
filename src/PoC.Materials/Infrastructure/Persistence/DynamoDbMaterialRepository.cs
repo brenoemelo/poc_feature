@@ -13,6 +13,7 @@ namespace PoC.Materials.Infrastructure.Persistence;
 public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client, IOptions<MaterialsOptions> options) : IMaterialRepository
 {
     private readonly MaterialsOptions _options = options.Value;
+    private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
 
     public async Task<Result<PagedResult<MaterialFormulation>>> GetAllAsync(int limit, string? cursor)
     {
@@ -46,15 +47,13 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
             }
 
             var response = await client.QueryAsync(request);
-
             var items = new List<MaterialFormulation>();
             var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
-            foreach (var item in dynamoItems)
-            {
-                var doc = Document.FromAttributeMap(item);
-                var entity = context.FromDocument<MaterialEntity>(doc);
-                items.Add(MapToDomain(entity));
-            }
+
+            items.AddRange(dynamoItems
+                .Select(item => context.FromDocument<MaterialEntity>(Document.FromAttributeMap(item)))
+                .Where(entity => entity is not null)
+                .Select(MapToDomain));
 
             string? nextCursor = null;
             if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
@@ -182,7 +181,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
             // Optimistic Locking: We trust DynamoDBContext to handle the Version check.
             // We do NOT manually copy the version unless we want to force an overwrite (which we don't).
             var entity = MapToEntity(material);
-            await context.SaveAsync(entity);
+            await context.SaveAsync(entity, _dynamoConfig);
             return Result.Success();
         }
         catch (Exception ex)
@@ -195,7 +194,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
     {
         try
         {
-            await context.DeleteAsync<MaterialEntity>(materialId);
+            await context.DeleteAsync<MaterialEntity>(materialId, _dynamoConfig);
             return Result.Success();
         }
         catch (Exception ex)

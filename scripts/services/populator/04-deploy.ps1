@@ -30,6 +30,9 @@ Write-Log "Deploying AWS Resources..." -Level INFO
 # Ensure SNS Topic
 New-SnsTopic -Name $($ServiceConfig.TopicName) | Out-Null
 
+# Ensure Output SNS Topic (Material Events)
+New-SnsTopic -Name $($ServiceConfig.OutputTopicName) | Out-Null
+
 # Ensure SQS Queue
 New-SqsQueue -Name $($ServiceConfig.QueueName) | Out-Null
 
@@ -60,7 +63,7 @@ Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
 
 # Deploy Worker Lambda
 Write-Log "Deploying Worker Lambda..." -Level INFO
-$WorkerEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),$(Get-CommonEnvVars)"
+$WorkerEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.OutputTopicArn),Populator__MaterialsTableName=$($ServiceConfig.MaterialsTableName),Populator__PricesTableName=$($ServiceConfig.PricesTableName),$(Get-CommonEnvVars)"
 
 New-LambdaFunction -Name $($ServiceConfig.WorkerName) `
     -Handler "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler" `

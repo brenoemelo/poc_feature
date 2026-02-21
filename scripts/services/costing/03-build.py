@@ -17,6 +17,34 @@ def build():
     
     # 1. Clean
     aws_helpers.write_log("Cleaning .NET Project...", "INFO")
+    
+    # Force delete bin/obj folders to ensure clean build
+    bin_dir = os.path.join(os.path.dirname(project_path), "bin")
+    obj_dir = os.path.join(os.path.dirname(project_path), "obj")
+    if os.path.exists(bin_dir):
+        shutil.rmtree(bin_dir)
+    if os.path.exists(obj_dir):
+        shutil.rmtree(obj_dir)
+
+    # Clean dependent projects to avoid DLL conflicts (AWS SDK V3 vs V4)
+    shared_path = os.path.abspath(os.path.join(os.path.dirname(project_path), "../PoC.Shared/PoC.Shared.csproj"))
+    shared_bin = os.path.join(os.path.dirname(shared_path), "bin")
+    shared_obj = os.path.join(os.path.dirname(shared_path), "obj")
+    if os.path.exists(shared_bin): shutil.rmtree(shared_bin)
+    if os.path.exists(shared_obj): shutil.rmtree(shared_obj)
+
+    ff_path = os.path.abspath(os.path.join(os.path.dirname(project_path), "../PoC.FeatureFlags/PoC.FeatureFlags.csproj"))
+    ff_bin = os.path.join(os.path.dirname(ff_path), "bin")
+    ff_obj = os.path.join(os.path.dirname(ff_path), "obj")
+    if os.path.exists(ff_bin): shutil.rmtree(ff_bin)
+    if os.path.exists(ff_obj): shutil.rmtree(ff_obj)
+
+    shared_infra_path = os.path.abspath(os.path.join(os.path.dirname(project_path), "../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj"))
+    shared_infra_bin = os.path.join(os.path.dirname(shared_infra_path), "bin")
+    shared_infra_obj = os.path.join(os.path.dirname(shared_infra_path), "obj")
+    if os.path.exists(shared_infra_bin): shutil.rmtree(shared_infra_bin)
+    if os.path.exists(shared_infra_obj): shutil.rmtree(shared_infra_obj)
+
     subprocess.check_call(["dotnet", "clean", project_path, "-c", "Release"])
 
     if os.path.exists(publish_dir):

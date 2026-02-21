@@ -25,6 +25,15 @@ def build():
         zip_path = SERVICE_CONFIG["ZipPath"]
 
     aws_helpers.write_log("Cleaning .NET Project...", "INFO")
+    
+    # Force delete bin/obj folders to ensure clean build
+    bin_dir = os.path.join(os.path.dirname(project_path), "bin")
+    obj_dir = os.path.join(os.path.dirname(project_path), "obj")
+    if os.path.exists(bin_dir):
+        shutil.rmtree(bin_dir)
+    if os.path.exists(obj_dir):
+        shutil.rmtree(obj_dir)
+
     subprocess.check_call(["dotnet", "clean", project_path, "-c", "Release"])
 
     if os.path.exists(publish_dir):

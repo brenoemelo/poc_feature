@@ -6,12 +6,16 @@ import time
 
 # Add utils to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/utils')))
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/config')))
+
 try:
     import aws_helpers
     from logger import init_log, write_log
+    from global_config import CONFIG
 except ImportError:
     # Fallback if running from a different directory
-    print("Error importing utils. Ensure you are running from the correct directory or PYTHONPATH is set.")
+    print("Error importing utils/config. Ensure you are running from the correct directory or PYTHONPATH is set.")
     sys.exit(1)
 
 def main():
@@ -34,8 +38,8 @@ def main():
     # 2. Ensure API Gateway Exists (Shared Resource)
     write_log("STEP 1.1: Ensure API Gateway Exists", "INFO")
     # Using static ID as per project convention
-    api_name = "Material-Formulation-API"
-    api_id_static = "material-api"
+    api_name = CONFIG["ApiGateway"]["Name"]
+    api_id_static = CONFIG["ApiGateway"]["Id"]
     
     api_id = aws_helpers.ensure_api_gateway(api_name, api_id_static)
     write_log(f"API Gateway ID: {api_id}", "INFO")
