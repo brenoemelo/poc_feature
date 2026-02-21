@@ -84,7 +84,7 @@ create_lambda() {
     awslocal lambda delete-function --function-name "$name" >/dev/null 2>&1 || true
     awslocal lambda create-function \
       --function-name "$name" \
-      --runtime dotnet8 \
+      --runtime dotnet10 \
       --handler "$handler" \
       --role arn:aws:iam::000000000000:role/lambda-role \
       --zip-file "fileb://$zip" \
@@ -114,7 +114,7 @@ if [ -f "/opt/deploy/PoC.Populator.zip" ]; then
   awslocal lambda delete-function --function-name "PoC-Populator-Worker" >/dev/null 2>&1 || true
   awslocal lambda create-function \
     --function-name "PoC-Populator-Worker" \
-    --runtime dotnet8 \
+    --runtime dotnet10 \
     --handler "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler" \
     --role arn:aws:iam::000000000000:role/lambda-role \
     --zip-file fileb:///opt/deploy/PoC.Populator.zip \
@@ -134,7 +134,7 @@ if [ -f "/opt/deploy/PoC.Materials.zip" ]; then
   awslocal lambda delete-function --function-name "PoC-Materials-Ingestion" >/dev/null 2>&1 || true
   awslocal lambda create-function \
     --function-name "PoC-Materials-Ingestion" \
-    --runtime dotnet8 \
+    --runtime dotnet10 \
     --handler "PoC.Materials::PoC.Materials.Functions.MaterialIngestionFunction::FunctionHandler" \
     --role arn:aws:iam::000000000000:role/lambda-role \
     --zip-file fileb:///opt/deploy/PoC.Materials.zip \

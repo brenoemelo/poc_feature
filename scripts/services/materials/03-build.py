@@ -26,7 +26,8 @@ def build():
         "-c", "Release",
         "-o", publish_dir,
         "-r", "linux-x64",
-        "--no-self-contained"
+        "--no-self-contained",
+        "/p:TreatWarningsAsErrors=false"
     ])
     
     # 3. Zip

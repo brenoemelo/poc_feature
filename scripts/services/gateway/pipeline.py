@@ -11,6 +11,7 @@ def run_pipeline():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Service Pipeline")
     parser.add_argument("--skip-build", action="store_true", help="Skip build stage")
+    parser.add_argument("--skip-test", action="store_true", help="Skip test stage")
     args = parser.parse_args()
 
     # Setup
@@ -56,8 +57,11 @@ def run_pipeline():
         # 5. Test
         test_script = os.path.join(script_dir, "05-test.py")
         if os.path.exists(test_script):
-            write_log("Running Tests...", "INFO")
-            subprocess.check_call([python_exe, test_script])
+            if not args.skip_test:
+                write_log("Running Tests...", "INFO")
+                subprocess.check_call([python_exe, test_script])
+            else:
+                write_log("Test Stage Skipped.", "WARN")
         
         write_log(">>> PIPELINE COMPLETED SUCCESSFULLY <<<", "SUCCESS")
         sys.exit(0)

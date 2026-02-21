@@ -24,7 +24,10 @@ def test():
         if response['status'] in [200, 404]:
              aws_helpers.write_log("Smoke Test Passed", "SUCCESS")
         else:
-             aws_helpers.write_log(f"Smoke Test Failed: {response['body']}", "ERROR")
+             error_body = str(response['body'])
+             if len(error_body) > 1000:
+                 error_body = error_body[:1000] + "... (truncated)"
+             aws_helpers.write_log(f"Smoke Test Failed: {error_body}", "ERROR")
              sys.exit(1)
     else:
         sys.exit(1)

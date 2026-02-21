@@ -187,11 +187,11 @@ def ensure_api_gateway(name, custom_id=None):
             return item['id']
             
     write_log(f"Creating API Gateway: {name}", "INFO")
-    tags = {}
+    tags_arg = {}
     if custom_id:
-        tags['_custom_id_'] = custom_id
+        tags_arg['_custom_id_'] = custom_id
         
-    api = apigateway.create_rest_api(Name=name, Tags=tags)
+    api = apigateway.create_rest_api(name=name, tags=tags_arg)
     return api['id']
 
 def remove_lambda_function(function_name):

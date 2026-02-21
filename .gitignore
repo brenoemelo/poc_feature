@@ -99,3 +99,4 @@ tmp/
 .env.*
 stderr.tmp
 stdout.tmp
+*.pyc
