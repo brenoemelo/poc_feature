@@ -1,27 +1,37 @@
 # 04-deploy.ps1
-param([string]$LogFile)
+param([string]$LogFile, [string]$ArtifactPath)
 . "$PSScriptRoot/../../utils/common.ps1"
 $Global:CurrentLogFile = $LogFile
 
 Write-Log "STEP 4: Deploy" -Level INFO
 . "$PSScriptRoot/config.local.ps1"
 
-# 1. Resolve ZIP file path to a valid absolute path on Windows
-$RelativeZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
-
-if (-Not (Test-Path $RelativeZipPath)) {
-    Write-Log "ZIP file not found at resolved path: $RelativeZipPath" -Level ERROR
-    throw "ZIP File Not Found"
+# 1. Resolve ZIP file path
+if ([string]::IsNullOrEmpty($ArtifactPath)) {
+    $RelativeZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
+    if (-Not (Test-Path $RelativeZipPath)) {
+        Write-Log "ZIP file not found at default path: $RelativeZipPath" -Level ERROR
+        throw "ZIP File Not Found"
+    }
+    $ZipPath = (Resolve-Path $RelativeZipPath).ProviderPath
+} else {
+    if (-Not (Test-Path $ArtifactPath)) {
+        Write-Log "Artifact file not found at provided path: $ArtifactPath" -Level ERROR
+        throw "Artifact File Not Found"
+    }
+    $ZipPath = (Resolve-Path $ArtifactPath).ProviderPath
 }
 
-$ZipPath = (Resolve-Path $RelativeZipPath).ProviderPath
-Write-Log "Absolute ZIP path resolved to: $ZipPath" -Level INFO
+Write-Log "Using Artifact: $ZipPath" -Level INFO
 
 # 2. Deploy AWS Resources using High-Level Functions (DRY Pattern)
 Write-Log "Deploying AWS Resources..." -Level INFO
 
 # Ensure SNS Topic
 New-SnsTopic -Name $($ServiceConfig.TopicName) | Out-Null
+
+# Ensure Output SNS Topic (Material Events)
+New-SnsTopic -Name $($ServiceConfig.OutputTopicName) | Out-Null
 
 # Ensure SQS Queue
 New-SqsQueue -Name $($ServiceConfig.QueueName) | Out-Null
@@ -53,7 +63,7 @@ Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
 
 # Deploy Worker Lambda
 Write-Log "Deploying Worker Lambda..." -Level INFO
-$WorkerEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),$(Get-CommonEnvVars)"
+$WorkerEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.OutputTopicArn),Populator__MaterialsTableName=$($ServiceConfig.MaterialsTableName),Populator__PricesTableName=$($ServiceConfig.PricesTableName),$(Get-CommonEnvVars)"
 
 New-LambdaFunction -Name $($ServiceConfig.WorkerName) `
     -Handler "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler" `

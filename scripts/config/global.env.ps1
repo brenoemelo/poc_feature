@@ -2,6 +2,9 @@
 # Use static ID for LocalStack stability (mimics prod environment with known IDs or custom domains)
 $ApiId = "material-api"
 
+# Load Resources Config
+. "$PSScriptRoot/resources.ps1"
+
 $Global:Config = @{
     Aws = @{
         Region = "us-east-1"

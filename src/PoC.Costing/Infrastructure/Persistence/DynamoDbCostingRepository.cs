@@ -1,17 +1,20 @@
 using Amazon.DynamoDBv2.DataModel;
+using Microsoft.Extensions.Options;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger) : ICostingRepository
+public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger, IOptions<CostingOptions> options) : ICostingRepository
 {
+    private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
+
     public async Task<Result> UpsertPriceAsync(ComponentPriceRequest request)
     {
         try
         {
-            var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName);
+            var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName, _dynamoConfig);
             var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
 
             logger.LogDebug("[UpsertPrice] Processing {ComponentName}. Existing: {Exists}, Version: {Version}", request.ComponentName, existing != null, existing?.Version);
@@ -24,7 +27,12 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             // If item exists but has no version (e.g. manually inserted), skip version check to initialize it
             // With SaveAsync, if Version is null, it usually treats as new item or ignores version check.
 #pragma warning disable CS0618 // Type or member is obsolete
-            await context.SaveAsync(entity, new DynamoDBOperationConfig { IgnoreNullValues = true });
+            var saveConfig = new DynamoDBOperationConfig 
+            { 
+                IgnoreNullValues = true,
+                OverrideTableName = _dynamoConfig.OverrideTableName 
+            };
+            await context.SaveAsync(entity, saveConfig);
 #pragma warning restore CS0618 // Type or member is obsolete
             return Result.Success();
         }
@@ -38,7 +46,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
     {
         try
         {
-            var batch = context.CreateBatchGet<ComponentPriceEntity>();
+            var batch = context.CreateBatchGet<ComponentPriceEntity>(_dynamoConfig);
             
             // Deduplicate keys to avoid DynamoDB error
             var uniqueNames = componentNames.Distinct().ToList();
@@ -70,7 +78,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
         {
             var conditions = new List<ScanCondition>();
             // ScanAsync returns an AsyncSearch which we need to execute
-            var search = context.ScanAsync<ComponentPriceEntity>(conditions);
+            var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
             var prices = await search.GetRemainingAsync();
             
             logger.LogInformation("[GetAllPricesAsync] Found: {Found}", prices.Count);
@@ -99,7 +107,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             // In a real production scenario with large datasets, this should be optimized 
             // (e.g., keeping a counter, or using a GSI if applicable, or using Select=COUNT).
             // For this PoC, scanning and counting is acceptable.
-            var search = context.ScanAsync<ComponentPriceEntity>(conditions);
+            var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
             var count = await search.GetRemainingAsync();
             
             logger.LogInformation("[GetPricesCountAsync] Count: {Count}", count.Count);

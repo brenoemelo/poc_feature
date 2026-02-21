@@ -2,7 +2,6 @@ using Amazon.DynamoDBv2.DataModel;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-[DynamoDBTable("costing-prices-table")]
 public class ComponentPriceEntity
 {
     [DynamoDBHashKey]

@@ -3,8 +3,10 @@
 . "$PSScriptRoot/../../config/global.env.ps1"
 
 $ServiceConfig = @{
-    Name = "PoC-Materials"
+    Name = $Global:Resources.Lambda.Materials.ApiFunction
+    IngestionFunctionName = $Global:Resources.Lambda.Materials.IngestionFunction
+    IngestionQueueName = $Global:Resources.Sqs.MaterialIngestionQueue
     ProjectPath = "$PSScriptRoot/../../../src/PoC.Materials/PoC.Materials.csproj"
-    DynamoTable = "materials-table"
-    SnsTopic = "material-events"
+    DynamoTable = $Global:Resources.DynamoDb.MaterialsTable
+    SnsTopic = $Global:Resources.Sns.MaterialEventsTopic
 }

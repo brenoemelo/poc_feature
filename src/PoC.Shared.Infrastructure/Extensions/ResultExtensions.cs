@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using PoC.Shared.Common;
 
 namespace PoC.Shared.Infrastructure.Extensions;
@@ -19,7 +20,8 @@ public static class ResultExtensions
             "Error.NotFound" => Results.Problem(
                 title: "Resource not found",
                 detail: error.Description,
-                statusCode: StatusCodes.Status404NotFound),
+                statusCode: StatusCodes.Status404NotFound,
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"),
             
             "MissingPrices" or "CurrencyMismatch" or "InvalidMargin" or "Error.ConditionNotMet" => Results.Problem(
                 title: "Validation Error",

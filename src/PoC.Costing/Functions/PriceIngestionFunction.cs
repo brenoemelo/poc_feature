@@ -2,7 +2,6 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
-using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using System.Text.Json;
@@ -18,7 +17,6 @@ public sealed class PriceIngestionFunction
     {
         var builder = Host.CreateApplicationBuilder();
 
-        builder.AddPoCObservability("PoC.Costing", "1.0.0");
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
         var host = builder.Build();

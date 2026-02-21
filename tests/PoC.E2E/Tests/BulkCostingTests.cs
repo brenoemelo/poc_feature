@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 using PoC.E2E.Common;
+using PoC.Shared.Common;
 using RestSharp;
 
 namespace PoC.E2E.Tests;
@@ -61,18 +62,19 @@ public class BulkCostingTests : ApiTestBase
 
         // 4. Act: Call Batch Endpoint
         var request = new RestRequest("/api/v1/costing/estimations/batch", Method.Get);
-        var response = await Client.ExecuteAsync<List<CostCalculationResponse>>(request);
+        var response = await Client.ExecuteAsync<ApiResponse<List<CostCalculationResponse>>>(request);
 
         // 4. Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Data.Should().NotBeNull();
-        response.Data!.Should().HaveCountGreaterThan(1);
+        response.Data!.Data.Should().NotBeNull();
+        response.Data.Data.Should().HaveCountGreaterThan(1);
 
-        var calc1 = response.Data.Find(c => c.MaterialId == material1Id);
+        var calc1 = response.Data.Data.Find(c => c.MaterialId == material1Id);
         calc1.Should().NotBeNull();
         calc1!.TotalCost.Should().Be(15m);
 
-        var calc2 = response.Data.Find(c => c.MaterialId == material2Id);
+        var calc2 = response.Data.Data.Find(c => c.MaterialId == material2Id);
         calc2.Should().NotBeNull();
         calc2!.TotalCost.Should().Be(10m);
     }

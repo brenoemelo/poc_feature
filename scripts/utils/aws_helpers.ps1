@@ -178,7 +178,7 @@ function New-LambdaFunction {
         [string]$Handler,
         [string]$RoleArn,
         [string]$ZipPath,
-        [string]$Runtime = "dotnet10",
+        [string]$Runtime = "dotnet8",
         [string]$Timeout = "30",
         [string]$MemorySize = "1024",
         [string]$EnvironmentVariables # Comma-separated Key=Value string

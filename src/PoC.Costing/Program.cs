@@ -10,7 +10,6 @@ using PoC.Costing.Functions;
 using PoC.Costing.Infrastructure;
 using PoC.Costing.Infrastructure.ExternalServices;
 using PoC.FeatureFlags.Extensions;
-using PoC.Observability.Extensions;
 using PoC.Shared.Validators;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
@@ -34,16 +33,6 @@ public class Program
         }
 
         var builder = WebApplication.CreateBuilder();
-
-        // Observability (Native OTel + ILogger)
-        builder.AddPoCObservability("PoC-Costing", "1.0.0");
-
-        // Add Custom Meter to OTel
-        builder.Services.AddOpenTelemetry()
-           .WithMetrics(metrics => 
-           {
-               metrics.AddMeter(PoC.Costing.Infrastructure.BusinessMetrics.MeterName);
-           });
 
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 
@@ -82,8 +71,6 @@ public class Program
         });
 
         var app = builder.Build();
-
-        app.UsePoCObservability();
 
         app.MapGroup("/api/v1/costing")
            .MapCostingEndpoints();

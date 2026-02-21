@@ -3,16 +3,16 @@
 . "$PSScriptRoot/../../config/global.env.ps1"
 
 $ServiceConfig = @{
-    Name = "PoC-Costing"
+    Name = $Global:Resources.Lambda.Costing.ApiFunction
     ProjectPath = "$PSScriptRoot/../../../src/PoC.Costing/PoC.Costing.csproj"
-    DynamoTable = "costing-prices-table"
+    DynamoTable = $Global:Resources.DynamoDb.CostingTable
     
     # Ingestion Function & Queue
-    IngestionFunctionName = "PoC-Costing-PriceIngestion"
-    IngestionQueueName = "costing-ingestion-queue"
-    IngestionQueueArn = "arn:aws:sqs:us-east-1:000000000000:costing-ingestion-queue"
+    IngestionFunctionName = $Global:Resources.Lambda.Costing.IngestionFunction
+    IngestionQueueName = $Global:Resources.Sqs.CostingIngestionQueue
+    IngestionQueueArn = "arn:aws:sqs:us-east-1:000000000000:$($Global:Resources.Sqs.CostingIngestionQueue)"
     
     # Dependencies
-    MaterialsTopicArn = "arn:aws:sns:us-east-1:000000000000:material-events"
+    MaterialsTopicArn = "arn:aws:sns:us-east-1:000000000000:$($Global:Resources.Sns.MaterialEventsTopic)"
     MaterialsApiUrl = "http://localstack:4566/_aws/execute-api/$($Global:Config.ApiGateway.Id)/prod/"
 }

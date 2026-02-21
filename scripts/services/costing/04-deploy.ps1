@@ -47,7 +47,7 @@ New-SnsSubscription -TopicArn $($ServiceConfig.MaterialsTopicArn) `
     -Endpoint $($ServiceConfig.IngestionQueueArn)
 
 # 4. Main Lambda (API)
-$MainEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.Name),MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),$(Get-CommonEnvVars)"
+$MainEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.Name),MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),Costing__TableName=$($ServiceConfig.DynamoTable),$(Get-CommonEnvVars)"
 New-LambdaFunction -Name $($ServiceConfig.Name) `
     -Handler "PoC.Costing" `
     -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
@@ -63,7 +63,7 @@ Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
     -SourceArn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*"
 
 # 6. Worker Lambda (Ingestion)
-$WorkerEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.IngestionFunctionName),COSTING_TABLE_NAME=$($ServiceConfig.DynamoTable),$(Get-CommonEnvVars)"
+$WorkerEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.IngestionFunctionName),Costing__TableName=$($ServiceConfig.DynamoTable),$(Get-CommonEnvVars)"
 New-LambdaFunction -Name $($ServiceConfig.IngestionFunctionName) `
     -Handler "PoC.Costing::PoC.Costing.Functions.PriceIngestionFunction::FunctionHandler" `
     -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `

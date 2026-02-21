@@ -7,7 +7,6 @@ using PoC.FeatureFlags.Extensions;
 using PoC.Materials.API.Endpoints;
 using PoC.Materials.Functions;
 using PoC.Materials.Infrastructure;
-using PoC.Observability.Extensions;
 using PoC.Shared.Validators;
 using System.Text.Json;
 
@@ -25,13 +24,8 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("MaterialIngestionFunctio
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Observability (Native OTel + ILogger)
-builder.AddPoCObservability("PoC-Materials", "1.0.0");
-
-builder.Services.AddOpenTelemetry()
-   .WithMetrics(metrics => metrics.AddMeter(MaterialsMetrics.MeterName));
-
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+builder.Services.AddProblemDetails();
 
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
@@ -56,8 +50,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 var app = builder.Build();
-
-app.UsePoCObservability();
 
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();

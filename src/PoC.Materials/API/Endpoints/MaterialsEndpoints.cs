@@ -124,7 +124,10 @@ public static class MaterialsEndpoints
         var result = await repository.GetByIdAsync(id);
 
         if (result.IsFailure)
+        {
+            logger.LogWarning("[MaterialQuery] Failed to get material {MaterialId}: {Error} - {Detail}", id, result.Error.Code, result.Error.Description);
             return result.ToProblem();
+        }
 
         var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialById", new { id }) ?? $"/api/v1/materials/{id}";
         var response = new ApiResponse<MaterialFormulation>(

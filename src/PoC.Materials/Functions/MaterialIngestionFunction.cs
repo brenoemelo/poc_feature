@@ -2,7 +2,6 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
-using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using System.Text.Json;
 
@@ -13,14 +12,11 @@ public sealed class MaterialIngestionFunction
     private readonly IMaterialRepository _repository;
     private readonly ILogger<MaterialIngestionFunction> _logger;
     private readonly MaterialsMetrics _metrics;
-    private readonly IHost? _host;
 
     public MaterialIngestionFunction()
     {
         var builder = Host.CreateApplicationBuilder();
 
-        builder.AddPoCObservability("PoC.Materials", "1.0.0");
-        builder.Services.AddOpenTelemetry().WithMetrics(m => m.AddMeter(MaterialsMetrics.MeterName));
         builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
         var host = builder.Build();
@@ -28,7 +24,6 @@ public sealed class MaterialIngestionFunction
         _repository = host.Services.GetRequiredService<IMaterialRepository>();
         _logger = host.Services.GetRequiredService<ILogger<MaterialIngestionFunction>>();
         _metrics = host.Services.GetRequiredService<MaterialsMetrics>();
-        _host = host;
     }
 
     public MaterialIngestionFunction(IMaterialRepository repository, ILogger<MaterialIngestionFunction> logger, MaterialsMetrics metrics)
@@ -42,48 +37,41 @@ public sealed class MaterialIngestionFunction
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        try
+        var batchResponse = new SQSBatchResponse();
+
+        _logger.LogInformation("[MaterialIngestion] Processing {Count} SQS messages", sqsEvent.Records.Count);
+
+        foreach (var record in sqsEvent.Records)
         {
-            var batchResponse = new SQSBatchResponse();
-
-            _logger.LogInformation("[MaterialIngestion] Processing {Count} SQS messages", sqsEvent.Records.Count);
-
-            foreach (var record in sqsEvent.Records)
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string status = "success";
+            try
             {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                string status = "success";
-                try
-                {
-                    await ProcessSqsRecordAsync(record);
-                }
-                catch (Exception ex)
-                {
-                    status = "failure";
-                    _logger.LogError(ex, "[MaterialIngestion] Failed to process record {MessageId}", record.MessageId);
-                    batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
-                    {
-                        ItemIdentifier = record.MessageId
-                    });
-                }
-                finally
-                {
-                    sw.Stop();
-                    _metrics.RecordIngestion(status);
-                    _metrics.RecordProcessingDuration(sw.Elapsed.TotalMilliseconds);
-                }
+                await ProcessSqsRecordAsync(record);
             }
-
-            _logger.LogInformation(
-                "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}",
-                sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
-                batchResponse.BatchItemFailures.Count);
-
-            return batchResponse;
+            catch (Exception ex)
+            {
+                status = "failure";
+                _logger.LogError(ex, "[MaterialIngestion] Failed to process record {MessageId}", record.MessageId);
+                batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                {
+                    ItemIdentifier = record.MessageId
+                });
+            }
+            finally
+            {
+                sw.Stop();
+                _metrics.RecordIngestion(status);
+                _metrics.RecordProcessingDuration(sw.Elapsed.TotalMilliseconds);
+            }
         }
-        finally
-        {
-            _host?.Services.FlushOpenTelemetryProviders();
-        }
+
+        _logger.LogInformation(
+            "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}",
+            sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
+            batchResponse.BatchItemFailures.Count);
+
+        return batchResponse;
     }
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)

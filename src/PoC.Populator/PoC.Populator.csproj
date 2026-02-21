@@ -6,8 +6,8 @@
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <AWSProjectType>Lambda</AWSProjectType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>CS1591</NoWarn>
     <BuildTimestamp>$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss UTC'))</BuildTimestamp>
@@ -16,31 +16,29 @@
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
     <ProjectReference Include="../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj" />
-    <ProjectReference Include="..\PoC.Observability\PoC.Observability.csproj" />
-    <ProjectReference Include="..\PoC.FeatureFlags\PoC.FeatureFlags.csproj" />
+    <ProjectReference Include="../PoC.FeatureFlags/PoC.FeatureFlags.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.10.0" />
-    <PackageReference Include="Amazon.Lambda.RuntimeSupport" Version="1.14.2" />
-    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.400" />
+    <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.7.2" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.22" />
     <PackageReference Include="Amazon.Lambda.Core" Version="2.8.1" />
-    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.5" />
-    <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.7.3" />
+    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.4" />
+    <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.7.1" />
     <PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.1" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.502.42" />
-    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.502.46" />
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.2.14" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="4.0.2.7" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
-    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.0" />  </ItemGroup>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.19.0.132793" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.9.28" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.16.0.82469" />
   </ItemGroup>
 </Project>

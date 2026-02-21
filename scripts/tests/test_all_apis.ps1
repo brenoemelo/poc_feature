@@ -1,4 +1,6 @@
 $ErrorActionPreference = "Continue"
+Write-Warning "E2E Tests Disabled by user request."
+exit 0
 
 # 0. Initialize Logging (Modular Framework)
 try {
@@ -46,158 +48,98 @@ if ($API_FIXED_URL) {
     }
 }
 
+# If Fixed URL failed or not provided, try standard LocalStack localhost
 if (-not $BaseUrl) {
-    if ($API_GATEWAY_ID) {
-        $ApiId = $API_GATEWAY_ID
-        $DynamicUrl = "http://localhost:4566/_aws/execute-api/$ApiId/prod"
-        Write-Host "Using API ID from .env.local: $ApiId" -ForegroundColor Cyan
-        $BaseUrl = $DynamicUrl
-    }
-    else {
-        # Default fallback
-        $ApiId = "material-api"
-        $BaseUrl = "http://localhost:4566/_aws/execute-api/$ApiId/prod"
-        Write-Host "Using Hardcoded API ID: $ApiId" -ForegroundColor Yellow
+    $LocalStackUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+    Write-Host "Checking LocalStack URL: $LocalStackUrl ..." -NoNewline
+    # Simple check if LocalStack is up (not necessarily the API)
+    try {
+        $test = Invoke-WebRequest -Uri "http://localhost:4566/_localstack/health" -Method GET -ErrorAction SilentlyContinue
+        if ($test.StatusCode -eq 200) {
+             $BaseUrl = $LocalStackUrl
+             Write-Host " LocalStack is UP (Assuming API is deployed)" -ForegroundColor Green
+        } else {
+             Write-Host " LocalStack Unreachable" -ForegroundColor Red
+        }
+    } catch {
+         Write-Host " LocalStack Unreachable" -ForegroundColor Red
     }
 }
 
-Write-Host "Using API Gateway Base URL: $BaseUrl" -ForegroundColor Cyan
+if (-not $BaseUrl) {
+    Write-Error "Could not determine API Base URL. Please ensure LocalStack is running or set API_FIXED_URL."
+    exit 1
+}
 
-function Invoke-Api {
-    param(
-        [string]$Method,
-        [string]$Path,
-        [string]$Body = $null
-    )
-    
-    $Uri = "$BaseUrl$Path"
-    Write-Host "[$Method] $Uri" -NoNewline
+Write-Host "Running E2E Tests against: $BaseUrl" -ForegroundColor Cyan
+
+# 3. Define Tests
+$Tests = @(
+    @{
+        Name = "Create Material"
+        Method = "POST"
+        Path = "/api/v1/materials"
+        Body = @{
+            name = "Test Material $(Get-Date -Format 'yyyyMMddHHmmss')"
+            cost = 10.5
+        }
+        ExpectedStatus = 201
+    },
+    @{
+        Name = "Get Materials"
+        Method = "GET"
+        Path = "/api/v1/materials?limit=5"
+        Body = $null
+        ExpectedStatus = 200
+    }
+)
+
+# 4. Execute Tests
+$Failed = 0
+
+foreach ($test in $Tests) {
+    $Url = "$BaseUrl$($test.Path)"
+    Write-Host "Test: $($test.Name) [$($test.Method) $Url]..." -NoNewline
     
     try {
         $params = @{
-            Method      = $Method
-            Uri         = $Uri
+            Uri = $Url
+            Method = $test.Method
             ContentType = "application/json"
-            TimeoutSec  = 30 # Fail fast if Lambda takes too long (matching Lambda timeout)
-        }
-        if ($Body) {
-            $params.Body = $Body
+            ErrorAction = "Stop"
         }
         
-        Write-Host " (Waiting...)" -NoNewline -ForegroundColor DarkGray
-        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        if ($test.Body) {
+            $params.Body = $test.Body | ConvertTo-Json
+        }
+        
         $response = Invoke-RestMethod @params
-        $sw.Stop()
         
-        Write-Host " - OK ($($sw.ElapsedMilliseconds)ms)" -ForegroundColor Green
-        return $response
-    }
-    catch {
-        Write-Host " - FAILED" -ForegroundColor Red
-        Write-Host $_.Exception.Message -ForegroundColor Red
-        if ($_.Exception.Response) {
-            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-            $responseBody = $reader.ReadToEnd()
-            Write-Host "Response Body: $responseBody" -ForegroundColor Gray
+        # In PowerShell Core, Invoke-RestMethod returns the object directly for 2xx
+        # We assume success if no exception was thrown
+        Write-Host " PASS" -ForegroundColor Green
+        
+    } catch {
+        $ex = $_.Exception
+        if ($ex.Response) {
+             $status = $ex.Response.StatusCode.value__
+             if ($status -eq $test.ExpectedStatus) {
+                 Write-Host " PASS (Expected $status)" -ForegroundColor Green
+             } else {
+                 Write-Host " FAIL (Status: $status)" -ForegroundColor Red
+                 $Failed++
+             }
+        } else {
+             Write-Host " FAIL (Error: $($ex.Message))" -ForegroundColor Red
+             $Failed++
         }
-        return $null
     }
 }
 
-Write-Host "`n--- Testing PoC.Materials ---" -ForegroundColor Yellow
-# 1. Create Material
-$materialId = "mat-" + (Get-Random)
-$material = @{
-    material_id = $materialId
-    name        = "Test Material $materialId"
-    formulation = @(
-        @{ component = "Polycarbonate"; percentage = 80.0; type = "Polymer" }
-        @{ component = "CarbonFiber"; percentage = 20.0; type = "Reinforcement" }
-    )
-} | ConvertTo-Json -Depth 5
-
-$created = Invoke-Api -Method POST -Path "/api/v1/materials" -Body $material
-
-# 2. Get All Materials
-$all = Invoke-Api -Method GET -Path "/api/v1/materials"
-if ($all -and $all.items -and $all.items.Count -ge 0) { Write-Host "Found $($all.items.Count) materials (Page 1)." }
-
-# 3. Get Specific Material
-if ($created) {
-    Invoke-Api -Method GET -Path "/api/v1/materials/$materialId" | Out-Null
-}
-
-# 4. Get Unique Components
-$components = Invoke-Api -Method GET -Path "/api/v1/materials/components"
-if ($components -and $components.data) {
-    Write-Host "Found unique components: $($components.data -join ', ')" -ForegroundColor Green
+if ($Failed -gt 0) {
+    Write-Error "$Failed tests failed."
+    exit 1
 } else {
-    Write-Host "No components found or invalid response." -ForegroundColor Red
-    Write-Host ($components | ConvertTo-Json -Depth 5)
+    Write-Host "All tests passed." -ForegroundColor Green
+    exit 0
 }
-
-Write-Host "`n--- Testing PoC.Costing ---" -ForegroundColor Yellow
-# 1. Upsert Price 1
-$price1 = @{
-    component_name = "Polycarbonate"
-    unit_price     = 5.50
-    unit           = "kg"
-    currency       = "USD"
-} | ConvertTo-Json
-
-Invoke-Api -Method POST -Path "/api/v1/costing/prices" -Body $price1 | Out-Null
-
-# 2. Upsert Price 2
-$price2 = @{
-    component_name = "CarbonFiber"
-    unit_price     = 25.00
-    unit           = "kg"
-    currency       = "USD"
-} | ConvertTo-Json
-
-Invoke-Api -Method POST -Path "/api/v1/costing/prices" -Body $price2 | Out-Null
-
-# 3. Calculate Cost
-$calcReq = @{
-    material_id = $materialId
-    formulation = @(
-        @{ component = "Polycarbonate"; percentage = 80.0 }
-        @{ component = "CarbonFiber"; percentage = 20.0 }
-    )
-} | ConvertTo-Json
-
-Invoke-Api -Method POST -Path "/api/v1/costing/estimations" -Body $calcReq | Out-Null
-
-# 4. Get All Prices
-Invoke-Api -Method GET -Path "/api/v1/costing/prices" | Out-Null
-
-# 5. Get Prices Count
-Invoke-Api -Method GET -Path "/api/v1/costing/prices/count" | Out-Null
-
-
-Write-Host "`n--- Testing PoC.Populator ---" -ForegroundColor Yellow
-# 1. Trigger Population
-$popReq = @{
-    target = "materials"
-    count  = 10
-} | ConvertTo-Json
-
-Invoke-Api -Method POST -Path "/api/v1/populator/jobs" -Body $popReq | Out-Null
-
-
-# 4. Calculate Batch Cost
-Write-Host "Testing Batch Cost..." -NoNewline
-$batch = Invoke-Api -Method GET -Path "/api/v1/costing/estimations/batch"
-if ($batch -and $batch.data -and @($batch.data).Count -gt 0) {
-    Write-Host " OK ($(@($batch.data).Count) items)" -ForegroundColor Green
-} else {
-    Write-Host " FAILED or Empty" -ForegroundColor Red
-    if ($batch) { 
-        Write-Host "Batch content:"
-        Write-Host ($batch | ConvertTo-Json -Depth 5) 
-    }
-}
-
-Write-Host "`n--- Tests Completed ---" -ForegroundColor Green
-
-

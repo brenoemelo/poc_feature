@@ -26,8 +26,9 @@ public static class DependencyInjection
                     var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
                     serviceUrl = $"http://{localStackHost}:{edgePort}";
                 }
-
-                options.QueueUrl = $"{serviceUrl}/000000000000/populator-queue";
+                
+                var queueName = Environment.GetEnvironmentVariable("QUEUE_NAME") ?? "populator-queue";
+                options.QueueUrl = $"{serviceUrl}/000000000000/{queueName}";
             }
         });
 
@@ -36,9 +37,15 @@ public static class DependencyInjection
 
         var sqsConfig = new AmazonSQSConfig
         {
-            ServiceURL = opts.QueueUrl.Replace("/000000000000/populator-queue", string.Empty), // Extract base URL
+            ServiceURL = opts.QueueUrl.Substring(0, opts.QueueUrl.IndexOf("/000000000000", StringComparison.Ordinal)), // Extract base URL
             AuthenticationRegion = "us-east-1"
         };
+        
+        // Fallback if substring fails (e.g. if URL doesn't contain account ID standard format)
+        if (string.IsNullOrEmpty(sqsConfig.ServiceURL))
+        {
+             sqsConfig.ServiceURL = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? "http://localhost:4566";
+        }
 
         services.AddSingleton<IAmazonSQS>(sp => new AmazonSQSClient(sqsConfig));
         

@@ -45,6 +45,7 @@ def deploy():
     main_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['Name'],
         "MATERIALS_API_URL": SERVICE_CONFIG['MaterialsApiUrl'],
+        "Costing__TableName": SERVICE_CONFIG['DynamoTable'],
         **common_env
     }
     
@@ -69,7 +70,7 @@ def deploy():
     # 6. Worker Lambda (Ingestion)
     worker_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['IngestionFunctionName'],
-        "COSTING_TABLE_NAME": SERVICE_CONFIG['DynamoTable'],
+        "Costing__TableName": SERVICE_CONFIG['DynamoTable'],
         **common_env
     }
     
