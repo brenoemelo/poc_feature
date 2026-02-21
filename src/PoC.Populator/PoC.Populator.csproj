@@ -10,6 +10,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>CS1591</NoWarn>
+    <BuildTimestamp>$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss UTC'))</BuildTimestamp>
+    <InformationalVersion>Build-$(BuildTimestamp)</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
@@ -25,13 +27,13 @@
     <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.5" />
     <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.7.3" />
     <PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.1" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.400" />
-    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.400.33" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.502.42" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.502.46" />
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
-  </ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.0" />  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">

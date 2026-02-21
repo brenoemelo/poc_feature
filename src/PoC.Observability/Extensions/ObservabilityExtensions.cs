@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
-using OpenTelemetry.Instrumentation.AWSLambda;
+// using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -101,15 +101,17 @@ public static class ObservabilityExtensions
                     .SetResourceBuilder(resourceBuilder)
                     .AddSource(serviceName)
                     .AddHttpClientInstrumentation()
-                    .AddAspNetCoreInstrumentation()
-                    .AddAWSInstrumentation(); // Habilitado: Essencial para propagar contexto no SQS, SNS e S3
+                    .AddAspNetCoreInstrumentation();
+                    //.AddAWSInstrumentation(); // Habilitado: Essencial para propagar contexto no SQS, SNS e S3
 
                 if (isLambda)
                 {
+                    /*
                     tracing.AddAWSLambdaConfigurations(options =>
                     {
                         options.DisableAwsXRayContextExtraction = true; // Use OTel W3C propagation
                     });
+                    */
                 }
 
                 tracing.AddOtlpExporter(options =>

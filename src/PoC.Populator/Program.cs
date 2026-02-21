@@ -1,4 +1,5 @@
 using Amazon.Lambda.Core;
+using System.Reflection;
 using Amazon.Lambda.RuntimeSupport;
 using Amazon.Lambda.Serialization.SystemTextJson;
 using Amazon.Lambda.SQSEvents;
@@ -18,6 +19,16 @@ public class Program
 
     public static async Task Main()
     {
+        // Lê a versão injetada no build
+        var assembly = Assembly.GetExecutingAssembly();
+        var versionInfo = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+        // Imprime no log da AWS/LocalStack
+        Console.WriteLine($"===================================================");
+        Console.WriteLine($"[STARTUP] Executando PoC.Populator");
+        Console.WriteLine($"[STARTUP] Versão do Build: {versionInfo}");
+        Console.WriteLine($"===================================================");
+
         var handler = Environment.GetEnvironmentVariable("_HANDLER");
         if (!string.IsNullOrEmpty(handler) && handler.Contains("PopulatorWorkerFunction"))
         {

@@ -22,14 +22,10 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             entity.UpdatedAt = DateTime.UtcNow;
 
             // If item exists but has no version (e.g. manually inserted), skip version check to initialize it
-            var config = new DynamoDBOperationConfig();
-            if (existing != null && existing.Version == null)
-            {
-                logger.LogDebug("[UpsertPrice] Existing item has no version. Skipping version check");
-                config.SkipVersionCheck = true;
-            }
-
-            await context.SaveAsync(entity, config);
+            // With SaveAsync, if Version is null, it usually treats as new item or ignores version check.
+#pragma warning disable CS0618 // Type or member is obsolete
+            await context.SaveAsync(entity, new DynamoDBOperationConfig { IgnoreNullValues = true });
+#pragma warning restore CS0618 // Type or member is obsolete
             return Result.Success();
         }
         catch (Exception ex)

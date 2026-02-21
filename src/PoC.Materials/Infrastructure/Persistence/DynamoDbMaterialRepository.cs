@@ -105,23 +105,17 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
                 Select = Select.COUNT
             };
 
-            var response = await client.QueryAsync(request);
-            
-            // QueryAsync with Select.COUNT returns Count in the response
-            // Note: If result > 1MB, Query might return partial count. 
-            // We should loop LastEvaluatedKey to get full count, but for PoC/Test this is likely sufficient 
-            // unless we have massive data. To be safe, let's loop.
-            long totalCount = response.Count;
-            var currentKey = response.LastEvaluatedKey;
+            long totalCount = 0;
+            Dictionary<string, AttributeValue>? currentKey = null;
 
-            while (currentKey != null && currentKey.Count > 0)
+            do
             {
                 request.ExclusiveStartKey = currentKey;
-                response = await client.QueryAsync(request);
+                var response = await client.QueryAsync(request);
                 totalCount += response.Count;
                 currentKey = response.LastEvaluatedKey;
             }
-
+            while (currentKey != null && currentKey.Count > 0);
             return Result.Success((int)totalCount);
         }
         catch (Exception ex)
