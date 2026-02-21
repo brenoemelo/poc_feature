@@ -27,7 +27,7 @@ Verify LocalStack:
 docker ps
 ```
 
-You should see the container `poc_feature-localstack-1` running on port `4566`.
+You should see the container `poc_feature-localstack` running on port `4566`.
 
 ## 3) Build the Solution
 

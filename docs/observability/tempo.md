@@ -59,7 +59,7 @@ Tempo supports two query types:
 ### 5.1. Check OTel Collector
 Ensure the Collector is receiving spans. Check logs (if verbose):
 ```bash
-docker logs otel-collector-1
+docker logs otel-collector
 ```
 *Note: Verbosity is set to `normal` by default to avoid log spam.*
 

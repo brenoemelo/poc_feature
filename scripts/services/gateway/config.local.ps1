@@ -8,6 +8,7 @@
 $ServiceConfig = @{
     Name = "PoC-Gateway"
     ApiName = "Material-Formulation-API"
+    CustomApiId = "material-api" # Static ID for LocalStack stability
     ApiId = $Global:Config.ApiGateway.Id
     Stage = $Global:Config.ApiGateway.Stage
     Region = $Global:Config.Aws.Region

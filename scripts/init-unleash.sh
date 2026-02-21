@@ -69,7 +69,7 @@ find /src -name "appsettings.json" -not -path "*/bin/*" -not -path "*/obj/*" | w
   # Preserves other settings
   jq ".FeatureFlags = {
     \"Provider\": \"Unleash\",
-    \"UnleashApiUrl\": \"http://unleash-1:4242/api/\",
+    \"UnleashApiUrl\": \"http://unleash:4242/api/\",
     \"UnleashApiKey\": \"$CLIENT_TOKEN\",
     \"UnleashAppName\": \"$APP_NAME\",
     \"UnleashInstanceId\": \"$INSTANCE_ID\"

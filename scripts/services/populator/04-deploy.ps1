@@ -6,44 +6,67 @@ $Global:CurrentLogFile = $LogFile
 Write-Log "STEP 4: Deploy" -Level INFO
 . "$PSScriptRoot/config.local.ps1"
 
-$ZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
+# 1. Resolve ZIP file path to a valid absolute path on Windows
+$RelativeZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
 
-# Create Topic
-Write-Log "Creating SNS Topic: $($ServiceConfig.TopicName)" -Level INFO
-aws sns create-topic --name $($ServiceConfig.TopicName) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SNS Topic Creation Failed" }
-
-# Create Queue
-Write-Log "Creating SQS Queue: $($ServiceConfig.QueueName)" -Level INFO
-aws sqs create-queue --queue-name $($ServiceConfig.QueueName) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SQS Queue Creation Failed" }
-
-# Subscribe Queue to Topic
-Write-Log "Subscribing Queue to Topic..." -Level INFO
-aws sns subscribe --topic-arn $($ServiceConfig.TopicArn) --protocol sqs --notification-endpoint $($ServiceConfig.QueueArn) --attributes RawMessageDelivery=true --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SNS Subscription Failed" }
-
-# Create Main Lambda (API)
-Write-Log "Creating Main Lambda Function (API)..." -Level INFO
-aws lambda create-function --function-name $($ServiceConfig.Name) --runtime dotnet10 --handler PoC.Populator --role arn:aws:iam::000000000000:role/lambda-role --zip-file fileb://$ZipPath --environment "Variables={MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),Otel__Endpoint=http://otel-collector:4318,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,AWS__Region=us-east-1}" --endpoint-url http://localhost:4566 --timeout 30 --memory-size 1024 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Main Lambda Creation Failed" }
-
-# Add API Gateway Permission (Main)
-Write-Log "Adding API Gateway Permission..." -Level INFO
-aws lambda add-permission --function-name $($ServiceConfig.Name) --statement-id apigateway-invoke --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*" --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "API Gateway Permission Failed" }
-
-# Create Worker Lambda
-Write-Log "Creating Worker Lambda Function..." -Level INFO
-aws lambda create-function --function-name $($ServiceConfig.WorkerName) --runtime dotnet10 --handler PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler --role arn:aws:iam::000000000000:role/lambda-role --zip-file fileb://$ZipPath --environment "Variables={MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),Otel__Endpoint=http://otel-collector:4318,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,AWS__Region=us-east-1}" --endpoint-url http://localhost:4566 --timeout 30 --memory-size 1024 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Worker Lambda Creation Failed" }
-
-# Create Event Source Mapping
-Write-Log "Creating Event Source Mapping..." -Level INFO
-$Output = aws lambda create-event-source-mapping --function-name $($ServiceConfig.WorkerName) --batch-size 10 --event-source-arn $($ServiceConfig.QueueArn) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Error Output: $Output" -Level ERROR
-    throw "Event Source Mapping Creation Failed"
+if (-Not (Test-Path $RelativeZipPath)) {
+    Write-Log "ZIP file not found at resolved path: $RelativeZipPath" -Level ERROR
+    throw "ZIP File Not Found"
 }
+
+$ZipPath = (Resolve-Path $RelativeZipPath).ProviderPath
+Write-Log "Absolute ZIP path resolved to: $ZipPath" -Level INFO
+
+# 2. Deploy AWS Resources using High-Level Functions (DRY Pattern)
+Write-Log "Deploying AWS Resources..." -Level INFO
+
+# Ensure SNS Topic
+New-SnsTopic -Name $($ServiceConfig.TopicName) | Out-Null
+
+# Ensure SQS Queue
+New-SqsQueue -Name $($ServiceConfig.QueueName) | Out-Null
+
+# Ensure SNS Subscription (Queue -> Topic)
+New-SnsSubscription -TopicArn $($ServiceConfig.TopicArn) `
+    -Protocol "sqs" `
+    -Endpoint $($ServiceConfig.QueueArn) `
+    -Attributes @{ "RawMessageDelivery" = "true" }
+
+# Deploy Main Lambda (API)
+Write-Log "Deploying Main Lambda (API)..." -Level INFO
+$MainEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),$(Get-CommonEnvVars)"
+
+New-LambdaFunction -Name $($ServiceConfig.Name) `
+    -Handler "PoC.Populator" `
+    -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
+    -ZipPath $ZipPath `
+    -Runtime "dotnet8" `
+    -Timeout "30" `
+    -MemorySize "1024" `
+    -EnvironmentVariables $MainEnv
+
+# Grant API Gateway Permission
+Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
+    -StatementId "apigateway-invoke" `
+    -Principal "apigateway.amazonaws.com" `
+    -SourceArn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*"
+
+# Deploy Worker Lambda
+Write-Log "Deploying Worker Lambda..." -Level INFO
+$WorkerEnv = "MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),SNS_TOPIC_ARN=$($ServiceConfig.TopicArn),$(Get-CommonEnvVars)"
+
+New-LambdaFunction -Name $($ServiceConfig.WorkerName) `
+    -Handler "PoC.Populator::PoC.Populator.Functions.PopulatorWorkerFunction::FunctionHandler" `
+    -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
+    -ZipPath $ZipPath `
+    -Runtime "dotnet8" `
+    -Timeout "30" `
+    -MemorySize "1024" `
+    -EnvironmentVariables $WorkerEnv
+
+# Create Event Source Mapping (Worker <- Queue)
+New-EventSourceMapping -FunctionName $($ServiceConfig.WorkerName) `
+    -EventSourceArn $($ServiceConfig.QueueArn) `
+    -BatchSize 10
 
 Write-Log "Deployment Successful." -Level SUCCESS

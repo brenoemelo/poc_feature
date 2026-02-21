@@ -1,11 +1,24 @@
 {
-  "errorType": "NullReferenceException",
-  "errorMessage": "Object reference not set to an instance of an object.",
+  "errorType": "JsonSerializerException",
+  "errorMessage": "Error converting the Lambda event JSON payload to type System.String[]: The JSON value could not be converted to System.String[]. Path: $ | LineNumber: 0 | BytePositionInLine: 1.",
   "stackTrace": [
-    "at Amazon.Lambda.AspNetCoreServer.APIGatewayProxyFunction.MarshallRequest(InvokeFeatures features, APIGatewayProxyRequest apiGatewayRequest, ILambdaContext lambdaContext)",
-    "at Amazon.Lambda.AspNetCoreServer.AbstractAspNetCoreFunction`2.FunctionHandlerAsync(TREQUEST request, ILambdaContext lambdaContext)",
-    "at Amazon.Lambda.RuntimeSupport.HandlerWrapper.<>c__DisplayClass26_0`2.<<GetHandlerWrapper>b__0>d.MoveNext()",
-    "--- End of stack trace from previous location ---",
-    "at Amazon.Lambda.RuntimeSupport.LambdaBootstrap.<>c__DisplayClass26_0.<<InvokeOnceAsync>b__0>d.MoveNext()"
-  ]
+    "at Amazon.Lambda.Serialization.SystemTextJson.AbstractLambdaJsonSerializer.Deserialize[T](Stream requestStream)",
+    "at lambda_method1(Closure, Stream, ILambdaContext, Stream)",
+    "at Amazon.Lambda.RuntimeSupport.HandlerWrapper.<>c__DisplayClass8_0.<GetHandlerWrapper>b__0(InvocationRequest invocation) in /src/Repo/Libraries/src/Amazon.Lambda.RuntimeSupport/Bootstrap/HandlerWrapper.cs:line 68",
+    "at Amazon.Lambda.RuntimeSupport.LambdaBootstrap.<>c__DisplayClass26_0.<<InvokeOnceAsync>b__0>d.MoveNext() in /src/Repo/Libraries/src/Amazon.Lambda.RuntimeSupport/Bootstrap/LambdaBootstrap.cs:line 369"
+  ],
+  "cause":   {
+    "errorType": "JsonException",
+    "errorMessage": "The JSON value could not be converted to System.String[]. Path: $ | LineNumber: 0 | BytePositionInLine: 1.",
+    "stackTrace": [
+      "at System.Text.Json.ThrowHelper.ThrowJsonException_DeserializeUnableToConvertValue(Type propertyType)",
+      "at System.Text.Json.Serialization.JsonCollectionConverter`2.OnTryRead(Utf8JsonReader& reader, Type typeToConvert, JsonSerializerOptions options, ReadStack& state, TCollection& value)",
+      "at System.Text.Json.Serialization.JsonConverter`1.TryRead(Utf8JsonReader& reader, Type typeToConvert, JsonSerializerOptions options, ReadStack& state, T& value, Boolean& isPopulatedValue)",
+      "at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader& reader, JsonSerializerOptions options, ReadStack& state)",
+      "at System.Text.Json.JsonSerializer.ReadFromSpan[TValue](ReadOnlySpan`1 utf8Json, JsonTypeInfo`1 jsonTypeInfo, Nullable`1 actualByteCount)",
+      "at System.Text.Json.JsonSerializer.Deserialize[TValue](ReadOnlySpan`1 utf8Json, JsonSerializerOptions options)",
+      "at Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer.InternalDeserialize[T](Byte[] utf8Json)",
+      "at Amazon.Lambda.Serialization.SystemTextJson.AbstractLambdaJsonSerializer.Deserialize[T](Stream requestStream)"
+    ]
+  }
 }

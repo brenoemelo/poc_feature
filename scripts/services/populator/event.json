@@ -1,0 +1,42 @@
+{
+  "resource": "/{proxy+}",
+  "path": "/api/v1/populator/jobs",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "multiValueHeaders": {
+    "Content-Type": ["application/json"]
+  },
+  "body": "{\r\n    \"target\": \"materials\",\r\n    \"count\": 10,\r\n    \"minComponents\": 10,\r\n    \"maxComponents\": 30\r\n}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "resourceId": "123456",
+    "apiId": "local-api",
+    "resourcePath": "/{proxy+}",
+    "httpMethod": "POST",
+    "requestId": "c6af9ac6-7b61-11e6-9a41-93e8deadbeef",
+    "accountId": "123456789012",
+    "stage": "prod",
+    "identity": {
+        "apiKey": "",
+        "userArn": "",
+        "cognitoAuthenticationType": "",
+        "caller": "",
+        "userAgent": "Custom User Agent String",
+        "user": "",
+        "cognitoIdentityPoolId": "",
+        "cognitoIdentityId": "",
+        "cognitoAuthenticationProvider": "",
+        "sourceIp": "127.0.0.1",
+        "accountId": ""
+    },
+    "authorizer": {
+        "claims": {
+            "sub": "test-user"
+        }
+    },
+    "path": "/api/v1/populator/jobs"
+  }
+}

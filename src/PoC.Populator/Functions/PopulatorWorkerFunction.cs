@@ -237,10 +237,10 @@ public class PopulatorWorkerFunction
 
                 _logger.LogInformation("Successfully processed job. Generated and published {PublishedCount} events for target {Target}.", publishedCount, job.Target);
             }
-            catch (Exception ex)
+            catch (Exception exc)
             {
-                _logger.LogError(ex, "Error processing message {MessageId}", message.MessageId);
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                // Log is handled by the runtime or upper layer when rethrowing
+                activity?.SetStatus(ActivityStatusCode.Error, exc.Message);
                 throw; 
             }
         }
@@ -264,7 +264,7 @@ public class PopulatorWorkerFunction
         }
     }
 
-    private IPopulationStrategy GetStrategy(string target)
+    private static IPopulationStrategy GetStrategy(string target)
     {
         return target.ToLowerInvariant() switch
         {

@@ -4,6 +4,8 @@ Set-StrictMode -Version Latest
 
 # Load Logger
 . "$PSScriptRoot/logger.ps1"
+# Load AWS Helpers
+. "$PSScriptRoot/aws_helpers.ps1"
 
 function Assert-Command {
     param([string]$Command)

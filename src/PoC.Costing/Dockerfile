@@ -1,6 +1,6 @@
-FROM public.ecr.aws/lambda/dotnet:10 AS base
+FROM public.ecr.aws/lambda/dotnet:8 AS base
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["src/PoC.Costing/PoC.Costing.csproj", "PoC.Costing/"]
 COPY ["src/PoC.Shared/PoC.Shared.csproj", "PoC.Shared/"]

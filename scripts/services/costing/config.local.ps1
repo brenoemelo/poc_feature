@@ -14,5 +14,5 @@ $ServiceConfig = @{
     
     # Dependencies
     MaterialsTopicArn = "arn:aws:sns:us-east-1:000000000000:material-events"
-    MaterialsApiUrl = "http://localstack:4566/restapis/material-api/prod/_user_request_/"
+    MaterialsApiUrl = "http://localstack:4566/_aws/execute-api/$($Global:Config.ApiGateway.Id)/prod/"
 }

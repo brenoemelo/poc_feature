@@ -1,50 +1,22 @@
 # 02-cleanup.ps1
 param([string]$LogFile)
 . "$PSScriptRoot/../../utils/common.ps1"
-. "$PSScriptRoot/../../utils/aws_helpers.ps1"
 $Global:CurrentLogFile = $LogFile
 
 Write-Log "STEP 2: Cleanup (Idempotency)" -Level INFO
-
-# Load Config
 . "$PSScriptRoot/config.local.ps1"
 
-# Delete Lambda
-Remove-AwsResource -Description "Lambda ($($ServiceConfig.Name))" -Action {
-    aws lambda delete-function --function-name $($ServiceConfig.Name) --endpoint-url http://localhost:4566 --no-cli-pager
-}
+# Remove Main Lambda
+Remove-LambdaFunction -FunctionName $($ServiceConfig.Name)
 
-# Delete Event Source Mappings (Worker)
-try {
-    $ESMs = aws lambda list-event-source-mappings --function-name $($ServiceConfig.WorkerName) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        $ESMsJson = $ESMs | ConvertFrom-Json
-        if ($ESMsJson.EventSourceMappings) {
-            foreach ($Mapping in $ESMsJson.EventSourceMappings) {
-                Remove-AwsResource -Description "ESM ($($Mapping.UUID))" -Action {
-                    aws lambda delete-event-source-mapping --uuid $($Mapping.UUID) --endpoint-url http://localhost:4566 --no-cli-pager
-                }
-            }
-        }
-    }
-} catch {
-    Write-Log "Failed to list ESMs: $_" -Level WARN
-}
+# Remove Worker Lambda
+Remove-LambdaFunction -FunctionName $($ServiceConfig.WorkerName)
 
-# Delete Lambda (Worker)
-Remove-AwsResource -Description "Lambda ($($ServiceConfig.WorkerName))" -Action {
-    aws lambda delete-function --function-name $($ServiceConfig.WorkerName) --endpoint-url http://localhost:4566 --no-cli-pager
-}
-
-# Delete Queue
+# Remove SQS Queue
 $QueueUrl = "http://localhost:4566/000000000000/$($ServiceConfig.QueueName)"
-Remove-AwsResource -Description "Queue ($($ServiceConfig.QueueName))" -Action {
-    aws sqs delete-queue --queue-url $QueueUrl --endpoint-url http://localhost:4566 --no-cli-pager
-}
+Remove-SqsQueue -QueueUrl $QueueUrl
 
-# Delete Topic
-Remove-AwsResource -Description "Topic ($($ServiceConfig.TopicArn))" -Action {
-    aws sns delete-topic --topic-arn $($ServiceConfig.TopicArn) --endpoint-url http://localhost:4566 --no-cli-pager
-}
+# Remove SNS Topic
+Remove-SnsTopic -TopicArn $($ServiceConfig.TopicArn)
 
 Write-Log "Cleanup Completed." -Level SUCCESS

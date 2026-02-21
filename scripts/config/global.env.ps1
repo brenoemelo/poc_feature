@@ -1,4 +1,7 @@
 # Global Environment Variables
+# Use static ID for LocalStack stability (mimics prod environment with known IDs or custom domains)
+$ApiId = "material-api"
+
 $Global:Config = @{
     Aws = @{
         Region = "us-east-1"
@@ -6,7 +9,7 @@ $Global:Config = @{
         LocalStackUrl = "http://localhost:4566"
     }
     ApiGateway = @{
-        Id = "material-api"
+        Id = $ApiId
         Stage = "prod"
     }
     Project = @{

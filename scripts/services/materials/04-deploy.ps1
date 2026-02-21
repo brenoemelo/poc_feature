@@ -1,15 +1,24 @@
 # 04-deploy.ps1
 param([string]$LogFile)
 . "$PSScriptRoot/../../utils/common.ps1"
+. "$PSScriptRoot/../../utils/aws_helpers.ps1"
 $Global:CurrentLogFile = $LogFile
 
 Write-Log "STEP 4: Deploy" -Level INFO
 . "$PSScriptRoot/config.local.ps1"
 
-$ZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
+$ZipPath = "$PSScriptRoot/../../../PoC-Materials.zip"
 
-# Create Table
-Write-Log "Creating DynamoDB Table: $($ServiceConfig.DynamoTable)..." -Level INFO
+if (-not (Test-Path $ZipPath)) {
+    throw "Build artifact not found: $ZipPath"
+}
+
+$AbsZipPath = Resolve-Path $ZipPath
+Write-Log "Absolute ZIP path resolved to: $AbsZipPath" -Level INFO
+
+Write-Log "Deploying AWS Resources..." -Level INFO
+
+# 1. DynamoDB Table
 $TableDef = @{
     TableName = $ServiceConfig.DynamoTable
     AttributeDefinitions = @(
@@ -38,30 +47,25 @@ $TableDef = @{
         }
     )
 }
+New-DynamoDbTable -TableDef $TableDef | Out-Null
 
-# Convert to JSON for AWS CLI to avoid parsing issues
-    $TableJson = $TableDef | ConvertTo-Json -Depth 4
-    $TableJsonFile = Join-Path "$PSScriptRoot/../../tmp" "materials-table.json"
-    $TableJson | Set-Content -Path $TableJsonFile -Encoding Ascii
+# 2. SNS Topic
+$TopicArn = New-SnsTopic -Name $($ServiceConfig.SnsTopic)
 
-    Write-Log "DEBUG: JSON Path: $TableJsonFile" -Level INFO
-    # Use fileb:// for binary/file handling to avoid encoding issues or file:// with quotes
-    aws dynamodb create-table --cli-input-json "file://$TableJsonFile" --endpoint-url http://localhost:4566 --no-cli-pager | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "DynamoDB Table Creation Failed" }
+# 3. Lambda Function
+$EnvVars = "Materials__TableName=$($ServiceConfig.DynamoTable),$(Get-CommonEnvVars)"
+New-LambdaFunction -Name $($ServiceConfig.Name) `
+    -Handler "PoC.Materials" `
+    -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
+    -ZipPath $AbsZipPath `
+    -Timeout "30" `
+    -MemorySize "1024" `
+    -EnvironmentVariables $EnvVars
 
-# Create SNS Topic
-Write-Log "Creating SNS Topic: $($ServiceConfig.SnsTopic)" -Level INFO
-aws sns create-topic --name $($ServiceConfig.SnsTopic) --endpoint-url http://localhost:4566 --no-cli-pager | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SNS Topic Creation Failed" }
-
-# Create Lambda
-Write-Log "Creating Lambda Function..." -Level INFO
-aws lambda create-function --function-name $($ServiceConfig.Name) --runtime dotnet10 --handler PoC.Materials --role arn:aws:iam::000000000000:role/lambda-role --zip-file fileb://$ZipPath --environment "Variables={Materials__TableName=$($ServiceConfig.DynamoTable),Otel__Endpoint=http://otel-collector:4318,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,AWS__Region=us-east-1}" --endpoint-url http://localhost:4566 --timeout 30 --memory-size 1024 --no-cli-pager | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Lambda Function Creation Failed" }
-
-# Add API Gateway Permission
-Write-Log "Adding API Gateway Permission..." -Level INFO
-aws lambda add-permission --function-name $($ServiceConfig.Name) --statement-id apigateway-invoke --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*" --endpoint-url http://localhost:4566 --no-cli-pager | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "API Gateway Permission Failed" }
+# 4. API Gateway Permission
+Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
+    -StatementId "apigateway-invoke" `
+    -Principal "apigateway.amazonaws.com" `
+    -SourceArn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*"
 
 Write-Log "Deployment Successful." -Level SUCCESS

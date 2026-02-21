@@ -3,33 +3,43 @@ param([string]$LogFile)
 . "$PSScriptRoot/../../utils/common.ps1"
 $Global:CurrentLogFile = $LogFile
 
-Write-Log "STEP 4: Deploy" -Level INFO
-
-# Load Config
+Write-Log "STEP 4: Deploy API Gateway" -Level INFO
 . "$PSScriptRoot/config.local.ps1"
 
-# Create API Shell (Static ID)
-Write-Log "Creating API Gateway Shell: $($ServiceConfig.ApiId)" -Level INFO
-$Output = aws apigateway create-rest-api --name $($ServiceConfig.ApiName) --tags "_custom_id_=$($ServiceConfig.ApiId)" --endpoint-url $($ServiceConfig.EndpointUrl) --no-cli-pager 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Failed to create API Gateway Shell: $Output" -Level ERROR
-    throw "API Gateway Creation Failed"
+# 1. Create/Get API Gateway using High-Level Function
+# Use CustomApiId to ensure stable ID in LocalStack
+$ApiId = New-ApiGateway -Name $($ServiceConfig.ApiName) -CustomId $($ServiceConfig.CustomApiId)
+
+if (-not $ApiId) {
+    throw "Failed to retrieve or create API Gateway ID."
 }
 
-# Update API Definition (OpenAPI)
+# 2. Update API Definition (OpenAPI)
 Write-Log "Updating API Definition from OpenAPI..." -Level INFO
-$Output = aws apigateway put-rest-api --rest-api-id $($ServiceConfig.ApiId) --mode overwrite --body "fileb://$($ServiceConfig.OpenApiPath)" --endpoint-url $($ServiceConfig.EndpointUrl) --no-cli-pager 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Failed to update API Definition: $Output" -Level ERROR
-    throw "API Definition Update Failed"
+$OpenApiPath = $ServiceConfig.OpenApiPath
+
+if (-not (Test-Path $OpenApiPath)) {
+    throw "OpenAPI definition not found at: $OpenApiPath"
 }
 
-# Deploy to Stage
+# We need to read the OpenAPI file and replace placeholders if necessary, 
+# but for now we assume it's valid or we just upload it.
+# Note: 'aws apigateway put-rest-api' replaces the entire API definition.
+
+Invoke-Aws -Service "apigateway" -Command "put-rest-api" -Arguments @(
+    "--rest-api-id", $ApiId,
+    "--mode", "overwrite",
+    "--body", "fileb://$OpenApiPath"
+) | Out-Null
+
+Write-Log "API Definition Updated." -Level SUCCESS
+
+# 3. Deploy to Stage
 Write-Log "Deploying API to Stage: $($ServiceConfig.Stage)" -Level INFO
-$Output = aws apigateway create-deployment --rest-api-id $($ServiceConfig.ApiId) --stage-name $($ServiceConfig.Stage) --endpoint-url $($ServiceConfig.EndpointUrl) --no-cli-pager 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Failed to deploy API to Stage: $Output" -Level ERROR
-    throw "API Deployment Failed"
-}
 
-Write-Log "Deployment Successful." -Level SUCCESS
+Invoke-Aws -Service "apigateway" -Command "create-deployment" -Arguments @(
+    "--rest-api-id", $ApiId,
+    "--stage-name", $($ServiceConfig.Stage)
+) | Out-Null
+
+Write-Log "Deployment to stage '$($ServiceConfig.Stage)' Successful." -Level SUCCESS

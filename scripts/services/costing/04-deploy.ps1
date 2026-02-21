@@ -1,53 +1,80 @@
 # 04-deploy.ps1
 param([string]$LogFile)
 . "$PSScriptRoot/../../utils/common.ps1"
+. "$PSScriptRoot/../../utils/aws_helpers.ps1"
 $Global:CurrentLogFile = $LogFile
 
 Write-Log "STEP 4: Deploy" -Level INFO
 . "$PSScriptRoot/config.local.ps1"
 
-$ZipPath = "$PSScriptRoot/../../../$($ServiceConfig.Name).zip"
+$ZipPath = "$PSScriptRoot/../../../PoC-Costing.zip"
 
-# Create Table
-Write-Log "Creating DynamoDB Table..." -Level INFO
-aws dynamodb create-table --table-name $($ServiceConfig.DynamoTable) --attribute-definitions AttributeName=ComponentName,AttributeType=S --key-schema AttributeName=ComponentName,KeyType=HASH --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "DynamoDB Table Creation Failed" }
-
-# Create Queue
-Write-Log "Creating SQS Queue: $($ServiceConfig.IngestionQueueName)" -Level INFO
-aws sqs create-queue --queue-name $($ServiceConfig.IngestionQueueName) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SQS Queue Creation Failed" }
-
-# Subscribe Queue to Material Events Topic
-Write-Log "Subscribing Queue to Topic..." -Level INFO
-aws sns subscribe --topic-arn $($ServiceConfig.MaterialsTopicArn) --protocol sqs --notification-endpoint $($ServiceConfig.IngestionQueueArn) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "SNS Subscription Failed" }
-
-# Create Main Lambda
-Write-Log "Creating Main Lambda Function..." -Level INFO
-aws lambda create-function --function-name $($ServiceConfig.Name) --runtime dotnet10 --handler PoC.Costing --role arn:aws:iam::000000000000:role/lambda-role --zip-file fileb://$ZipPath --environment "Variables={OTEL_SERVICE_NAME=$($ServiceConfig.Name),MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),Otel__Endpoint=http://otel-collector:4318,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,AWS__Region=us-east-1}" --endpoint-url http://localhost:4566 --timeout 30 --memory-size 1024 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Main Lambda Creation Failed" }
-
-# Add API Gateway Permission (Main)
-Write-Log "Adding API Gateway Permission..." -Level INFO
-aws lambda add-permission --function-name $($ServiceConfig.Name) --statement-id apigateway-invoke --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*" --endpoint-url http://localhost:4566 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "API Gateway Permission Failed" }
-
-# Create Ingestion Lambda
-Write-Log "Creating Ingestion Lambda Function..." -Level INFO
-aws lambda create-function --function-name $($ServiceConfig.IngestionFunctionName) --runtime dotnet10 --handler PoC.Costing::PoC.Costing.Functions.PriceIngestionFunction::FunctionHandler --role arn:aws:iam::000000000000:role/lambda-role --zip-file fileb://$ZipPath --environment "Variables={OTEL_SERVICE_NAME=$($ServiceConfig.IngestionFunctionName),COSTING_TABLE_NAME=$($ServiceConfig.DynamoTable),Otel__Endpoint=http://otel-collector:4318,FeatureFlags__UnleashApiUrl=http://unleash:4242/api/,AWS__Region=us-east-1}" --endpoint-url http://localhost:4566 --timeout 30 --memory-size 1024 --no-cli-pager 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Ingestion Lambda Creation Failed" }
-
-# Create Event Source Mapping
-Write-Log "Creating Event Source Mapping..." -Level INFO
-$ErrorActionPreference = "Continue"
-$Output = aws lambda create-event-source-mapping --function-name $($ServiceConfig.IngestionFunctionName) --batch-size 10 --event-source-arn $($ServiceConfig.IngestionQueueArn) --endpoint-url http://localhost:4566 --no-cli-pager 2>&1
-$ExitCode = $LASTEXITCODE
-$ErrorActionPreference = "Stop"
-
-if ($ExitCode -ne 0) { 
-    Write-Log "Error Output: $Output" -Level ERROR
-    throw "Event Source Mapping Creation Failed" 
+if (-not (Test-Path $ZipPath)) {
+    throw "Build artifact not found: $ZipPath"
 }
+
+$AbsZipPath = Resolve-Path $ZipPath
+Write-Log "Absolute ZIP path resolved to: $AbsZipPath" -Level INFO
+
+Write-Log "Deploying AWS Resources..." -Level INFO
+
+# 1. DynamoDB Table
+$TableDef = @{
+    TableName = $ServiceConfig.DynamoTable
+    AttributeDefinitions = @(
+        @{ AttributeName = "ComponentName"; AttributeType = "S" }
+    )
+    KeySchema = @(
+        @{ AttributeName = "ComponentName"; KeyType = "HASH" }
+    )
+    ProvisionedThroughput = @{
+        ReadCapacityUnits = 5
+        WriteCapacityUnits = 5
+    }
+}
+New-DynamoDbTable -TableDef $TableDef | Out-Null
+
+# 2. SQS Queue
+$QueueUrl = New-SqsQueue -Name $($ServiceConfig.IngestionQueueName)
+
+# 3. SNS Subscription (Materials -> Queue)
+# Note: Topic ARN is external, so we don't create it here, just subscribe.
+# If it doesn't exist, this might fail, but in local env we usually ensure it.
+# aws_helpers New-SnsSubscription handles subscription.
+# We need to make sure the topic exists. If it's owned by Materials service, it should be there.
+New-SnsSubscription -TopicArn $($ServiceConfig.MaterialsTopicArn) `
+    -Protocol "sqs" `
+    -Endpoint $($ServiceConfig.IngestionQueueArn)
+
+# 4. Main Lambda (API)
+$MainEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.Name),MATERIALS_API_URL=$($ServiceConfig.MaterialsApiUrl),$(Get-CommonEnvVars)"
+New-LambdaFunction -Name $($ServiceConfig.Name) `
+    -Handler "PoC.Costing" `
+    -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
+    -ZipPath $AbsZipPath `
+    -Timeout "30" `
+    -MemorySize "1024" `
+    -EnvironmentVariables $MainEnvVars
+
+# 5. API Gateway Permission
+Grant-LambdaPermission -FunctionName $($ServiceConfig.Name) `
+    -StatementId "apigateway-invoke" `
+    -Principal "apigateway.amazonaws.com" `
+    -SourceArn "arn:aws:execute-api:us-east-1:000000000000:$($Global:Config.ApiGateway.Id)/*/*/*"
+
+# 6. Worker Lambda (Ingestion)
+$WorkerEnvVars = "OTEL_SERVICE_NAME=$($ServiceConfig.IngestionFunctionName),COSTING_TABLE_NAME=$($ServiceConfig.DynamoTable),$(Get-CommonEnvVars)"
+New-LambdaFunction -Name $($ServiceConfig.IngestionFunctionName) `
+    -Handler "PoC.Costing::PoC.Costing.Functions.PriceIngestionFunction::FunctionHandler" `
+    -RoleArn "arn:aws:iam::000000000000:role/lambda-role" `
+    -ZipPath $AbsZipPath `
+    -Timeout "30" `
+    -MemorySize "1024" `
+    -EnvironmentVariables $WorkerEnvVars
+
+# 7. Event Source Mapping (Queue -> Worker)
+New-EventSourceMapping -FunctionName $($ServiceConfig.IngestionFunctionName) `
+    -EventSourceArn $($ServiceConfig.IngestionQueueArn) `
+    -BatchSize 10
 
 Write-Log "Deployment Successful." -Level SUCCESS

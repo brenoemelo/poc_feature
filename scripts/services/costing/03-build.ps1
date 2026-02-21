@@ -8,6 +8,11 @@ Write-Log "STEP 3: Build" -Level INFO
 
 $PublishDir = "$PSScriptRoot/../../../publish/$($ServiceConfig.Name)"
 
+# Dotnet Clean
+Write-Log "Cleaning .NET Project..." -Level INFO
+dotnet clean $ServiceConfig.ProjectPath -c Release
+if ($LASTEXITCODE -ne 0) { throw "Dotnet Clean Failed" }
+
 # Dotnet Publish
 Write-Log "Publishing .NET Project..." -Level INFO
 dotnet publish $ServiceConfig.ProjectPath -c Release -o $PublishDir -r linux-x64 --no-self-contained

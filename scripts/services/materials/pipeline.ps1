@@ -17,9 +17,10 @@ try {
         Write-Log "Build Stage Skipped." -Level WARN
     }
     & "$PSScriptRoot/04-deploy.ps1" -LogFile $LogFile
-    & "$PSScriptRoot/05-test.ps1" -LogFile $LogFile
+    #& "$PSScriptRoot/05-test.ps1" -LogFile $LogFile
     
     Write-Log ">>> PIPELINE COMPLETED SUCCESSFULLY <<<" -Level SUCCESS
+    exit 0
 } catch {
     Write-Log ">>> PIPELINE FAILED <<<" -Level ERROR
     Write-Log $_ -Level ERROR

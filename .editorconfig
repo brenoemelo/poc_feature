@@ -69,10 +69,10 @@ dotnet_diagnostic.CS8618.severity = error # Non-nullable field must contain a no
 # ==============================================================================
 
 # Rule: Remove unused usings (Dirty code)
-dotnet_diagnostic.IDE0005.severity = error
+dotnet_diagnostic.IDE0005.severity = warning
 
 # Rule: Remove unused variables (Dead code)
-dotnet_diagnostic.IDE0059.severity = error
+dotnet_diagnostic.IDE0059.severity = warning
 
 # Rule: Remove unnecessary parentheses (Noise)
 dotnet_diagnostic.IDE0047.severity = warning

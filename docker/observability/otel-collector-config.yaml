@@ -42,7 +42,7 @@ exporters:
     verbosity: normal
   
   otlp/tempo:
-    endpoint: tempo-1:4317
+    endpoint: tempo:4317
     tls:
       insecure: true
 
@@ -53,7 +53,7 @@ exporters:
     # namespace removed to match standard dashboards
 
   loki:
-    endpoint: http://loki-1:3100/loki/api/v1/push
+    endpoint: http://loki:3100/loki/api/v1/push
     default_labels_enabled:
       exporter: true
       job: true

@@ -27,9 +27,38 @@ $Event = @{
     resource = "/{proxy+}"
     path = "/api/v1/costing/estimations"
     httpMethod = "POST"
-    headers = @{ "Content-Type" = "application/json" }
+    headers = @{ 
+        "Content-Type" = "application/json"
+        "Accept" = "application/json"
+    }
+    multiValueHeaders = @{ 
+        "Content-Type" = @("application/json") 
+    }
     body = $PayloadContent
     isBase64Encoded = $false
+    requestContext = @{
+        resourceId = "123456"
+        apiId = "local-api"
+        resourcePath = "/{proxy+}"
+        httpMethod = "POST"
+        requestId = "c6af9ac6-7b61-11e6-9a41-93e8deadbeef"
+        accountId = "123456789012"
+        stage = "prod"
+        identity = @{
+            apiKey = ""
+            userArn = ""
+            cognitoAuthenticationType = ""
+            caller = ""
+            userAgent = "Custom User Agent String"
+            user = ""
+            cognitoIdentityPoolId = ""
+            cognitoIdentityId = ""
+            cognitoAuthenticationProvider = ""
+            sourceIp = "127.0.0.1"
+            accountId = ""
+        }
+        path = "/api/v1/costing/estimations"
+    }
 }
 
 Write-Log "Converting to JSON..." -Level INFO
@@ -50,7 +79,7 @@ Write-Log "Starting invocation..." -Level INFO
 $OldEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $Output = aws lambda invoke --function-name $($ServiceConfig.Name) --payload "fileb://$PSScriptRoot/event.json" --endpoint-url http://localhost:4566 --cli-read-timeout 40 --no-cli-pager "$PSScriptRoot/response.json" 2>&1
+    $Output = aws lambda invoke --function-name $($ServiceConfig.Name) --payload "fileb://$PSScriptRoot/event.json" --endpoint-url http://localhost:4566 --cli-connect-timeout 10 --cli-read-timeout 60 --no-cli-pager "$PSScriptRoot/response.json" 2>&1
     Write-Log "DEBUG: ExitCode: $LASTEXITCODE" -Level INFO
     Write-Log "DEBUG: Output: $Output" -Level INFO
 } catch {

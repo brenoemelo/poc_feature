@@ -15,77 +15,79 @@ using PoC.Shared.Validators;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
 
-var handler = Environment.GetEnvironmentVariable("_HANDLER");
-if (!string.IsNullOrEmpty(handler) && handler.Contains("PriceIngestionFunction"))
-{
-    var wrapper = new PriceIngestionFunction();
-    await LambdaBootstrapBuilder.Create<SQSEvent>(wrapper.FunctionHandler, new DefaultLambdaJsonSerializer())
-        .Build()
-        .RunAsync();
-    return;
-}
+namespace PoC.Costing;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Observability (Native OTel + ILogger)
-builder.AddPoCObservability("PoC-Costing", "1.0.0");
-
-// Add Custom Meter to OTel
-builder.Services.AddOpenTelemetry()
-   .WithMetrics(metrics => 
-   {
-       metrics.AddMeter(PoC.Costing.Infrastructure.BusinessMetrics.MeterName);
-   });
-
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
-
-// Dependency Injection
-builder.Services.AddCostingInfrastructure(builder.Configuration);
-
-// Feature Flags (OpenFeature + Unleash)
-builder.Services.AddPoCFeatureFlags(o =>
-{
-    o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-    o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
-    o.UnleashAppName = "Default";
-    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
-    {
-        o.FetchTogglesIntervalSeconds = interval;
-    }
-});
-
-builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
-builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
-
-builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>(client =>
-{
-    var materialsUrl = builder.Configuration["MATERIALS_API_URL"] ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
-    client.BaseAddress = new Uri(materialsUrl);
-})
-.AddStandardResilienceHandler();
-
-// Validators
-builder.Services.AddValidatorsFromAssemblyContaining<ComponentPriceRequestValidator>();
-
-// JSON Configuration
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
-});
-
-var app = builder.Build();
-
-app.UsePoCObservability();
-
-app.MapGroup("/api/v1/costing")
-   .MapCostingEndpoints();
-
-app.Run();
-
-/// <summary>
-/// Program entry point.
-/// </summary>
-public partial class Program
+public class Program
 {
     protected Program() { }
+
+    public static async Task Main()
+    {
+        var handler = Environment.GetEnvironmentVariable("_HANDLER");
+        if (!string.IsNullOrEmpty(handler) && handler.Contains("PriceIngestionFunction"))
+        {
+            var wrapper = new PriceIngestionFunction();
+            await LambdaBootstrapBuilder.Create<SQSEvent>(wrapper.FunctionHandler, new DefaultLambdaJsonSerializer())
+                .Build()
+                .RunAsync();
+            return;
+        }
+
+        var builder = WebApplication.CreateBuilder();
+
+        // Observability (Native OTel + ILogger)
+        builder.AddPoCObservability("PoC-Costing", "1.0.0");
+
+        // Add Custom Meter to OTel
+        builder.Services.AddOpenTelemetry()
+           .WithMetrics(metrics => 
+           {
+               metrics.AddMeter(PoC.Costing.Infrastructure.BusinessMetrics.MeterName);
+           });
+
+        builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+
+        // Dependency Injection
+        builder.Services.AddCostingInfrastructure(builder.Configuration);
+
+        // Feature Flags (OpenFeature + Unleash)
+        builder.Services.AddPoCFeatureFlags(o =>
+        {
+            o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
+            o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
+            o.UnleashAppName = "Default";
+            if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+            {
+                o.FetchTogglesIntervalSeconds = interval;
+            }
+        });
+
+        builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
+        builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
+
+        builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>(client =>
+        {
+            var materialsUrl = builder.Configuration["MATERIALS_API_URL"] ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
+            client.BaseAddress = new Uri(materialsUrl);
+        })
+        .AddStandardResilienceHandler();
+
+        // Validators
+        builder.Services.AddValidatorsFromAssemblyContaining<ComponentPriceRequestValidator>();
+
+        // JSON Configuration
+        builder.Services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+        });
+
+        var app = builder.Build();
+
+        app.UsePoCObservability();
+
+        app.MapGroup("/api/v1/costing")
+           .MapCostingEndpoints();
+
+        await app.RunAsync();
+    }
 }

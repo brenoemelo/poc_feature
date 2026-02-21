@@ -14,9 +14,10 @@ $ScriptsRoot = Resolve-Path "$PSScriptRoot/../../scripts"
 . "$ScriptsRoot/utils/logger.ps1"
 . "$ScriptsRoot/utils/common.ps1"
 . "$ScriptsRoot/utils/aws_helpers.ps1"
+. "$ScriptsRoot/utils/gateway_helpers.ps1"
 
 # 2. Initialize Logging
-$LogFile = Init-Log -ServiceName "Master-Deploy"
+$LogFile = Init-Log -ServiceName "Master-Deploy" -CleanAll
 
 Write-Log ">>> STARTING MASTER DEPLOYMENT <<<" -Level INFO
 Write-Log "Parameters: SkipBuild=$SkipBuild" -Level INFO
@@ -25,6 +26,13 @@ Write-Log "Parameters: SkipBuild=$SkipBuild" -Level INFO
 try {
     Write-Log "STEP 1: Global Validation" -Level INFO
     Assert-AwsConnection
+
+    # 3.1 Ensure API Gateway Exists (Shared Resource)
+    Write-Log "STEP 1.1: Ensure API Gateway Exists" -Level INFO
+    $ApiId = Get-Or-Create-ApiGateway -ApiName "Material-Formulation-API"
+    $ApiIdFile = "$PSScriptRoot/../../.api_gateway_id"
+    Set-Content -Path $ApiIdFile -Value $ApiId -Force
+    Write-Log "API Gateway ID: $ApiId (Saved to $ApiIdFile)" -Level INFO
     
     # 4. Execute Service Pipelines
     # Order matters: Materials (Shared SNS) -> Costing/Populator -> Gateway
@@ -48,13 +56,26 @@ try {
         $ArgsList = @("-ExecutionPolicy", "Bypass", "-File", "$PipelinePath")
         if ($SkipBuild) { $ArgsList += "-SkipBuild" }
         
-        # Execute Pipeline in Isolated Process
+        # Execute Pipeline in Isolated Process with Timeout
         Write-Log "Executing: powershell $ArgsList" -Level INFO
         
-        & powershell @ArgsList
+        $Process = Start-Process -FilePath "powershell" -ArgumentList $ArgsList -PassThru -NoNewWindow
+        $TimeoutMs = 300 * 1000 # 5 minutes per service
         
-        if ($LASTEXITCODE -ne 0) {
-            throw "Pipeline for $($Service.Name) failed with exit code $LASTEXITCODE"
+        if ($Process.WaitForExit($TimeoutMs)) {
+            # Process exited within timeout
+            Start-Sleep -Milliseconds 500 # Give time for ExitCode to populate
+            
+            if ($null -eq $Process.ExitCode) {
+                Write-Log "Warning: Pipeline for $($Service.Name) exited but ExitCode is null. Assuming success." -Level WARN
+            } elseif ($Process.ExitCode -ne 0) {
+                throw "Pipeline for $($Service.Name) failed with exit code $($Process.ExitCode)"
+            }
+        } else {
+            # Timeout
+            try { $Process.Kill() } catch { }
+            Write-Log "Pipeline for $($Service.Name) timed out." -Level ERROR
+            throw "Pipeline Timeout: $($Service.Name)"
         }
     }
 

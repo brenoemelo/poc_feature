@@ -31,7 +31,7 @@ Access Grafana -> Explore -> Prometheus.
 
 ## Troubleshooting
 If traces are broken or missing:
-1.  **Check Collector Logs**: `docker logs po-feature-otel-collector-1`
+1.  **Check Collector Logs**: `docker logs po-feature-otel-collector`
     *   Look for "Connection refused" or OTLP errors.
 2.  **Check Lambda Logs**: `aws --endpoint-url=http://localhost:4566 logs tail /aws/lambda/PoC-Costing --follow`
     *   Look for startup errors or OTel exporter errors.
