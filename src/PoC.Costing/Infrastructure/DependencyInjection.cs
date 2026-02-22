@@ -1,5 +1,4 @@
 using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DataModel;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure.Persistence;
 
@@ -30,7 +29,6 @@ public static class DependencyInjection
 
         services.Configure<CostingOptions>(configuration.GetSection(CostingOptions.SectionName));
 
-        services.AddScoped<IDynamoDBContext, DynamoDBContext>();
         services.AddScoped<ICostingRepository, DynamoDbCostingRepository>();
 
         return services;

@@ -41,6 +41,7 @@ def get_common_env_vars():
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318",
         "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "FeatureFlags__UnleashApiUrl": "http://unleash:4242/api/",
+        "FeatureFlags__FetchTogglesIntervalSeconds": "1",
         "AWS_REGION": AWS_REGION,
         "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
         "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,

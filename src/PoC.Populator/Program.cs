@@ -20,14 +20,14 @@ public class Program
     public static async Task Main()
     {
         // Lê a versão injetada no build
-        var assembly = Assembly.GetExecutingAssembly();
-        var versionInfo = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        // var assembly = Assembly.GetExecutingAssembly();
+        // var versionInfo = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
 
         // Imprime no log da AWS/LocalStack
-        Console.WriteLine($"===================================================");
-        Console.WriteLine($"[STARTUP] Executando PoC.Populator");
-        Console.WriteLine($"[STARTUP] Versão do Build: {versionInfo}");
-        Console.WriteLine($"===================================================");
+        // Console.WriteLine($"===================================================");
+        // Console.WriteLine($"[STARTUP] Executando PoC.Populator");
+        // Console.WriteLine($"[STARTUP] Versão do Build: {versionInfo}");
+        // Console.WriteLine($"===================================================");
 
         var handler = Environment.GetEnvironmentVariable("_HANDLER");
         if (!string.IsNullOrEmpty(handler) && handler.Contains("PopulatorWorkerFunction"))
@@ -42,7 +42,7 @@ public class Program
         var builder = WebApplication.CreateBuilder();
 
         // Add Observability (Logging, Tracing, Metrics)
-        builder.AddPoCObservability("PoC.Populator", "1.0.0");
+        // builder.AddPoCObservability("PoC.Populator", "1.0.0");
 
         // Observability (Native OTel + ILogger)
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
@@ -53,14 +53,31 @@ public class Program
         // Feature Flags (OpenFeature + Unleash)
         builder.Services.AddPoCFeatureFlags(options =>
         {
+            var section = builder.Configuration.GetSection("FeatureFlags");
+            if (section.Exists())
+            {
+                section.Bind(options);
+            }
+            
             options.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
             options.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "default:development.unleash-insecure-api-token";
             options.UnleashAppName = "PoC-Populator";
             options.UnleashInstanceId = "populator";
-            if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+            
+            var intervalEnv = Environment.GetEnvironmentVariable("FeatureFlags__FetchTogglesIntervalSeconds");
+            if (!string.IsNullOrEmpty(intervalEnv) && int.TryParse(intervalEnv, out var intervalVal))
             {
-                options.FetchTogglesIntervalSeconds = interval;
+                options.FetchTogglesIntervalSeconds = intervalVal;
             }
+            else
+            {
+                var intervalStr = builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"];
+                if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var interval))
+                {
+                    options.FetchTogglesIntervalSeconds = interval;
+                }
+            }
+            // Console.WriteLine($"[CONFIG] Unleash Interval set to: {options.FetchTogglesIntervalSeconds}s");
         });
 
         // JSON Configuration

@@ -18,34 +18,34 @@ public sealed partial class PriceIngestionFunction
     private readonly ICostingRepository _repository;
     private readonly ILogger<PriceIngestionFunction> _logger;
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Processing {Count} SQS messages")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Processing {count} SQS messages")]
     private partial void LogProcessingBatch(int count);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "[PriceIngestion] Failed to process record {MessageId}")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "[PriceIngestion] Failed to process record {messageId}")]
     private partial void LogProcessingError(Exception ex, string messageId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Batch complete. Processed: {processed}, Failed: {failed}")]
     private partial void LogBatchComplete(int processed, int failed);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type: {EventType}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type: {eventType}")]
     private partial void LogIgnoringEventType(string eventType);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type (from body): {EventType}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type (from body): {eventType}")]
     private partial void LogIgnoringEventTypeFromBody(string eventType);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has no 'Message' property")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has no 'Message' property")]
     private partial void LogRecordNoMessageProperty(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has empty message")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has empty message")]
     private partial void LogRecordEmptyMessage(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has invalid price event")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has invalid price event")]
     private partial void LogRecordInvalidPriceEvent(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ingesting price for {ComponentName}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ingesting price for {componentName}")]
     private partial void LogIngestingPrice(string componentName);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Successfully ingested price for {ComponentName}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Successfully ingested price for {componentName}")]
     private partial void LogSuccessfullyIngestedPrice(string componentName);
 
     public PriceIngestionFunction()

@@ -26,7 +26,7 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("MaterialIngestionFunctio
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Observability (Logging, Tracing, Metrics)
-builder.AddPoCObservability("PoC.Materials", "1.0.0");
+        // builder.AddPoCObservability("PoC.Materials", "1.0.0");
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 builder.Services.AddProblemDetails();
@@ -36,13 +36,38 @@ builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 // Feature Flags (OpenFeature + Unleash)
 builder.Services.AddPoCFeatureFlags(o =>
 {
-    o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-    o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
-    o.UnleashAppName = "Default";
-    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+    var section = builder.Configuration.GetSection("FeatureFlags");
+    if (section.Exists())
     {
-        o.FetchTogglesIntervalSeconds = interval;
+        section.Bind(o);
     }
+    
+    // Fallbacks if not in configuration
+    if (string.IsNullOrEmpty(o.UnleashApiUrl) || o.UnleashApiUrl == "http://localhost:4242/api/")
+    {
+         o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
+    }
+    if (string.IsNullOrEmpty(o.UnleashApiKey))
+    {
+         o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
+    }
+    
+    // Explicitly check for interval if default (30) is still there and config has it
+    // Check Env Var FIRST to ensure override
+    var intervalEnv = Environment.GetEnvironmentVariable("FeatureFlags__FetchTogglesIntervalSeconds");
+    if (!string.IsNullOrEmpty(intervalEnv) && int.TryParse(intervalEnv, out var intervalVal))
+    {
+        o.FetchTogglesIntervalSeconds = intervalVal;
+    }
+    else
+    {
+        var intervalStr = builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"];
+        if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var interval))
+        {
+            o.FetchTogglesIntervalSeconds = interval;
+        }
+    }
+    // Console.WriteLine($"[CONFIG] Unleash Interval set to: {o.FetchTogglesIntervalSeconds}s");
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();

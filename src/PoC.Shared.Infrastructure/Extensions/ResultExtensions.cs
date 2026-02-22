@@ -17,21 +17,27 @@ public static class ResultExtensions
 
         return error.Code switch
         {
-            "Error.NotFound" => Results.Problem(
-                title: "Resource not found",
-                detail: error.Description,
-                statusCode: StatusCodes.Status404NotFound,
-                type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"),
+            "Error.NotFound" => Results.Json(new ProblemDetails
+            {
+                Title = "Resource not found",
+                Detail = error.Description,
+                Status = StatusCodes.Status404NotFound,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4"
+            }, statusCode: StatusCodes.Status404NotFound, contentType: "application/problem+json"),
             
-            "MissingPrices" or "CurrencyMismatch" or "InvalidMargin" or "Error.ConditionNotMet" => Results.Problem(
-                title: "Validation Error",
-                detail: error.Description,
-                statusCode: StatusCodes.Status400BadRequest),
+            "MissingPrices" or "CurrencyMismatch" or "InvalidMargin" or "Error.ConditionNotMet" => Results.Json(new ProblemDetails
+            {
+                Title = "Validation Error",
+                Detail = error.Description,
+                Status = StatusCodes.Status400BadRequest
+            }, statusCode: StatusCodes.Status400BadRequest, contentType: "application/problem+json"),
 
-            _ => Results.Problem(
-                title: "An error occurred",
-                detail: error.Description,
-                statusCode: StatusCodes.Status500InternalServerError)
+            _ => Results.Json(new ProblemDetails
+            {
+                Title = "An error occurred",
+                Detail = error.Description,
+                Status = StatusCodes.Status500InternalServerError
+            }, statusCode: StatusCodes.Status500InternalServerError, contentType: "application/problem+json")
         };
     }
 }

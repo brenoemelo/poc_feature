@@ -1,5 +1,4 @@
 using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DataModel;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure.Persistence;
 
@@ -14,7 +13,6 @@ public static class DependencyInjection
         services.Configure<MaterialsOptions>(configuration.GetSection(MaterialsOptions.SectionName));
         services.AddAWSService<IAmazonDynamoDB>();
 
-        services.AddScoped<IDynamoDBContext, DynamoDBContext>();
         services.AddScoped<IMaterialRepository, DynamoDbMaterialRepository>();
         services.AddSingleton<MaterialsMetrics>();
 

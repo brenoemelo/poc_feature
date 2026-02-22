@@ -27,10 +27,10 @@ public partial class PopulatorWorkerFunction
     [LoggerMessage(Level = LogLevel.Warning, Message = "Received empty SQS Message Body.")]
     private partial void LogEmptyBody();
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {body}")]
     private partial void LogReceivedBody(string body);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {body}")]
     private partial void LogUnwrappedBody(string body);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to deserialize message body.")]
@@ -39,22 +39,22 @@ public partial class PopulatorWorkerFunction
     [LoggerMessage(Level = LogLevel.Warning, Message = "Deserialized job is null")]
     private partial void LogNullJob();
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {body}")]
     private partial void LogInvalidJob(string body);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {batchSize} records for {target} (Min: {min}, Max: {max})")]
     private partial void LogProcessingJob(int batchSize, string target, int? min, int? max);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {Strategy} generated {Count} items.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {strategy} generated {count} items.")]
     private partial void LogStrategyGenerated(string strategy, int count);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {ItemType}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {itemType}")]
     private partial void LogUnknownItemType(string itemType);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {PublishedCount} events for target {Target}.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {publishedCount} events for target {target}.")]
     private partial void LogJobSuccess(int publishedCount, string target);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "{Message}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "{message}")]
     private partial void LogGenericInfo(string message);
 
     // Phase 2: Static Host Initialization
@@ -103,6 +103,11 @@ public partial class PopulatorWorkerFunction
     private static IHost HostInstance => _hostLazy.Value;
 
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<PopulatorWorkerFunction> _logger;
+    private readonly IAmazonSimpleNotificationService _snsClient;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IOptions<PopulatorOptions> _options;
+    private readonly string _topicArn;
 
     public PopulatorWorkerFunction()
     {
@@ -283,7 +288,7 @@ public partial class PopulatorWorkerFunction
                             price.ComponentName,
                             price.UnitPrice,
                             price.Currency,
-                            price.EffectiveDate);
+                            DateTime.UtcNow);
                         messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
                         eventType = "PriceUpdated";
                     }

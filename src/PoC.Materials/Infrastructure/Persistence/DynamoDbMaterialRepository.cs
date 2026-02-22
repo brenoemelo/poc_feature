@@ -1,5 +1,4 @@
 using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Options;
@@ -7,29 +6,14 @@ using PoC.Materials.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
 using System.Text;
+using System.Text.Json;
 
 namespace PoC.Materials.Infrastructure.Persistence;
 
-public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client, ILogger<DynamoDbMaterialRepository> logger, IOptions<MaterialsOptions> options) : IMaterialRepository
+public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, ILogger<DynamoDbMaterialRepository> logger, IOptions<MaterialsOptions> options) : IMaterialRepository
 {
     private readonly ILogger<DynamoDbMaterialRepository> _logger = logger;
     private readonly MaterialsOptions _options = options.Value;
-    private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllAsync] Listing materials (Limit: {Limit}, Cursor: {Cursor})")]
-    private partial void LogListingMaterials(int limit, string? cursor);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "[GetAllAsync] Failed to list materials: {Error}")]
-    private partial void LogListingMaterialsError(string error);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetCountAsync] Count: {Count}")]
-    private partial void LogCount(int count);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetUniqueComponentsAsync] Found {Count} unique components")]
-    private partial void LogUniqueComponents(int count);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "[SaveAsync] Saving material {MaterialId}")]
-    private partial void LogSavingMaterial(string materialId);
 
     public async Task<Result<PagedResult<MaterialFormulation>>> GetAllAsync(int limit, string? cursor)
     {
@@ -68,9 +52,10 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
             var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
 
             items.AddRange(dynamoItems
-                .Select(item => context.FromDocument<MaterialEntity>(Document.FromAttributeMap(item)))
+                .Select(item => Document.FromAttributeMap(item).ToJson())
+                .Select(json => JsonSerializer.Deserialize<MaterialEntity>(json))
                 .Where(entity => entity is not null)
-                .Select(MapToDomain));
+                .Select(entity => MapToDomain(entity!)));
 
             string? nextCursor = null;
             if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
@@ -93,11 +78,27 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
     {
         try
         {
-#pragma warning disable CS0618 // Type or member is obsolete
-            var entity = await context.LoadAsync<MaterialEntity>(materialId, _dynamoConfig);
-#pragma warning restore CS0618 // Type or member is obsolete
-            return entity is null 
-                ? Result.Failure<MaterialFormulation>(Error.NotFound) 
+            var request = new GetItemRequest
+            {
+                TableName = _options.TableName,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    { "material_id", new AttributeValue { S = materialId } }
+                }
+            };
+
+            var response = await client.GetItemAsync(request);
+
+            if (response.Item == null || response.Item.Count == 0)
+            {
+                return Result.Failure<MaterialFormulation>(Error.NotFound);
+            }
+
+            var itemDocument = Document.FromAttributeMap(response.Item);
+            var entity = JsonSerializer.Deserialize<MaterialEntity>(itemDocument.ToJson());
+
+            return entity is null
+                ? Result.Failure<MaterialFormulation>(Error.NotFound)
                 : Result.Success(MapToDomain(entity));
         }
         catch (Exception ex)
@@ -183,9 +184,9 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
             foreach (var item in dynamoItems)
             {
                 var doc = Document.FromAttributeMap(item);
-                var entity = context.FromDocument<MaterialEntity>(doc);
+                var entity = JsonSerializer.Deserialize<MaterialEntity>(doc.ToJson());
                 
-                if (entity.Formulation != null)
+                if (entity?.Formulation != null)
                 {
                     var components = entity.Formulation
                         .Select(f => f.Component)
@@ -217,9 +218,16 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
         {
             LogSavingMaterial(material.MaterialId);
             var entity = MapToEntity(material);
-#pragma warning disable CS0618 // Type or member is obsolete
-            await context.SaveAsync(entity, _dynamoConfig);
-#pragma warning restore CS0618 // Type or member is obsolete
+            var json = JsonSerializer.Serialize(entity);
+            var itemDocument = Document.FromJson(json);
+
+            var request = new PutItemRequest
+            {
+                TableName = _options.TableName,
+                Item = itemDocument.ToAttributeMap()
+            };
+
+            await client.PutItemAsync(request);
             return Result.Success();
         }
         catch (Exception ex)
@@ -232,9 +240,16 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
     {
         try
         {
-#pragma warning disable CS0618 // Type or member is obsolete
-            await context.DeleteAsync<MaterialEntity>(materialId, _dynamoConfig);
-#pragma warning restore CS0618 // Type or member is obsolete
+            var request = new DeleteItemRequest
+            {
+                TableName = _options.TableName,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    { "material_id", new AttributeValue { S = materialId } }
+                }
+            };
+
+            await client.DeleteItemAsync(request);
             return Result.Success();
         }
         catch (Exception ex)
@@ -276,4 +291,19 @@ public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context,
             Version = domain.Version
         };
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllAsync] Listing materials (Limit: {limit}, Cursor: {cursor})")]
+    private partial void LogListingMaterials(int limit, string? cursor);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "[GetAllAsync] Failed to list materials: {error}")]
+    private partial void LogListingMaterialsError(string error);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetCountAsync] Count: {count}")]
+    private partial void LogCount(int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetUniqueComponentsAsync] Found {count} unique components")]
+    private partial void LogUniqueComponents(int count);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "[SaveAsync] Saving material {materialId}")]
+    private partial void LogSavingMaterial(string materialId);
 }
