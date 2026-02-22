@@ -15,9 +15,9 @@ A microservices-based proof-of-concept for managing material formulations, built
 docker compose up -d
 ```
 
-### 3. Deploy Services (LocalStack)
+### 3. Deploy Services (LocalStack via Terraform)
 ```bash
-./deployment/localstack/deploy-all.ps1
+python deployment/localstack/deploy_all_terraform.py
 ```
 
 ### 4. Verify APIs
