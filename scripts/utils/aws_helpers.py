@@ -37,14 +37,17 @@ def validate_aws_connection():
         return False
 
 def get_common_env_vars():
-    return {
+    env_vars = {
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318",
         "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "FeatureFlags__UnleashApiUrl": "http://unleash:4242/api/",
         "AWS_REGION": AWS_REGION,
         "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
-        "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY
+        "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
+        "AWS_ENDPOINT_URL": "http://localstack:4566" # Explicitly point to LocalStack internal URL
     }
+    write_log(f"DEBUG: Common Env Vars: {env_vars}", "INFO")
+    return env_vars
 
 def _retry_with_backoff(func, max_attempts=5, base_delay_seconds=0.5, operation_name="operation"):
     for attempt in range(1, max_attempts + 1):
@@ -129,6 +132,7 @@ def ensure_dynamodb_table(table_def):
 def ensure_lambda_function(name, handler, role_arn, zip_path, runtime="dotnet8", timeout=30, memory_size=1024, env_vars=None):
     lambda_client = get_boto3_client("lambda")
     write_log(f"Ensuring Lambda Function: {name}", "INFO")
+    write_log(f"DEBUG: Lambda Env Vars: {env_vars}", "INFO")
     
     with open(zip_path, 'rb') as f:
         zip_content = f.read()

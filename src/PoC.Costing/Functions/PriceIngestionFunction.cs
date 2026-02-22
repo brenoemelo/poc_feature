@@ -2,6 +2,7 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using System.Text.Json;
@@ -16,6 +17,8 @@ public sealed class PriceIngestionFunction
     public PriceIngestionFunction()
     {
         var builder = Host.CreateApplicationBuilder();
+        
+        builder.AddPoCObservability("PoC.Costing.PriceIngestion", "1.0.0");
 
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
@@ -65,8 +68,38 @@ public sealed class PriceIngestionFunction
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)
     {
+        // Filter out non-PriceUpdated events if possible via MessageAttributes
+        if (record.MessageAttributes.TryGetValue("EventType", out var eventTypeAttr))
+        {
+            if (!string.Equals(eventTypeAttr.StringValue, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("[PriceIngestion] Ignoring event type: {EventType}", eventTypeAttr.StringValue);
+                return;
+            }
+        }
+        else 
+        {
+            // If MessageAttributes is empty on the SQS record, it might be because the subscription didn't forward them.
+            // Or we need to look into the Body -> MessageAttributes (if raw delivery is disabled)
+            // But let's check the body first.
+        }
+
         using var doc = JsonDocument.Parse(record.Body);
         var root = doc.RootElement;
+
+        // Try to get MessageAttributes from the SNS body if not present in SQS record attributes
+        // Standard SNS to SQS JSON format: "MessageAttributes": { "Key": { "Type": "String", "Value": "..." } }
+        if (root.TryGetProperty("MessageAttributes", out var msgAttrs) && 
+            msgAttrs.TryGetProperty("EventType", out var eventTypeProp) &&
+            eventTypeProp.TryGetProperty("Value", out var eventTypeValue))
+        {
+             var eventType = eventTypeValue.GetString();
+             if (!string.Equals(eventType, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
+             {
+                 _logger.LogInformation("[PriceIngestion] Ignoring event type (from body): {EventType}", eventType);
+                 return;
+             }
+        }
 
         if (!root.TryGetProperty("Message", out var messageProperty))
         {

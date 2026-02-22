@@ -66,9 +66,12 @@ def deploy():
     # 6. Worker Lambda
     output_topic_arn = f"arn:aws:sns:{SERVICE_CONFIG['Region']}:000000000000:{SERVICE_CONFIG['OutputSnsTopic']}"
     
+    # Ensure Materials API URL uses localstack hostname for internal communication
+    materials_api_url = SERVICE_CONFIG['MaterialsApiUrl'].replace("localhost", "localstack")
+    
     worker_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['WorkerFunctionName'],
-        "MATERIALS_API_URL": SERVICE_CONFIG['MaterialsApiUrl'],
+        "MATERIALS_API_URL": materials_api_url,
         "Populator__MaterialsTableName": SERVICE_CONFIG['MaterialsTableName'],
         "Populator__PricesTableName": SERVICE_CONFIG['PricesTableName'],
         "Populator__OutputTopicArn": output_topic_arn,

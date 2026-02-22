@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using System.Text.Json;
@@ -25,6 +26,7 @@ public class PopulatorWorkerFunction
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
+            builder.AddPoCObservability("PoC.Populator.Worker", "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
@@ -200,7 +202,8 @@ public class PopulatorWorkerFunction
             var popContext = new PopulationContext 
             { 
                 HttpClient = client,
-                LogError = (msg, ex) => _logger.LogError(ex, msg)
+                LogError = (msg, ex) => _logger.LogError(ex, msg),
+                LogInformation = (msg) => _logger.LogInformation(msg)
             };
 
             var items = await strategy.GenerateAsync(job.BatchSize, popContext, job.MinComponents, job.MaxComponents);

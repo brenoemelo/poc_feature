@@ -2,6 +2,7 @@ using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using System.Text.Json;
 
@@ -17,6 +18,7 @@ public sealed class MaterialIngestionFunction
     {
         var builder = Host.CreateApplicationBuilder();
 
+        builder.AddPoCObservability("PoC.Materials.Ingestion", "1.0.0");
         builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
         var host = builder.Build();

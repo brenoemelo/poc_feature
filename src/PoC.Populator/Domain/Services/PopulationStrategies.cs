@@ -12,6 +12,7 @@ public class PopulationContext
 {
     public HttpClient HttpClient { get; set; } = null!;
     public Action<string, Exception?>? LogError { get; set; }
+    public Action<string>? LogInformation { get; set; }
 }
 
 public interface IPopulationStrategy
@@ -77,14 +78,42 @@ public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> op
     public async Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
         var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-        var url = "api/v1/materials/components";
+        var baseUrl = "api/v1/materials/components";
         
         try
         {
-            // Fetch unique components from the new endpoint
-            var response = await context.HttpClient.GetFromJsonAsync<ApiResponse<IEnumerable<string>>>(url, jsonOptions);
+            var uniqueComponents = new HashSet<string>();
+            string? cursor = null;
+            int pageCount = 0;
             
-            if (response?.Data == null || !response.Data.Any())
+            do
+            {
+                pageCount++;
+                var url = $"{baseUrl}?limit=100";
+                if (!string.IsNullOrEmpty(cursor))
+                {
+                    url += $"&cursor={Uri.EscapeDataString(cursor)}";
+                }
+
+                context.LogInformation?.Invoke($"Fetching components page {pageCount}...");
+                var response = await context.HttpClient.GetFromJsonAsync<PagedResponse<string>>(url, jsonOptions);
+                
+                if (response?.Data != null)
+                {
+                    foreach (var component in response.Data)
+                    {
+                        uniqueComponents.Add(component);
+                    }
+                    context.LogInformation?.Invoke($"Page {pageCount}: Found {response.Data.Count()} components. Total unique: {uniqueComponents.Count}");
+                }
+                
+                cursor = response?.Meta?.NextCursor;
+            }
+            while (!string.IsNullOrEmpty(cursor));
+            
+            context.LogInformation?.Invoke($"Finished fetching components. Total unique: {uniqueComponents.Count}");
+
+            if (!uniqueComponents.Any())
             {
                 return Enumerable.Empty<object>();
             }
@@ -92,7 +121,7 @@ public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> op
             var faker = new Faker();
             var prices = new List<object>();
 
-            foreach (var componentName in response.Data)
+            foreach (var componentName in uniqueComponents)
             {
                 var price = new ComponentPriceRequest(
                     ComponentName: componentName,
@@ -106,7 +135,7 @@ public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> op
         }
         catch (Exception ex)
         {
-            context.LogError?.Invoke($"Failed to fetch unique components from {url}", ex);
+            context.LogError?.Invoke($"Failed to fetch unique components from {baseUrl}", ex);
             return Enumerable.Empty<object>();
         }
     }

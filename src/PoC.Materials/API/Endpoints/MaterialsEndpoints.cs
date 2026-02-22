@@ -26,7 +26,7 @@ public static class MaterialsEndpoints
         group.MapGet("/components", GetUniqueComponentsAsync)
              .WithName("GetUniqueComponents")
              .WithFeatureGate("view-all-components")
-             .Produces<ApiResponse<IEnumerable<string>>>();
+             .Produces<PagedResponse<string>>();
 
         group.MapGet("/{id}", GetMaterialByIdAsync)
              .WithName("GetMaterialById")
@@ -94,10 +94,12 @@ public static class MaterialsEndpoints
         IMaterialRepository repository,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
-        ILogger<Program> logger)
+        ILogger<Program> logger,
+        int limit = 10,
+        string? cursor = null)
     {
-        logger.LogInformation("[MaterialQuery] Retrieving unique components");
-        var result = await repository.GetUniqueComponentsAsync();
+        logger.LogInformation("[MaterialQuery] Retrieving unique components (Limit: {Limit}, Cursor: {Cursor})", limit, cursor);
+        var result = await repository.GetUniqueComponentsAsync(limit, cursor);
 
         if (result.IsFailure)
         {
@@ -105,11 +107,7 @@ public static class MaterialsEndpoints
             return result.ToProblem();
         }
 
-        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetUniqueComponents") ?? "/api/v1/materials/components";
-        var response = new ApiResponse<IEnumerable<string>>(
-            result.Value,
-            [new Link("self", selfUrl, "GET")]);
-
+        var response = result.Value.ToPagedResponse(httpContext, linkGenerator, "GetUniqueComponents", limit, cursor);
         return Results.Ok(response);
     }
 
