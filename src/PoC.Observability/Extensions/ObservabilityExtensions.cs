@@ -3,11 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
-// using OpenTelemetry.Instrumentation.AWSLambda;
+using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Extensions.AWS.Trace;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using PoC.Observability.Configuration;
 using PoC.Observability.Diagnostics;
 
 namespace PoC.Observability.Extensions;
@@ -37,6 +39,7 @@ public static class ObservabilityExtensions
             logger?.LogWarning(ex, "Failed to flush OpenTelemetry providers.");
         }
     }
+
     public static IServiceCollection AddStartUpMetrics(this IServiceCollection services)
     {
         services.AddSingleton<StartupTimer>();
@@ -52,7 +55,30 @@ public static class ObservabilityExtensions
         string serviceName,
         string serviceVersion)
     {
-        ConfigureObservability(builder.Services, builder.Logging, serviceName, serviceVersion);
+        return builder.AddPoCObservability(options =>
+        {
+            options.ServiceName = serviceName;
+            options.ServiceVersion = serviceVersion;
+            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+            options.Environment = builder.Environment.EnvironmentName;
+            options.ExportToConsole = builder.Environment.IsDevelopment();
+        });
+    }
+
+    /// <summary>
+    /// Configures OpenTelemetry Observability (Logging, Tracing, Metrics) for Web Applications with custom options.
+    /// </summary>
+    public static WebApplicationBuilder AddPoCObservability(
+        this WebApplicationBuilder builder,
+        Action<ObservabilityOptions> configureOptions)
+    {
+        // ServiceName is required, so we initialize with a placeholder that must be overwritten or we check it later.
+        // However, since we are creating the object here, the caller must set it via the Action.
+        // To satisfy the 'required' modifier, we provide a default which the caller should override.
+        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        configureOptions(options);
+
+        ConfigureObservability(builder.Services, builder.Logging, options);
         return builder;
     }
 
@@ -64,33 +90,79 @@ public static class ObservabilityExtensions
         string serviceName,
         string serviceVersion)
     {
-        ConfigureObservability(builder.Services, builder.Logging, serviceName, serviceVersion);
+        return builder.AddPoCObservability(options =>
+        {
+            options.ServiceName = serviceName;
+            options.ServiceVersion = serviceVersion;
+            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+            options.Environment = builder.Environment.EnvironmentName;
+            options.ExportToConsole = builder.Environment.IsDevelopment();
+        });
+    }
+
+    /// <summary>
+    /// Configures OpenTelemetry Observability (Logging, Tracing, Metrics) for Worker/Lambda Hosts with custom options.
+    /// </summary>
+    public static HostApplicationBuilder AddPoCObservability(
+        this HostApplicationBuilder builder,
+        Action<ObservabilityOptions> configureOptions)
+    {
+        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        configureOptions(options);
+
+        ConfigureObservability(builder.Services, builder.Logging, options);
         return builder;
     }
 
     private static void ConfigureObservability(
         IServiceCollection services,
         ILoggingBuilder loggingBuilder,
-        string serviceName,
-        string serviceVersion)
+        ObservabilityOptions options)
     {
-        var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
-
         // 0. Add Startup Metrics
         services.AddStartUpMetrics();
 
-        // 1. Definir o Resource Builder centralizado para garantir metadados idênticos em Logs, Metrics e Traces
+        // 1. Define Resource Builder
         var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService(serviceName: serviceName, serviceVersion: serviceVersion);
+            .AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion)
+            .AddAttributes(new Dictionary<string, object>
+            {
+                ["deployment.environment"] = options.Environment,
+                ["cloud.provider"] = "aws"
+            })
+            .AddAWSEC2Detector() // Requires OpenTelemetry.Resources.AWS
+            .AddTelemetrySdk();
 
-        // 2. Configure Logging (Substituindo o Serilog pelo ILogger Nativo Integrado ao OTel)
-        // loggingBuilder.ClearProviders(); // Keep default providers (Console) for debugging in Lambda
+        // 2. Configure Logging
         loggingBuilder.AddOpenTelemetry(logging =>
         {
             logging.SetResourceBuilder(resourceBuilder);
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
-            logging.AddOtlpExporter();
+            logging.ParseStateValues = true;
+
+            if (!string.IsNullOrEmpty(options.OtlpEndpoint))
+            {
+                logging.AddOtlpExporter(otlp =>
+                {
+                    otlp.Endpoint = new Uri(options.OtlpEndpoint);
+                    otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                });
+            }
+
+            if (options.ExportToConsole)
+            {
+                // We don't add ConsoleExporter to OTel logging because we will use the native JsonConsole below
+                // logging.AddConsoleExporter(); 
+            }
+        });
+
+        // Configure JsonConsole as the standard output format
+        loggingBuilder.AddJsonConsole(json =>
+        {
+            json.IncludeScopes = true;
+            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
         });
 
         // 3. Configure OpenTelemetry (Tracing & Metrics)
@@ -98,51 +170,60 @@ public static class ObservabilityExtensions
             .WithTracing(tracing =>
             {
                 tracing
+                    .AddXRayTraceId() // Requires OpenTelemetry.Extensions.AWS
                     .SetResourceBuilder(resourceBuilder)
-                    .AddSource(serviceName)
+                    .AddSource(options.ServiceName)
+                    .AddAspNetCoreInstrumentation(o => o.RecordException = true)
                     .AddHttpClientInstrumentation()
-                    .AddAspNetCoreInstrumentation();
-                    //.AddAWSInstrumentation(); // Habilitado: Essencial para propagar contexto no SQS, SNS e S3
+                    .AddAWSInstrumentation() // Requires OpenTelemetry.Instrumentation.AWS
+                    .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true);
 
-                if (isLambda)
+                if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {
-                    /*
-                    tracing.AddAWSLambdaConfigurations(options =>
+                    tracing.AddOtlpExporter(otlp =>
                     {
-                        options.DisableAwsXRayContextExtraction = true; // Use OTel W3C propagation
+                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
+                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
                     });
-                    */
                 }
 
-                tracing.AddOtlpExporter(options =>
+                if (options.ExportToConsole)
                 {
-                    if (isLambda)
-                    {
-                        // Em Lambdas, o processador "Simple" garante o envio imediato para o sidecar
-                        // antes que a AWS congele o ambiente de execução.
-                        options.ExportProcessorType = ExportProcessorType.Simple;
-                    }
-                });
+                    tracing.AddConsoleExporter();
+                }
             })
             .WithMetrics(metrics =>
             {
                 metrics
                     .SetResourceBuilder(resourceBuilder)
+                    .AddMeter(options.ServiceName)
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddMeter(serviceName) // Métricas de Negócio
-                    .AddMeter("app.startup") // Métricas de Startup
-                    .AddConsoleExporter() // Debug: Ver se métricas são geradas
-                    .AddOtlpExporter(options =>
+                    .AddMeter("System.Net.Http")
+                    .AddMeter("OpenTelemetry.Instrumentation.Http");
+
+                if (!string.IsNullOrEmpty(options.OtlpEndpoint))
+                {
+                    metrics.AddOtlpExporter(otlp =>
                     {
-                        if (isLambda)
-                    {
-                        // Para Lambda, usamos o endpoint HTTP/Protobuf para evitar problemas com gRPC
-                        // A configuração vem das variáveis de ambiente (OTEL_EXPORTER_OTLP_ENDPOINT/PROTOCOL)
-                        options.ExportProcessorType = ExportProcessorType.Simple;
-                    }
+                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
+                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
                     });
+                }
+
+                if (options.ExportToConsole)
+                {
+                    metrics.AddConsoleExporter();
+                }
             });
+
+        // 4. Configure Propagators (W3C + X-Ray + Baggage)
+        Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(new TextMapPropagator[]
+        {
+            new TraceContextPropagator(), // W3C Standard
+            new AWSXRayPropagator(),       // AWS X-Ray Specific
+            new BaggagePropagator()       // Arbitrary Metadata
+        }));
     }
 }

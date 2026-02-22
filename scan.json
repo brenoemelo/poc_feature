@@ -1,0 +1,55 @@
+﻿{
+    "Items": [
+        {
+            "density": {
+                "M": {
+                    "value": {
+                        "N": "1.5"
+                    },
+                    "unit": {
+                        "S": "g/cm3"
+                    }
+                }
+            },
+            "Version": {
+                "N": "0"
+            },
+            "formulation": {
+                "L": [
+                    {
+                        "M": {
+                            "type": {
+                                "S": "Liquid"
+                            },
+                            "component": {
+                                "S": "Water"
+                            },
+                            "percentage": {
+                                "N": "100"
+                            }
+                        }
+                    }
+                ]
+            },
+            "name": {
+                "S": "Test Material test-mat-74711d24-db5e-43a9-981a-ed2fddb26641"
+            },
+            "material_id": {
+                "S": "test-mat-74711d24-db5e-43a9-981a-ed2fddb26641"
+            },
+            "properties": {
+                "M": {
+                    "test_prop": {
+                        "S": "test_value"
+                    }
+                }
+            },
+            "record_type": {
+                "S": "MATERIAL"
+            }
+        }
+    ],
+    "Count": 1,
+    "ScannedCount": 1,
+    "ConsumedCapacity": null
+}

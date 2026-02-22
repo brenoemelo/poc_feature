@@ -10,6 +10,7 @@ using PoC.Costing.Functions;
 using PoC.Costing.Infrastructure;
 using PoC.Costing.Infrastructure.ExternalServices;
 using PoC.FeatureFlags.Extensions;
+using PoC.Observability.Extensions;
 using PoC.Shared.Validators;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
@@ -33,6 +34,9 @@ public class Program
         }
 
         var builder = WebApplication.CreateBuilder();
+        
+        // Add Observability (Logging, Tracing, Metrics)
+        builder.AddPoCObservability("PoC.Costing", "1.0.0");
 
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 

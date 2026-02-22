@@ -4,6 +4,7 @@ using Amazon.Lambda.RuntimeSupport;
 using Amazon.Lambda.Serialization.SystemTextJson;
 using Amazon.Lambda.SQSEvents;
 using PoC.FeatureFlags.Extensions;
+using PoC.Observability.Extensions;
 using PoC.Populator.API.Endpoints;
 using PoC.Populator.Functions;
 using PoC.Populator.Infrastructure;
@@ -39,6 +40,9 @@ public class Program
         }
 
         var builder = WebApplication.CreateBuilder();
+
+        // Add Observability (Logging, Tracing, Metrics)
+        builder.AddPoCObservability("PoC.Populator", "1.0.0");
 
         // Observability (Native OTel + ILogger)
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);

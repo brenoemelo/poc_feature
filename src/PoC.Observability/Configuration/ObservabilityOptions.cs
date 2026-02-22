@@ -1,4 +1,3 @@
-
 namespace PoC.Observability.Configuration;
 
 /// <summary>
@@ -22,7 +21,12 @@ public class ObservabilityOptions
     public string? OtlpEndpoint { get; set; }
 
     /// <summary>
+    /// The deployment environment (e.g., "Production", "Development").
+    /// </summary>
+    public string Environment { get; set; } = "Development";
+
+    /// <summary>
     /// Whether to enable console logging (useful for local debugging).
     /// </summary>
-    public bool EnableConsoleLogging { get; set; } = true;
+    public bool ExportToConsole { get; set; } = true;
 }

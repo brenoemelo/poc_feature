@@ -42,9 +42,13 @@ def deploy():
     
     # 4. Main Lambda (API)
     common_env = aws_helpers.get_common_env_vars()
+    
+    # Ensure Materials API URL uses localstack hostname for internal communication
+    materials_api_url = SERVICE_CONFIG['MaterialsApiUrl'].replace("localhost", "localstack")
+    
     main_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['Name'],
-        "MATERIALS_API_URL": SERVICE_CONFIG['MaterialsApiUrl'],
+        "MATERIALS_API_URL": materials_api_url,
         "Costing__TableName": SERVICE_CONFIG['DynamoTable'],
         **common_env
     }

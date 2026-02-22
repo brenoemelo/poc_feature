@@ -32,22 +32,26 @@ public static class DependencyInjection
             }
         });
 
-        var sp = services.BuildServiceProvider();
-        var opts = sp.GetRequiredService<IOptions<PopulatorOptions>>().Value;
-
-        var sqsConfig = new AmazonSQSConfig
+        services.AddSingleton<IAmazonSQS>(sp =>
         {
-            ServiceURL = opts.QueueUrl.Substring(0, opts.QueueUrl.IndexOf("/000000000000", StringComparison.Ordinal)), // Extract base URL
-            AuthenticationRegion = "us-east-1"
-        };
+            var opts = sp.GetRequiredService<IOptions<PopulatorOptions>>().Value;
+            var sqsConfig = new AmazonSQSConfig
+            {
+                ServiceURL = opts.QueueUrl.Substring(0, opts.QueueUrl.IndexOf("/000000000000", StringComparison.Ordinal)), // Extract base URL
+                AuthenticationRegion = "us-east-1"
+            };
+            
+            // Fallback if substring fails
+            if (string.IsNullOrEmpty(sqsConfig.ServiceURL))
+            {
+                 sqsConfig.ServiceURL = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? "http://localhost:4566";
+            }
+            return new AmazonSQSClient(sqsConfig);
+        });
         
-        // Fallback if substring fails (e.g. if URL doesn't contain account ID standard format)
-        if (string.IsNullOrEmpty(sqsConfig.ServiceURL))
-        {
-             sqsConfig.ServiceURL = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? "http://localhost:4566";
-        }
-
-        services.AddSingleton<IAmazonSQS>(sp => new AmazonSQSClient(sqsConfig));
+        services.AddSingleton<MaterialPopulationStrategy>();
+        services.AddSingleton<PricePopulationStrategy>();
+        services.AddSingleton<EnsurePricesPopulationStrategy>();
         
         services.AddScoped<IPopulationService, PopulationService>();
 

@@ -6,9 +6,22 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger, IOptions<CostingOptions> options) : ICostingRepository
+public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger, IOptions<CostingOptions> options) : ICostingRepository
 {
+    private readonly ILogger<DynamoDbCostingRepository> _logger = logger;
     private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "[UpsertPrice] Processing {ComponentName}. Existing: {Exists}, Version: {Version}")]
+    private partial void LogUpsertPriceProcessing(string componentName, bool exists, int? version);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesAsync] Requested: {Requested}. Found: {Found}")]
+    private partial void LogGetPricesRequested(string requested, int found);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllPricesAsync] Found: {Found}")]
+    private partial void LogGetAllPricesFound(int found);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesCountAsync] Count: {Count}")]
+    private partial void LogGetPricesCount(int count);
 
     public async Task<Result> UpsertPriceAsync(ComponentPriceRequest request)
     {
@@ -17,7 +30,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName, _dynamoConfig);
             var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
 
-            logger.LogDebug("[UpsertPrice] Processing {ComponentName}. Existing: {Exists}, Version: {Version}", request.ComponentName, existing != null, existing?.Version);
+            LogUpsertPriceProcessing(request.ComponentName, existing != null, existing?.Version);
 
             entity.UnitPrice = request.UnitPrice;
             entity.Unit = request.Unit;
@@ -58,7 +71,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
 
             await batch.ExecuteAsync();
 
-            logger.LogInformation("[GetPricesAsync] Requested: {Requested}. Found: {Found}", string.Join(",", componentNames), batch.Results.Count);
+            LogGetPricesRequested(string.Join(",", componentNames), batch.Results.Count);
 
             var result = batch.Results.ToDictionary(
                 p => p.ComponentName,
@@ -81,7 +94,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
             var prices = await search.GetRemainingAsync();
             
-            logger.LogInformation("[GetAllPricesAsync] Found: {Found}", prices.Count);
+            LogGetAllPricesFound(prices.Count);
 
             var result = prices.Select(p => new ComponentPriceResponse(
                 p.ComponentName,
@@ -110,7 +123,7 @@ public sealed class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<
             var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
             var count = await search.GetRemainingAsync();
             
-            logger.LogInformation("[GetPricesCountAsync] Count: {Count}", count.Count);
+            LogGetPricesCount(count.Count);
             
             return Result.Success(count.Count);
         }

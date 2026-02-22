@@ -10,15 +10,32 @@ using System.Text;
 
 namespace PoC.Materials.Infrastructure.Persistence;
 
-public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client, IOptions<MaterialsOptions> options) : IMaterialRepository
+public sealed partial class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazonDynamoDB client, ILogger<DynamoDbMaterialRepository> logger, IOptions<MaterialsOptions> options) : IMaterialRepository
 {
+    private readonly ILogger<DynamoDbMaterialRepository> _logger = logger;
     private readonly MaterialsOptions _options = options.Value;
     private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllAsync] Listing materials (Limit: {Limit}, Cursor: {Cursor})")]
+    private partial void LogListingMaterials(int limit, string? cursor);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "[GetAllAsync] Failed to list materials: {Error}")]
+    private partial void LogListingMaterialsError(string error);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetCountAsync] Count: {Count}")]
+    private partial void LogCount(int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetUniqueComponentsAsync] Found {Count} unique components")]
+    private partial void LogUniqueComponents(int count);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "[SaveAsync] Saving material {MaterialId}")]
+    private partial void LogSavingMaterial(string materialId);
 
     public async Task<Result<PagedResult<MaterialFormulation>>> GetAllAsync(int limit, string? cursor)
     {
         try
         {
+            LogListingMaterials(limit, cursor);
             var tableName = _options.TableName;
             var request = new QueryRequest
             {
@@ -67,6 +84,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
         }
         catch (Exception ex)
         {
+            LogListingMaterialsError(ex.Message);
             return Result.Failure<PagedResult<MaterialFormulation>>(new Error("DynamoDb.Error", ex.Message));
         }
     }
@@ -75,7 +93,9 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
     {
         try
         {
-            var entity = await context.LoadAsync<MaterialEntity>(materialId);
+#pragma warning disable CS0618 // Type or member is obsolete
+            var entity = await context.LoadAsync<MaterialEntity>(materialId, _dynamoConfig);
+#pragma warning restore CS0618 // Type or member is obsolete
             return entity is null 
                 ? Result.Failure<MaterialFormulation>(Error.NotFound) 
                 : Result.Success(MapToDomain(entity));
@@ -116,6 +136,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
                 currentKey = response.LastEvaluatedKey;
             }
             while (currentKey != null && currentKey.Count > 0);
+            LogCount((int)totalCount);
             return Result.Success((int)totalCount);
         }
         catch (Exception ex)
@@ -124,7 +145,7 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
         }
     }
 
-    public async Task<Result<IEnumerable<string>>> GetUniqueComponentsAsync()
+    public async Task<Result<PagedResult<string>>> GetUniqueComponentsAsync(int limit, string? cursor)
     {
         try
         {
@@ -137,40 +158,56 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
                 ExpressionAttributeValues = new Dictionary<string, AttributeValue> 
                 {
                     { ":v_type", new AttributeValue { S = "MATERIAL" } }
-                }
+                },
+                Limit = limit
             };
 
-            var uniqueComponents = new HashSet<string>();
-            Dictionary<string, AttributeValue>? lastKey = null;
-
-            do
+            if (!string.IsNullOrEmpty(cursor))
             {
-                request.ExclusiveStartKey = lastKey;
-                var response = await client.QueryAsync(request);
-                var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
-                foreach (var item in dynamoItems)
+                try
                 {
-                    var doc = Document.FromAttributeMap(item);
-                    var entity = context.FromDocument<MaterialEntity>(doc);
-                    
-                    if (entity.Formulation != null)
-                    {
-                        var components = entity.Formulation
-                            .Select(f => f.Component)
-                            .Where(c => !string.IsNullOrWhiteSpace(c));
-                        uniqueComponents.UnionWith(components);
-                    }
+                    var json = Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
+                    var doc = Document.FromJson(json);
+                    request.ExclusiveStartKey = doc.ToAttributeMap();
                 }
-                
-                lastKey = response.LastEvaluatedKey;
-            } 
-            while (lastKey != null && lastKey.Count > 0);
+                catch
+                {
+                    return Result.Failure<PagedResult<string>>(new Error("Pagination.InvalidCursor", "The provided cursor is invalid."));
+                }
+            }
 
-            return Result.Success<IEnumerable<string>>(uniqueComponents);
+            var response = await client.QueryAsync(request);
+            var uniqueComponents = new HashSet<string>();
+            var dynamoItems = response.Items ?? new List<Dictionary<string, AttributeValue>>();
+
+            foreach (var item in dynamoItems)
+            {
+                var doc = Document.FromAttributeMap(item);
+                var entity = context.FromDocument<MaterialEntity>(doc);
+                
+                if (entity.Formulation != null)
+                {
+                    var components = entity.Formulation
+                        .Select(f => f.Component)
+                        .Where(c => !string.IsNullOrWhiteSpace(c));
+                    uniqueComponents.UnionWith(components);
+                }
+            }
+            
+            string? nextCursor = null;
+            if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
+            {
+                var lastKeyDoc = Document.FromAttributeMap(response.LastEvaluatedKey);
+                var json = lastKeyDoc.ToJson();
+                nextCursor = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            }
+
+            LogUniqueComponents(uniqueComponents.Count);
+            return Result.Success(new PagedResult<string>(uniqueComponents, nextCursor));
         }
         catch (Exception ex)
         {
-            return Result.Failure<IEnumerable<string>>(new Error("DynamoDb.Error", ex.Message));
+            return Result.Failure<PagedResult<string>>(new Error("DynamoDb.Error", ex.Message));
         }
     }
 
@@ -178,10 +215,11 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
     {
         try
         {
-            // Optimistic Locking: We trust DynamoDBContext to handle the Version check.
-            // We do NOT manually copy the version unless we want to force an overwrite (which we don't).
+            LogSavingMaterial(material.MaterialId);
             var entity = MapToEntity(material);
+#pragma warning disable CS0618 // Type or member is obsolete
             await context.SaveAsync(entity, _dynamoConfig);
+#pragma warning restore CS0618 // Type or member is obsolete
             return Result.Success();
         }
         catch (Exception ex)
@@ -194,7 +232,9 @@ public sealed class DynamoDbMaterialRepository(IDynamoDBContext context, IAmazon
     {
         try
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             await context.DeleteAsync<MaterialEntity>(materialId, _dynamoConfig);
+#pragma warning restore CS0618 // Type or member is obsolete
             return Result.Success();
         }
         catch (Exception ex)

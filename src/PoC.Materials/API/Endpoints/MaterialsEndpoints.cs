@@ -9,8 +9,44 @@ using PoC.Shared.Models;
 
 namespace PoC.Materials.API.Endpoints;
 
-public static class MaterialsEndpoints
+public static partial class MaterialsEndpoints
 {
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Listing materials (Limit: {Limit}, Cursor: {Cursor})")]
+    private static partial void LogListingMaterials(ILogger logger, int limit, string? cursor);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialQuery] Failed to list materials: {Error} - {Detail}")]
+    private static partial void LogListingMaterialsFailed(ILogger logger, string error, string detail);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Counting materials")]
+    private static partial void LogCountingMaterials(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Retrieving unique components (Limit: {Limit}, Cursor: {Cursor})")]
+    private static partial void LogRetrievingComponents(ILogger logger, int limit, string? cursor);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialQuery] Failed to retrieve components: {Error} - {Detail}")]
+    private static partial void LogRetrievingComponentsFailed(ILogger logger, string error, string detail);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Getting material {MaterialId}")]
+    private static partial void LogGettingMaterial(ILogger logger, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialQuery] Failed to get material {MaterialId}: {Error} - {Detail}")]
+    private static partial void LogGettingMaterialFailed(ILogger logger, string materialId, string error, string detail);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialCreation] Processing material: {Name} ({MaterialId})")]
+    private static partial void LogProcessingMaterial(ILogger logger, string name, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialCreation] Validation failed for {MaterialId}")]
+    private static partial void LogValidationFailed(ILogger logger, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialCreation] Successfully saved material {MaterialId}")]
+    private static partial void LogMaterialSaved(ILogger logger, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialDeletion] Deletion requested for {MaterialId}")]
+    private static partial void LogDeletionRequested(ILogger logger, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialDeletion] Material {MaterialId} not found")]
+    private static partial void LogMaterialNotFound(ILogger logger, string materialId);
+
     public static RouteGroupBuilder MapMaterialsEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", GetAllMaterialsAsync)
@@ -26,7 +62,7 @@ public static class MaterialsEndpoints
         group.MapGet("/components", GetUniqueComponentsAsync)
              .WithName("GetUniqueComponents")
              .WithFeatureGate("view-all-components")
-             .Produces<ApiResponse<IEnumerable<string>>>();
+             .Produces<PagedResponse<string>>();
 
         group.MapGet("/{id}", GetMaterialByIdAsync)
              .WithName("GetMaterialById")
@@ -57,12 +93,12 @@ public static class MaterialsEndpoints
         int limit = 10,
         string? cursor = null)
     {
-        logger.LogInformation("[MaterialQuery] Listing materials (Limit: {Limit}, Cursor: {Cursor})", limit, cursor);
+        LogListingMaterials(logger, limit, cursor);
         var result = await repository.GetAllAsync(limit, cursor);
         
         if (result.IsFailure)
         {
-            logger.LogError("[MaterialQuery] Failed to list materials: {Error} - {Detail}", result.Error.Code, result.Error.Description);
+            LogListingMaterialsFailed(logger, result.Error.Code, result.Error.Description);
             return result.ToProblem();
         }
 
@@ -76,7 +112,7 @@ public static class MaterialsEndpoints
         LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
-        logger.LogInformation("[MaterialQuery] Counting materials");
+        LogCountingMaterials(logger);
         var result = await repository.GetCountAsync();
 
         if (result.IsFailure)
@@ -94,22 +130,20 @@ public static class MaterialsEndpoints
         IMaterialRepository repository,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
-        ILogger<Program> logger)
+        ILogger<Program> logger,
+        int limit = 10,
+        string? cursor = null)
     {
-        logger.LogInformation("[MaterialQuery] Retrieving unique components");
-        var result = await repository.GetUniqueComponentsAsync();
+        LogRetrievingComponents(logger, limit, cursor);
+        var result = await repository.GetUniqueComponentsAsync(limit, cursor);
 
         if (result.IsFailure)
         {
-            logger.LogError("[MaterialQuery] Failed to retrieve components: {Error} - {Detail}", result.Error.Code, result.Error.Description);
+            LogRetrievingComponentsFailed(logger, result.Error.Code, result.Error.Description);
             return result.ToProblem();
         }
 
-        var selfUrl = linkGenerator.GetUriByName(httpContext, "GetUniqueComponents") ?? "/api/v1/materials/components";
-        var response = new ApiResponse<IEnumerable<string>>(
-            result.Value,
-            [new Link("self", selfUrl, "GET")]);
-
+        var response = result.Value.ToPagedResponse(httpContext, linkGenerator, "GetUniqueComponents", limit, cursor);
         return Results.Ok(response);
     }
 
@@ -120,12 +154,12 @@ public static class MaterialsEndpoints
         LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
-        logger.LogInformation("[MaterialQuery] Getting material {MaterialId}", id);
+        LogGettingMaterial(logger, id);
         var result = await repository.GetByIdAsync(id);
 
         if (result.IsFailure)
         {
-            logger.LogWarning("[MaterialQuery] Failed to get material {MaterialId}: {Error} - {Detail}", id, result.Error.Code, result.Error.Description);
+            LogGettingMaterialFailed(logger, id, result.Error.Code, result.Error.Description);
             return result.ToProblem();
         }
 
@@ -149,17 +183,14 @@ public static class MaterialsEndpoints
         LinkGenerator linkGenerator,
         ILogger<Program> logger)
     {
-        logger.LogInformation(
-            "[MaterialCreation] Processing material: {Name} ({MaterialId})",
-            input.Name,
-            input.MaterialId);
+        LogProcessingMaterial(logger, input.Name, input.MaterialId);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var validationResult = await validator.ValidateAsync(input);
         if (!validationResult.IsValid)
         {
-            logger.LogWarning("[MaterialCreation] Validation failed for {MaterialId}", input.MaterialId);
+            LogValidationFailed(logger, input.MaterialId);
             metrics.RecordIngestion("validation_failed");
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
@@ -176,7 +207,7 @@ public static class MaterialsEndpoints
         }
 
         metrics.RecordIngestion("success");
-        logger.LogInformation("[MaterialCreation] Successfully saved material {MaterialId}", input.MaterialId);
+        LogMaterialSaved(logger, input.MaterialId);
 
         var selfUrl = linkGenerator.GetUriByName(httpContext, "GetMaterialById", new { id = input.MaterialId })
                       ?? $"/api/v1/materials/{input.MaterialId}";
@@ -193,12 +224,12 @@ public static class MaterialsEndpoints
         IMaterialRepository repository,
         ILogger<Program> logger)
     {
-        logger.LogInformation("[MaterialDeletion] Deletion requested for {MaterialId}", id);
+        LogDeletionRequested(logger, id);
  
         var existingResult = await repository.GetByIdAsync(id);
         if (existingResult.IsFailure)
         {
-            logger.LogWarning("[MaterialDeletion] Material {MaterialId} not found", id);
+            LogMaterialNotFound(logger, id);
             return existingResult.ToProblem();
         }
 

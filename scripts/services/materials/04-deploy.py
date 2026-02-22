@@ -88,6 +88,7 @@ def deploy():
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['IngestionFunctionName'],
         **common_env
     }
+    aws_helpers.write_log(f"Ingestion Env Vars: {ingestion_env_vars}", "INFO")
 
     aws_helpers.ensure_lambda_function(
         name=SERVICE_CONFIG['IngestionFunctionName'],

@@ -10,8 +10,35 @@ using PoC.Shared.Models;
 
 namespace PoC.Costing.API.Endpoints;
 
-public static class CostingEndpoints
+public static partial class CostingEndpoints
 {
+    [LoggerMessage(Level = LogLevel.Information, Message = "Upserting price for component: {ComponentName}")]
+    private static partial void LogUpsertingPrice(ILogger logger, string componentName);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Retrieving all component prices")]
+    private static partial void LogRetrievingAllPrices(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Retrieving count of component prices")]
+    private static partial void LogRetrievingPricesCount(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Calculating cost for material: {MaterialId}")]
+    private static partial void LogCalculatingCost(ILogger logger, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Calculation success. TotalCost: {TotalCost}, BreakdownCount: {Count}")]
+    private static partial void LogCalculationSuccess(ILogger logger, decimal totalCost, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Starting bulk cost calculation for all materials")]
+    private static partial void LogStartingBulkCalculation(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to fetch materials")]
+    private static partial void LogFailedToFetchMaterials(ILogger logger, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping material {MaterialId}: {Error}")]
+    private static partial void LogSkippingMaterial(ILogger logger, string materialId, string error);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Batch cost calculation completed. Processed {Count} materials")]
+    private static partial void LogBatchCalculationCompleted(ILogger logger, int count);
+
     public static RouteGroupBuilder MapCostingEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/prices", UpsertPriceAsync)
@@ -51,7 +78,7 @@ public static class CostingEndpoints
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
-        logger.LogInformation("Upserting price for component: {ComponentName}", request.ComponentName);
+        LogUpsertingPrice(logger, request.ComponentName);
         var result = await repository.UpsertPriceAsync(request);
 
         if (result.IsFailure)
@@ -71,7 +98,7 @@ public static class CostingEndpoints
         LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
-        logger.LogInformation("Retrieving all component prices");
+        LogRetrievingAllPrices(logger);
         var result = await repository.GetAllPricesAsync();
 
         if (result.IsFailure)
@@ -91,7 +118,7 @@ public static class CostingEndpoints
         LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
-        logger.LogInformation("Retrieving count of component prices");
+        LogRetrievingPricesCount(logger);
         var result = await repository.GetPricesCountAsync();
 
         if (result.IsFailure)
@@ -120,7 +147,7 @@ public static class CostingEndpoints
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
-        logger.LogInformation("Calculating cost for material: {MaterialId}", request.MaterialId);
+        LogCalculatingCost(logger, request.MaterialId);
 
         var componentNames = request.Formulation.Select(f => f.Component).Distinct().ToList();
         var pricesResult = await repository.GetPricesAsync(componentNames);
@@ -209,7 +236,7 @@ public static class CostingEndpoints
             }
             else
             {
-                logger.LogWarning("Skipping material {MaterialId}: {Error}", material.MaterialId, calculationResult.Error.Description);
+                LogSkippingMaterial(logger, material.MaterialId, calculationResult.Error.Description);
             }
         }
 
@@ -217,7 +244,7 @@ public static class CostingEndpoints
             results,
             [new Link("self", selfUrl, "GET")]);
 
-        logger.LogInformation("Batch cost calculation completed. Processed {Count} materials", results.Count);
+        LogBatchCalculationCompleted(logger, results.Count);
 
         return Results.Ok(response);
     }

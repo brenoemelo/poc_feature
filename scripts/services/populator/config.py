@@ -19,7 +19,7 @@ SERVICE_CONFIG = {
     "ZipPath": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../PoC-Populator.zip")),
     "ProjectFile": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src/PoC.Populator/PoC.Populator.csproj")),
     "CustomApiId": CONFIG["ApiGateway"]["Id"],
-    "MaterialsApiUrl": f"{AWS_ENDPOINT_URL}/restapis/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/_user_request_/api/v1/materials",
+    "MaterialsApiUrl": f"{AWS_ENDPOINT_URL}/restapis/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/_user_request_",
     "Stage": CONFIG["ApiGateway"]["Stage"],
     "Region": AWS_REGION,
     "EndpointUrl": AWS_ENDPOINT_URL

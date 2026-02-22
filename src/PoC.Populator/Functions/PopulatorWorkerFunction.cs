@@ -5,26 +5,68 @@ using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using System.Text.Json;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 #nullable enable
 
 namespace PoC.Populator.Functions;
 
-public class PopulatorWorkerFunction
+public partial class PopulatorWorkerFunction
 {
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received null event or records")]
+    private partial void LogNullEvent();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received empty SQS Message Body.")]
+    private partial void LogEmptyBody();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {Body}")]
+    private partial void LogReceivedBody(string body);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {Body}")]
+    private partial void LogUnwrappedBody(string body);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to deserialize message body.")]
+    private partial void LogDeserializationFailed(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Deserialized job is null")]
+    private partial void LogNullJob();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {Body}")]
+    private partial void LogInvalidJob(string body);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})")]
+    private partial void LogProcessingJob(int batchSize, string target, int? min, int? max);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {Strategy} generated {Count} items.")]
+    private partial void LogStrategyGenerated(string strategy, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {ItemType}")]
+    private partial void LogUnknownItemType(string itemType);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {PublishedCount} events for target {Target}.")]
+    private partial void LogJobSuccess(int publishedCount, string target);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Message}")]
+    private partial void LogGenericInfo(string message);
+
     // Phase 2: Static Host Initialization
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+    
     private static readonly Lazy<IHost> _hostLazy = new(
         () =>
         {
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
+            builder.AddPoCObservability("PoC.Populator.Worker", "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
@@ -60,11 +102,7 @@ public class PopulatorWorkerFunction
 
     private static IHost HostInstance => _hostLazy.Value;
 
-    private readonly ILogger<PopulatorWorkerFunction> _logger;
-    private readonly IAmazonSimpleNotificationService _snsClient;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<PopulatorOptions> _options;
-    private readonly string _topicArn;
+    private readonly IServiceProvider _serviceProvider;
 
     public PopulatorWorkerFunction()
     {
@@ -73,6 +111,7 @@ public class PopulatorWorkerFunction
         _snsClient = host.Services.GetRequiredService<IAmazonSimpleNotificationService>();
         _httpClientFactory = host.Services.GetRequiredService<IHttpClientFactory>();
         _options = host.Services.GetRequiredService<IOptions<PopulatorOptions>>();
+        _serviceProvider = host.Services;
         
         _topicArn = Environment.GetEnvironmentVariable("SNS_TOPIC_ARN") 
                     ?? "arn:aws:sns:us-east-1:000000000000:material-events";
@@ -84,12 +123,14 @@ public class PopulatorWorkerFunction
         IHttpClientFactory httpClientFactory,
         ILogger<PopulatorWorkerFunction> logger,
         IOptions<PopulatorOptions> options,
+        IServiceProvider serviceProvider,
         string topicArn)
     {
         _snsClient = snsClient;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _options = options;
+        _serviceProvider = serviceProvider;
         _topicArn = topicArn;
     }
 
@@ -105,14 +146,27 @@ public class PopulatorWorkerFunction
 
         if (ev == null || ev.Records == null)
         {
-            _logger.LogWarning("Received null event or records");
+            LogNullEvent();
             return;
         }
 
-        // We use our own Logger, but we can also log to Lambda Context if needed.
-        // For consistency, we rely on standard logging which writes to Console (captured by CloudWatch/LocalStack).
-        foreach (var message in ev.Records)
+        // Parallel processing of SQS messages
+        // We use Task.WhenAll to process all messages concurrently
+        var processingTasks = ev.Records.Select(ProcessMessageAsync);
+        
+        try
         {
+            await Task.WhenAll(processingTasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing one or more messages in the batch.");
+            throw; // Re-throw to let Lambda know (partial batch failure handling might be needed in real prod)
+        }
+    }
+
+    private async Task ProcessMessageAsync(SQSEvent.SQSMessage message)
+    {
         // Phase 3: Extract Parent Trace Context
         var parentContext = ExtractParentContext(message);
 
@@ -136,12 +190,12 @@ public class PopulatorWorkerFunction
         {
             if (string.IsNullOrWhiteSpace(message.Body))
             {
-                _logger.LogWarning("Received empty SQS Message Body.");
-                continue;
+                LogEmptyBody();
+                return;
             }
 
             // Phase 1: Reduce Log Noise (Info -> Debug)
-            _logger.LogDebug("Received SQS Message Body: {Body}", message.Body);
+            LogReceivedBody(message.Body);
 
             string incomingMessageBody = message.Body;
 
@@ -155,7 +209,7 @@ public class PopulatorWorkerFunction
                     doc.RootElement.TryGetProperty("Message", out var msg))
                 {
                     incomingMessageBody = msg.GetString() ?? incomingMessageBody;
-                    _logger.LogDebug("Unwrapped SNS Notification. Inner Body: {Body}", incomingMessageBody);
+                    LogUnwrappedBody(incomingMessageBody);
                 }
             }
             catch (JsonException)
@@ -166,106 +220,117 @@ public class PopulatorWorkerFunction
             PopulationJob? job = null;
             try
             {
-                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, _jsonOptions);
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "Failed to deserialize message body.");
-                continue;
+                LogDeserializationFailed(ex);
+                return;
             }
 
             if (job == null) 
             {
-                _logger.LogWarning("Deserialized job is null");
-                continue;
+                LogNullJob();
+                return;
             }
 
             // Check if it's a valid job (must have Target)
             if (string.IsNullOrEmpty(job.Target))
             {
-                _logger.LogWarning("Received message is not a valid PopulationJob (Target is missing). It might be an event from another topic. Body: {Body}", incomingMessageBody);
-                continue;
+                LogInvalidJob(incomingMessageBody);
+                return;
             }
 
-            _logger.LogInformation(
-                "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})",
-                job.BatchSize,
-                job.Target ?? "NULL",
-                job.MinComponents,
-                job.MaxComponents);
+            LogProcessingJob(job.BatchSize, job.Target, job.MinComponents, job.MaxComponents);
 
-            var strategy = GetStrategy(job.Target!, _options);
+            var strategy = GetStrategy(job.Target!);
             var client = _httpClientFactory.CreateClient("MaterialsClient");
             
             var popContext = new PopulationContext 
             { 
                 HttpClient = client,
-                LogError = (msg, ex) => _logger.LogError(ex, msg)
+                LogError = (msg, ex) => _logger.LogError(ex, msg),
+                LogInformation = LogGenericInfo
             };
 
             var items = await strategy.GenerateAsync(job.BatchSize, popContext, job.MinComponents, job.MaxComponents);
             
             var itemList = items.ToList();
-            _logger.LogInformation("Strategy {Strategy} generated {Count} items.", job.Target, itemList.Count);
+            LogStrategyGenerated(job.Target, itemList.Count);
 
-            var tasks = new List<Task>();
+            // Use SNS Batch Publish (Max 10 items per batch)
+            var chunks = itemList.Chunk(10);
             var publishedCount = 0;
+            var publishTasks = new List<Task>();
 
-            foreach (var item in itemList)
+            foreach (var chunk in chunks)
             {
-                string messageBody;
-                string eventType;
+                var entries = new List<PublishBatchRequestEntry>();
+                foreach (var item in chunk)
+                {
+                    string messageBody;
+                    string eventType;
 
-                if (item is MaterialFormulation material)
-                {
-                    var evt = new MaterialCreatedEvent(material);
-                    messageBody = JsonSerializer.Serialize(evt);
-                    eventType = "MaterialCreated";
-                }
-                else if (item is ComponentPriceRequest price)
-                {
-                    var evt = new PriceUpdatedEvent(
-                        price.ComponentName,
-                        price.UnitPrice,
-                        price.Currency,
-                        DateTime.UtcNow);
-                    messageBody = JsonSerializer.Serialize(evt);
-                    eventType = "PriceUpdated";
-                }
-                else
-                {
-                    _logger.LogWarning("Unknown item type generated: {ItemType}", item.GetType().Name);
-                    continue;
-                }
-
-                var publishRequest = new PublishRequest
-                {
-                    TopicArn = _topicArn,
-                    Message = messageBody,
-                    MessageAttributes = new Dictionary<string, MessageAttributeValue>
+                    if (item is MaterialFormulation material)
                     {
-                        { "EventType", new MessageAttributeValue { DataType = "String", StringValue = eventType } }
+                        var evt = new MaterialCreatedEvent(material);
+                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                        eventType = "MaterialCreated";
                     }
-                };
-                
-                // Phase 1: Reduce Log Noise (Removed inner loop logging)
-                tasks.Add(_snsClient.PublishAsync(publishRequest));
+                    else if (item is ComponentPriceRequest price)
+                    {
+                        var evt = new PriceUpdatedEvent(
+                            price.ComponentName,
+                            price.UnitPrice,
+                            price.Currency,
+                            price.EffectiveDate);
+                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                        eventType = "PriceUpdated";
+                    }
+                    else
+                    {
+                        LogUnknownItemType(item.GetType().Name);
+                        continue;
+                    }
 
-                if (tasks.Count >= 50) 
+                    entries.Add(new PublishBatchRequestEntry
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Message = messageBody,
+                        MessageAttributes = new Dictionary<string, MessageAttributeValue>
+                        {
+                            { "EventType", new MessageAttributeValue { DataType = "String", StringValue = eventType } }
+                        }
+                    });
+                }
+
+                if (entries.Any())
                 {
-                    await Task.WhenAll(tasks);
-                    publishedCount += tasks.Count;
-                    tasks.Clear();
+                    publishTasks.Add(_snsClient.PublishBatchAsync(new PublishBatchRequest
+                    {
+                        TopicArn = _topicArn,
+                        PublishBatchRequestEntries = entries
+                    }).ContinueWith(t => 
+                    {
+                        if (t.IsCompletedSuccessfully)
+                        {
+                            Interlocked.Add(ref publishedCount, t.Result.Successful.Count);
+                            if (t.Result.Failed.Count > 0)
+                            {
+                                _logger.LogError("Failed to publish {FailedCount} messages in a batch.", t.Result.Failed.Count);
+                            }
+                        }
+                        else if (t.IsFaulted)
+                        {
+                            _logger.LogError(t.Exception, "Error publishing batch.");
+                        }
+                    }));
                 }
             }
 
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-                publishedCount += tasks.Count;
-            }
+            await Task.WhenAll(publishTasks);
 
-            _logger.LogInformation("Successfully processed job. Generated and published {PublishedCount} events for target {Target}.", publishedCount, job.Target);
+            LogJobSuccess(publishedCount, job.Target);
         }
         catch (Exception exc)
         {
@@ -274,7 +339,6 @@ public class PopulatorWorkerFunction
             throw; 
         }
     }
-}
 
     private static ActivityContext ExtractParentContext(SQSEvent.SQSMessage msg)
     {
@@ -289,13 +353,13 @@ public class PopulatorWorkerFunction
         return default;
     }
 
-    private static IPopulationStrategy GetStrategy(string target, IOptions<PopulatorOptions> options)
+    private IPopulationStrategy GetStrategy(string target)
     {
         return target.ToLowerInvariant() switch
         {
-            "materials" or "material" => new MaterialPopulationStrategy(options),
-            "prices" or "price" => new PricePopulationStrategy(options),
-            "ensure-prices" => new EnsurePricesPopulationStrategy(options),
+            "materials" or "material" => _serviceProvider.GetRequiredService<MaterialPopulationStrategy>(),
+            "prices" or "price" => _serviceProvider.GetRequiredService<PricePopulationStrategy>(),
+            "ensure-prices" => _serviceProvider.GetRequiredService<EnsurePricesPopulationStrategy>(),
             _ => throw new ArgumentException($"Unknown target: {target}")
         };
     }

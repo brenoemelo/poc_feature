@@ -1,22 +1,61 @@
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using System.Text.Json;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PoC.Materials.Functions;
 
-public sealed class MaterialIngestionFunction
+public sealed partial class MaterialIngestionFunction
 {
     private readonly IMaterialRepository _repository;
     private readonly ILogger<MaterialIngestionFunction> _logger;
     private readonly MaterialsMetrics _metrics;
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Processing {Count} SQS messages")]
+    private partial void LogProcessingBatch(int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialIngestion] Failed to process record {MessageId}")]
+    private partial void LogProcessingError(Exception ex, string messageId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}")]
+    private partial void LogBatchComplete(int processed, int failed);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {MessageId} has no 'Message' property")]
+    private partial void LogMissingMessageProperty(string messageId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {MessageId} has empty message")]
+    private partial void LogEmptyMessage(string messageId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Successfully ingested material {MaterialId} ({Name})")]
+    private partial void LogMaterialIngested(string materialId, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Validation failed for material {MaterialId}")]
+    private partial void LogValidationFailed(string materialId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {MessageId} has null material")]
+    private partial void LogNullMaterial(string messageId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Ingesting material {MaterialName} ({MaterialId})")]
+    private partial void LogIngestingMaterial(string materialName, string materialId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Material {MaterialId} skipped due to Optimistic Locking conflict (idempotent)")]
+    private partial void LogMaterialSkippedIdempotent(string materialId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Successfully ingested material {MaterialId}")]
+    private partial void LogSuccessfullyIngested(string materialId);
+
     public MaterialIngestionFunction()
     {
         var builder = Host.CreateApplicationBuilder();
 
+        builder.AddPoCObservability("PoC.Materials.Ingestion", "1.0.0");
         builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
         var host = builder.Build();
@@ -81,31 +120,28 @@ public sealed class MaterialIngestionFunction
 
         if (!root.TryGetProperty("Message", out var messageProperty))
         {
-            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has no 'Message' property", record.MessageId);
+            LogMissingMessageProperty(record.MessageId);
             return;
         }
 
         var messageJson = messageProperty.GetString();
         if (string.IsNullOrEmpty(messageJson))
         {
-            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has empty message", record.MessageId);
+            LogEmptyMessage(record.MessageId);
             return;
         }
 
-        var materialEvent = JsonSerializer.Deserialize<MaterialCreatedEvent>(
+        var materialEvent = JsonSerializer.Deserialize<MaterialCreatedEvent>( 
             messageJson,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         if (materialEvent?.Material is null)
         {
-            _logger.LogWarning("[MaterialIngestion] Record {MessageId} has null material", record.MessageId);
+            LogNullMaterial(record.MessageId);
             return;
         }
 
-        _logger.LogInformation(
-            "[MaterialIngestion] Ingesting material {MaterialName} ({MaterialId})",
-            materialEvent.Material.Name,
-            materialEvent.Material.MaterialId);
+        LogIngestingMaterial(materialEvent.Material.Name, materialEvent.Material.MaterialId);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await _repository.SaveAsync(materialEvent.Material);
@@ -118,9 +154,7 @@ public sealed class MaterialIngestionFunction
             if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
             {
                 _metrics.RecordIngestion("skipped_idempotent");
-                _logger.LogWarning(
-                    "[MaterialIngestion] Material {MaterialId} skipped due to Optimistic Locking conflict (idempotent)",
-                    materialEvent.Material.MaterialId);
+                LogMaterialSkippedIdempotent(materialEvent.Material.MaterialId);
                 return;
             }
 
@@ -129,6 +163,6 @@ public sealed class MaterialIngestionFunction
         }
 
         _metrics.RecordIngestion("success");
-        _logger.LogInformation("[MaterialIngestion] Successfully ingested material {MaterialId}", materialEvent.Material.MaterialId);
+        LogSuccessfullyIngested(materialEvent.Material.MaterialId);
     }
 }
