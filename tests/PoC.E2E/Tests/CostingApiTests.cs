@@ -72,7 +72,7 @@ public class CostingApiTests : ApiTestBase, IAsyncLifetime
         await FeatureManager.DisableFlagAsync("price-ingestion");
         
         // Wait for the flag change to propagate
-        await Task.Delay(5000);
+        await Task.Delay(10000);
 
         var request = new RestRequest("/api/v1/costing/prices", Method.Post);
         // Add valid body so validation passes and we reach the feature flag check
