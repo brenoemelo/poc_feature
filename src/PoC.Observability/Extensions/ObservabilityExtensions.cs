@@ -152,16 +152,17 @@ public static class ObservabilityExtensions
 
             if (options.ExportToConsole)
             {
-                logging.AddConsoleExporter();
+                // We don't add ConsoleExporter to OTel logging because we will use the native JsonConsole below
+                // logging.AddConsoleExporter(); 
             }
         });
 
-        // Configure SimpleConsole to include timestamps for better local debugging
-        loggingBuilder.AddSimpleConsole(console =>
+        // Configure JsonConsole as the standard output format
+        loggingBuilder.AddJsonConsole(json =>
         {
-            console.IncludeScopes = true;
-            console.SingleLine = true;
-            console.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+            json.IncludeScopes = true;
+            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
         });
 
         // 3. Configure OpenTelemetry (Tracing & Metrics)

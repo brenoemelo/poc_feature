@@ -5,6 +5,7 @@ using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
@@ -12,13 +13,47 @@ using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using System.Text.Json;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 #nullable enable
 
 namespace PoC.Populator.Functions;
 
-public class PopulatorWorkerFunction
+public partial class PopulatorWorkerFunction
 {
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received null event or records")]
+    private partial void LogNullEvent();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received empty SQS Message Body.")]
+    private partial void LogEmptyBody();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {Body}")]
+    private partial void LogReceivedBody(string body);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {Body}")]
+    private partial void LogUnwrappedBody(string body);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to deserialize message body.")]
+    private partial void LogDeserializationFailed(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Deserialized job is null")]
+    private partial void LogNullJob();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {Body}")]
+    private partial void LogInvalidJob(string body);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})")]
+    private partial void LogProcessingJob(int batchSize, string target, int? min, int? max);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {Strategy} generated {Count} items.")]
+    private partial void LogStrategyGenerated(string strategy, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {ItemType}")]
+    private partial void LogUnknownItemType(string itemType);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {PublishedCount} events for target {Target}.")]
+    private partial void LogJobSuccess(int publishedCount, string target);
+
     // Phase 2: Static Host Initialization
     private static readonly Lazy<IHost> _hostLazy = new(
         () =>
@@ -107,7 +142,7 @@ public class PopulatorWorkerFunction
 
         if (ev == null || ev.Records == null)
         {
-            _logger.LogWarning("Received null event or records");
+            LogNullEvent();
             return;
         }
 
@@ -138,12 +173,12 @@ public class PopulatorWorkerFunction
         {
             if (string.IsNullOrWhiteSpace(message.Body))
             {
-                _logger.LogWarning("Received empty SQS Message Body.");
+                LogEmptyBody();
                 continue;
             }
 
             // Phase 1: Reduce Log Noise (Info -> Debug)
-            _logger.LogDebug("Received SQS Message Body: {Body}", message.Body);
+            LogReceivedBody(message.Body);
 
             string incomingMessageBody = message.Body;
 
@@ -157,7 +192,7 @@ public class PopulatorWorkerFunction
                     doc.RootElement.TryGetProperty("Message", out var msg))
                 {
                     incomingMessageBody = msg.GetString() ?? incomingMessageBody;
-                    _logger.LogDebug("Unwrapped SNS Notification. Inner Body: {Body}", incomingMessageBody);
+                    LogUnwrappedBody(incomingMessageBody);
                 }
             }
             catch (JsonException)
@@ -172,29 +207,24 @@ public class PopulatorWorkerFunction
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "Failed to deserialize message body.");
+                LogDeserializationFailed(ex);
                 continue;
             }
 
             if (job == null) 
             {
-                _logger.LogWarning("Deserialized job is null");
+                LogNullJob();
                 continue;
             }
 
             // Check if it's a valid job (must have Target)
             if (string.IsNullOrEmpty(job.Target))
             {
-                _logger.LogWarning("Received message is not a valid PopulationJob (Target is missing). It might be an event from another topic. Body: {Body}", incomingMessageBody);
+                LogInvalidJob(incomingMessageBody);
                 continue;
             }
 
-            _logger.LogInformation(
-                "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})",
-                job.BatchSize,
-                job.Target ?? "NULL",
-                job.MinComponents,
-                job.MaxComponents);
+            LogProcessingJob(job.BatchSize, job.Target, job.MinComponents, job.MaxComponents);
 
             var strategy = GetStrategy(job.Target!, _options);
             var client = _httpClientFactory.CreateClient("MaterialsClient");

@@ -210,26 +210,31 @@ public class PopulatorTests : ApiTestBase
         int initialCount = initialCountResponse.IsSuccessful ? initialCountResponse.Data!.Data.Count : 0;
         Console.WriteLine($"Initial Price Count: {initialCount}");
 
-        // 3. Trigger ensure-prices
-        var requestBody = new PopulationRequest
-        {
-            Target = "ensure-prices",
-            Count = 1 // Should process ALL components regardless of count
-        };
-        var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
-        request.AddJsonBody(requestBody);
-        
-        var popResponse = await Client.ExecuteAsync(request);
-        popResponse.IsSuccessful.Should().BeTrue();
-
-        // 4. Wait for processing
-        int maxRetries = 90;
+        // 3. Trigger ensure-prices and wait for processing in a loop
+        // We loop the trigger because the GSI (IX_Materials_By_Type) used by ensure-prices
+        // is eventually consistent and might not see the new material immediately.
+        int maxRetries = 15;
         bool pricesIncreased = false;
         int expectedMinCount = initialCount + 2;
 
         for (int i = 0; i < maxRetries; i++)
         {
-            await Task.Delay(2000);
+            // Trigger job
+            var requestBody = new PopulationRequest
+            {
+                Target = "ensure-prices",
+                Count = 1
+            };
+            var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
+            request.AddJsonBody(requestBody);
+            
+            var popResponse = await Client.ExecuteAsync(request);
+            popResponse.IsSuccessful.Should().BeTrue();
+
+            // Wait for processing
+            await Task.Delay(3000);
+
+            // Check count
             var currentCountResponse = await Client.ExecuteAsync<ApiResponse<CountResponse>>(new RestRequest("/api/v1/costing/prices/count", Method.Get));
             
             if (currentCountResponse.IsSuccessful)

@@ -1,11 +1,18 @@
+using Microsoft.Extensions.Logging;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
+using System.Net.Http.Json;
 
 namespace PoC.Costing.Infrastructure.ExternalServices;
 
-public sealed class MaterialsClient(HttpClient httpClient, ILogger<MaterialsClient> logger) : IMaterialsClient
+public sealed partial class MaterialsClient(HttpClient httpClient, ILogger<MaterialsClient> logger) : IMaterialsClient
 {
+    private readonly ILogger<MaterialsClient> _logger = logger;
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error fetching materials from Materials Service")]
+    private partial void LogFetchError(Exception ex);
+
     public async Task<IEnumerable<MaterialFormulation>> GetAllMaterialsAsync()
     {
         var allMaterials = new List<MaterialFormulation>();
@@ -31,7 +38,7 @@ public sealed class MaterialsClient(HttpClient httpClient, ILogger<MaterialsClie
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error fetching materials from Materials Service");
+                LogFetchError(ex);
                 throw;
             }
         }
