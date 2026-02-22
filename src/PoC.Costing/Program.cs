@@ -36,7 +36,7 @@ public class Program
         var builder = WebApplication.CreateBuilder();
         
         // Add Observability (Logging, Tracing, Metrics)
-        // builder.AddPoCObservability("PoC.Costing", "1.0.0");
+        builder.AddPoCObservability("PoC.Costing", "1.0.0");
 
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 

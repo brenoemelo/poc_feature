@@ -8,18 +8,26 @@ using System.Text.Json;
 
 namespace PoC.Populator.Infrastructure.Services;
 
-public sealed class PopulationService(
+public sealed partial class PopulationService(
     IAmazonSQS sqsClient,
     IOptions<PopulatorOptions> options,
     ILogger<PopulationService> logger) : IPopulationService
 {
+    private readonly ILogger<PopulationService> _logger = logger;
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Splitting {Count} records into {TotalBatches} batches.")]
+    private partial void LogSplittingRecords(int count, int totalBatches);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create population job")]
+    private partial void LogJobCreationFailure(Exception ex);
+
     public async Task<Result<PopulationJobResponse>> CreateJobAsync(PopulationRequest request)
     {
         try
         {
             int batchSize = 250;
             int totalBatches = (int)Math.Ceiling((double)request.Count / batchSize);
-            logger.LogInformation("Splitting {Count} records into {TotalBatches} batches.", request.Count, totalBatches);
+            LogSplittingRecords(request.Count, totalBatches);
 
             var queueUrl = options.Value.QueueUrl;
 
@@ -53,7 +61,7 @@ public sealed class PopulationService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create population job");
+            LogJobCreationFailure(ex);
             return Result.Failure<PopulationJobResponse>(new Error("Populator.Error", ex.Message));
         }
     }

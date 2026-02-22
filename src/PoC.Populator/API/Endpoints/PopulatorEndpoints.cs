@@ -8,8 +8,11 @@ using PoC.Shared.Models;
 
 namespace PoC.Populator.API.Endpoints;
 
-public static class PopulatorEndpoints
+public static partial class PopulatorEndpoints
 {
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing population request for {Count} items.")]
+    private static partial void LogProcessingRequest(ILogger logger, int count);
+
     public static RouteGroupBuilder MapPopulatorEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/jobs", HandlePopulationRequestAsync)
@@ -33,7 +36,7 @@ public static class PopulatorEndpoints
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
 
-        logger.LogInformation("Processing population request for {Count} items.", request.Count);
+        LogProcessingRequest(logger, request.Count);
 
         var result = await populationService.CreateJobAsync(request);
 

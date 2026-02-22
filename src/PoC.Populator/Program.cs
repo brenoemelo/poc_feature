@@ -42,7 +42,7 @@ public class Program
         var builder = WebApplication.CreateBuilder();
 
         // Add Observability (Logging, Tracing, Metrics)
-        // builder.AddPoCObservability("PoC.Populator", "1.0.0");
+        builder.AddPoCObservability("PoC.Populator", "1.0.0");
 
         // Observability (Native OTel + ILogger)
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
