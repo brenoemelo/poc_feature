@@ -117,15 +117,23 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         // Arrange
         await FeatureManager.DisableFlagAsync("materials-crud");
         
-        // Wait for the flag change to propagate (Lambda polls every 1s in test env)
-        await Task.Delay(10000);
+        // Act & Assert (Active Polling since Unleash updates asynchronously)
+        RestResponse? response = null;
+        for (int i = 0; i < 20; i++)
+        {
+            var request = new RestRequest("/api/v1/materials", Method.Get);
+            response = await Client.ExecuteAsync(request);
 
-        // Act
-        var request = new RestRequest("/api/v1/materials", Method.Get);
-        var response = await Client.ExecuteAsync(request);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                break; // Found 404, flag has synchronized
+            }
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "endpoint should be disabled when flag is off");
+            await Task.Delay(1000); // 1-second interval
+        }
+
+        response.Should().NotBeNull();
+        response!.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "endpoint should be disabled when flag is off");
     }
 
     private async Task InsertMaterialDirectlyAsync(string materialId, string name)

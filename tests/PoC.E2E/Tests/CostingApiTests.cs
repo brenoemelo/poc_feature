@@ -71,21 +71,29 @@ public class CostingApiTests : ApiTestBase, IAsyncLifetime
     {
         await FeatureManager.DisableFlagAsync("price-ingestion");
         
-        // Wait for the flag change to propagate
-        await Task.Delay(10000);
-
-        var request = new RestRequest("/api/v1/costing/prices", Method.Post);
-        // Add valid body so validation passes and we reach the feature flag check
         var requestBody = new ComponentPriceRequest(
             ComponentName: "test-component",
             UnitPrice: 10.0m,
             Unit: "kg",
             Currency: "USD");
-        
-        request.AddJsonBody(requestBody);
 
-        var response = await Client.ExecuteAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound, "because flag is disabled");
+        RestResponse? response = null;
+        for (int i = 0; i < 20; i++)
+        {
+            var request = new RestRequest("/api/v1/costing/prices", Method.Post);
+            request.AddJsonBody(requestBody);
+
+            response = await Client.ExecuteAsync(request);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                break; // Found 404, flag has synchronized
+            }
+
+            await Task.Delay(1000); // 1-second interval
+        }
+
+        response.Should().NotBeNull();
+        response!.StatusCode.Should().Be(HttpStatusCode.NotFound, "because flag is disabled");
     }
 
     [Fact]

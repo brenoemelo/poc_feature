@@ -7,5 +7,5 @@ public class FeatureFlagOptions
     public string UnleashApiKey { get; set; } = "*:development.unleash-insecure-api-token";
     public string UnleashAppName { get; set; } = "default-app";
     public string UnleashInstanceId { get; set; } = "default-instance";
-    public int FetchTogglesIntervalSeconds { get; set; } = 30;
+    public int FetchTogglesIntervalSeconds { get; set; } = 15;
 }

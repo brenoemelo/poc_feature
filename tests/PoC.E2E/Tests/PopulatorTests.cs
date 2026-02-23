@@ -210,10 +210,10 @@ public class PopulatorTests : ApiTestBase
         int initialCount = initialCountResponse.IsSuccessful ? initialCountResponse.Data!.Data.Count : 0;
         Console.WriteLine($"Initial Price Count: {initialCount}");
 
-        // 3. Trigger ensure-prices and wait for processing in a loop
+        // 3. Wait for processing (poll count)
         // We loop the trigger because the GSI (IX_Materials_By_Type) used by ensure-prices
         // is eventually consistent and might not see the new material immediately.
-        int maxRetries = 15;
+        int maxRetries = 40; // Increased to give up to 120 seconds of processing time locally
         bool pricesIncreased = false;
         int expectedMinCount = initialCount + 2;
 
@@ -247,6 +247,10 @@ public class PopulatorTests : ApiTestBase
                     pricesIncreased = true;
                     break;
                 }
+            }
+            else
+            {
+                Console.WriteLine($"Retry {i}: Request failed Status: {currentCountResponse.StatusCode}");
             }
         }
 
