@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
+using PoC.Populator.Configuration;
 using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Shared.Events;
@@ -77,18 +78,16 @@ public partial class PopulatorWorkerFunction
             builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 
             // 3. HTTP Client with Resilience
-#pragma warning disable S1075 // URIs should not be hardcoded
-            var materialsUrl = Environment.GetEnvironmentVariable("MATERIALS_API_URL") 
-                               ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
-            
-            if (!materialsUrl.EndsWith('/'))
+            builder.Services.AddHttpClient("MaterialsClient", (sp, client) =>
             {
-                materialsUrl += "/";
-            }
-#pragma warning restore S1075 // URIs should not be hardcoded
-            
-            builder.Services.AddHttpClient("MaterialsClient", client =>
-            {
+                var opts = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
+                var materialsUrl = opts.MaterialsApiUrl;
+                
+                if (!materialsUrl.EndsWith('/'))
+                {
+                    materialsUrl += "/";
+                }
+                
                 client.BaseAddress = new Uri(materialsUrl);
             })
             .AddStandardResilienceHandler(); // Policies for Retries/CircuitBreaker
@@ -120,8 +119,8 @@ public partial class PopulatorWorkerFunction
         _options = host.Services.GetRequiredService<IOptions<PopulatorOptions>>();
         _serviceProvider = host.Services;
         
-        _topicArn = Environment.GetEnvironmentVariable("SNS_TOPIC_ARN") 
-                    ?? "arn:aws:sns:us-east-1:000000000000:material-events";
+        var awsOptions = host.Services.GetRequiredService<IOptions<AwsOptions>>().Value;
+        _topicArn = awsOptions.SnsTopicArn;
     }
 
     // Constructor for testing

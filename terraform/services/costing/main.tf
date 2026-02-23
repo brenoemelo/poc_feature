@@ -48,7 +48,7 @@ module "costing_api" {
   environment_variables = merge(local.common_env_vars, {
     "Costing__TableName" = aws_dynamodb_table.costing.name
     "OTEL_SERVICE_NAME"  = "PoC-Costing"
-    "MATERIALS_API_URL"  = local.materials_api_url
+    "Services__MaterialsApiUrl"  = local.materials_api_url
   })
 }
 

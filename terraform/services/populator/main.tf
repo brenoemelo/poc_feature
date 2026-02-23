@@ -16,7 +16,7 @@ locals {
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4318"
     OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
     AWS__Region                 = "us-east-1"
-    AWS__LocalStackUrl          = "http://localstack:4566"
+    AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://unleash:4242/api/"
   }
   zip_path = "${path.module}/../../../dist/PoC-Populator/PoC-Populator.zip"
@@ -63,7 +63,7 @@ module "populator_worker" {
   lambda_role_arn = data.aws_iam_role.lambda_exec.arn
 
   environment_variables = merge(local.common_env_vars, {
-    "MATERIALS_API_URL"             = local.materials_api_url
+    "Services__MaterialsApiUrl"     = local.materials_api_url
     "Populator__MaterialsTableName" = "materials-table"
     "Populator__PricesTableName"    = "costing-prices-table"
     "Populator__OutputTopicArn"     = local.output_topic_arn

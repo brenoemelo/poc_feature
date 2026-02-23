@@ -11,7 +11,7 @@ locals {
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4318"
     OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
     AWS__Region                 = "us-east-1"
-    AWS__LocalStackUrl          = "http://localstack:4566"
+    AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://172.18.0.9:4242/api/" # Temporary IP for debugging DNS issues
   }
   zip_path = "${path.module}/../../../dist/PoC-Materials/PoC-Materials.zip"
@@ -58,8 +58,9 @@ module "materials_api" {
   lambda_role_arn = data.aws_iam_role.lambda_exec.arn
 
   environment_variables = merge(local.common_env_vars, {
-    "Materials__TableName" = aws_dynamodb_table.materials.name
-    "OTEL_SERVICE_NAME"    = "PoC-Materials"
+    "Materials__TableName"   = aws_dynamodb_table.materials.name
+    "OTEL_SERVICE_NAME"      = "PoC-Materials"
+    "Observability__Enabled" = "true"
   })
 }
 
@@ -87,8 +88,9 @@ module "materials_worker" {
   lambda_role_arn = data.aws_iam_role.lambda_exec.arn
 
   environment_variables = merge(local.common_env_vars, {
-    "Materials__TableName" = aws_dynamodb_table.materials.name
-    "OTEL_SERVICE_NAME"    = "PoC-Materials-Ingestion"
+    "Materials__TableName"   = aws_dynamodb_table.materials.name
+    "OTEL_SERVICE_NAME"      = "PoC-Materials-Ingestion"
+    "Observability__Enabled" = "true"
   })
 
   filter_policy = jsonencode({

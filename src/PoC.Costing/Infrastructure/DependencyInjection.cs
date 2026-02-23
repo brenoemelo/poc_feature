@@ -1,4 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Amazon.DynamoDBv2;
+using PoC.Costing.Configuration;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure.Persistence;
 
@@ -8,26 +12,33 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddCostingInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var endpoint = configuration["AWS_ENDPOINT_URL"] ?? Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
-        
-        if (string.IsNullOrEmpty(endpoint))
+        services.AddOptions<AwsOptions>()
+            .Bind(configuration.GetSection(AwsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+            
+        services.AddOptions<ServiceOptions>()
+            .Bind(configuration.GetSection(ServiceOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IAmazonDynamoDB>(sp =>
         {
-             var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME");
-             if (!string.IsNullOrEmpty(localStackHost))
-             {
-                 var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
-                 endpoint = $"http://{localStackHost}:{edgePort}";
-             }
-        }
+            var opts = sp.GetRequiredService<IOptions<AwsOptions>>().Value;
+            var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? opts.ServiceUrl;
 
-        if (!string.IsNullOrEmpty(endpoint))
-        {
-            Environment.SetEnvironmentVariable("AWS_ENDPOINT_URL", endpoint);
-        }
+            var config = new AmazonDynamoDBConfig
+            {
+                ServiceURL = serviceUrl,
+                AuthenticationRegion = opts.Region
+            };
+            return new AmazonDynamoDBClient(config);
+        });
 
-        services.AddAWSService<IAmazonDynamoDB>();
-
-        services.Configure<CostingOptions>(configuration.GetSection(CostingOptions.SectionName));
+        services.AddOptions<CostingOptions>()
+            .Bind(configuration.GetSection(CostingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddScoped<ICostingRepository, DynamoDbCostingRepository>();
 

@@ -3,7 +3,10 @@ using Amazon.Lambda.RuntimeSupport;
 using Amazon.Lambda.Serialization.SystemTextJson;
 using Amazon.Lambda.SQSEvents;
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using PoC.Costing.API.Endpoints;
+using PoC.Costing.Configuration;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Domain.Services;
 using PoC.Costing.Functions;
@@ -44,48 +47,21 @@ public class Program
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
         // Feature Flags (OpenFeature + Unleash)
-builder.Services.AddPoCFeatureFlags(o =>
-{
-    var section = builder.Configuration.GetSection("FeatureFlags");
-    if (section.Exists())
-    {
-        section.Bind(o);
-    }
-    
-    // Fallbacks if not in configuration
-    if (string.IsNullOrEmpty(o.UnleashApiUrl) || o.UnleashApiUrl == "http://localhost:4242/api/")
-    {
-         o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-    }
-    if (string.IsNullOrEmpty(o.UnleashApiKey))
-    {
-         o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
-    }
-    
-    // Explicitly check for interval if default (30) is still there and config has it
-    // Check Env Var FIRST to ensure override
-    var intervalEnv = Environment.GetEnvironmentVariable("FeatureFlags__FetchTogglesIntervalSeconds");
-    if (!string.IsNullOrEmpty(intervalEnv) && int.TryParse(intervalEnv, out var intervalVal))
-    {
-        o.FetchTogglesIntervalSeconds = intervalVal;
-    }
-    else
-    {
-        var intervalStr = builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"];
-        if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var interval))
-        {
-            o.FetchTogglesIntervalSeconds = interval;
-        }
-    }
-    Console.WriteLine($"[CONFIG] Unleash Interval set to: {o.FetchTogglesIntervalSeconds}s");
-}, builder.Configuration);
+        builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
         builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
         builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
 
-        builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>(client =>
+        builder.Services.AddHttpClient<IMaterialsClient, MaterialsClient>((sp, client) =>
         {
-            var materialsUrl = builder.Configuration["MATERIALS_API_URL"] ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
+            var opts = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
+            var materialsUrl = opts.MaterialsApiUrl;
+            
+            if (!materialsUrl.EndsWith('/'))
+            {
+                materialsUrl += "/";
+            }
+            
             client.BaseAddress = new Uri(materialsUrl);
         })
         .AddStandardResilienceHandler();

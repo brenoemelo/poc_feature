@@ -6,6 +6,11 @@ namespace PoC.Observability.Configuration;
 public class ObservabilityOptions
 {
     /// <summary>
+    /// Whether observability (telemetry) is enabled. Defaults to false.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
     /// The name of the service (e.g., "PoC-Costing").
     /// </summary>
     public required string ServiceName { get; set; }

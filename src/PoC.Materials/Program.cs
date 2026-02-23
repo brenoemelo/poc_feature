@@ -34,20 +34,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
 // Feature Flags (OpenFeature + Unleash)
-builder.Services.AddPoCFeatureFlags(o =>
-{
-    var section = builder.Configuration.GetSection("FeatureFlags");
-    if (section.Exists())
-    {
-        section.Bind(o);
-    }
-    
-    // Fallbacks if not in configuration
-    if (string.IsNullOrEmpty(o.UnleashAppName)) o.UnleashAppName = "PoC-Materials";
-    if (string.IsNullOrEmpty(o.UnleashApiUrl)) o.UnleashApiUrl = "http://localhost:4242/api/";
-    if (string.IsNullOrEmpty(o.UnleashApiKey)) o.UnleashApiKey = "default:development.unleash-insecure-api-token";
-    if (o.FetchTogglesIntervalSeconds == 0) o.FetchTogglesIntervalSeconds = 15;
-}, builder.Configuration);
+builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();

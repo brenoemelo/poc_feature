@@ -51,34 +51,7 @@ public class Program
         builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 
         // Feature Flags (OpenFeature + Unleash)
-        builder.Services.AddPoCFeatureFlags(options =>
-        {
-            var section = builder.Configuration.GetSection("FeatureFlags");
-            if (section.Exists())
-            {
-                section.Bind(options);
-            }
-            
-            options.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-            options.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "default:development.unleash-insecure-api-token";
-            options.UnleashAppName = "PoC-Populator";
-            options.UnleashInstanceId = "populator";
-            
-            var intervalEnv = Environment.GetEnvironmentVariable("FeatureFlags__FetchTogglesIntervalSeconds");
-            if (!string.IsNullOrEmpty(intervalEnv) && int.TryParse(intervalEnv, out var intervalVal))
-            {
-                options.FetchTogglesIntervalSeconds = intervalVal;
-            }
-            else
-            {
-                var intervalStr = builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"];
-                if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var interval))
-                {
-                    options.FetchTogglesIntervalSeconds = interval;
-                }
-            }
-            // Console.WriteLine($"[CONFIG] Unleash Interval set to: {options.FetchTogglesIntervalSeconds}s");
-        }, builder.Configuration);
+        builder.Services.AddPoCFeatureFlags(builder.Configuration);
 
         // JSON Configuration
         builder.Services.ConfigureHttpJsonOptions(options =>

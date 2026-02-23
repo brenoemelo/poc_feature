@@ -76,6 +76,7 @@ public static class ObservabilityExtensions
     {
         var options = new ObservabilityOptions 
         { 
+            Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e1) ? e1 : false,
             ServiceName = "UnknownService",
             OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
             Environment = builder.Environment.EnvironmentName,
@@ -111,6 +112,7 @@ public static class ObservabilityExtensions
     {
         var options = new ObservabilityOptions 
         { 
+            Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e2) ? e2 : false,
             ServiceName = "UnknownService",
             OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
             Environment = builder.Environment.EnvironmentName,
@@ -127,10 +129,23 @@ public static class ObservabilityExtensions
         ILoggingBuilder loggingBuilder,
         ObservabilityOptions options)
     {
-        // 0. Add Startup Metrics
+        // 0. Configure Base Logging (always available)
+        loggingBuilder.AddJsonConsole(json =>
+        {
+            json.IncludeScopes = true;
+            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
+        });
+
+        if (!options.Enabled)
+        {
+            return;
+        }
+
+        // 1. Add Startup Metrics
         services.AddStartUpMetrics();
 
-        // 1. Define Resource Builder
+        // 2. Define Resource Builder
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion)
             .AddAttributes(new Dictionary<string, object>
@@ -165,13 +180,7 @@ public static class ObservabilityExtensions
             }
         });
 
-        // Configure JsonConsole as the standard output format
-        loggingBuilder.AddJsonConsole(json =>
-        {
-            json.IncludeScopes = true;
-            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
-        });
+        // JSON console was already added initially
 
         // 3. Configure OpenTelemetry (Tracing & Metrics)
         services.AddOpenTelemetry()

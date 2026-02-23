@@ -13,23 +13,22 @@ public static class FeatureFlagsExtensions
 {
     public static IServiceCollection AddPoCFeatureFlags(
         this IServiceCollection services,
-        Action<FeatureFlagOptions> configureOptions,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        Action<FeatureFlagOptions>? configureOptions = null)
     {
-        var options = new FeatureFlagOptions
-        {
-            UnleashApiUrl = configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/",
-            UnleashApiKey = configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token",
-            UnleashAppName = configuration["FeatureFlags:UnleashAppName"] ?? "default-app",
-            UnleashInstanceId = configuration["FeatureFlags:UnleashInstanceId"] ?? "default-instance",
-        };
+        var options = new FeatureFlagOptions();
+        
+        // 1. Bind from Configuration (appsettings.json + Environment Variables)
+        configuration.GetSection("FeatureFlags").Bind(options);
 
-        if (int.TryParse(configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+        // 2. Allow manual overrides
+        configureOptions?.Invoke(options);
+
+        // 3. Validation
+        if (string.IsNullOrEmpty(options.UnleashApiUrl))
         {
-            options.FetchTogglesIntervalSeconds = interval;
+             // Log warning or throw? For now, we assume it's configured.
         }
-
-        configureOptions(options);
 
         // Register Unleash Client (Internal)
         services.AddSingleton<IUnleash>(sp =>
