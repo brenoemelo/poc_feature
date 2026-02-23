@@ -12,7 +12,7 @@ locals {
     OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
     AWS__Region                 = "us-east-1"
     AWS__LocalStackUrl          = "http://localstack:4566"
-    FeatureFlags__UnleashApiUrl = "http://unleash:4242/api/"
+    FeatureFlags__UnleashApiUrl = "http://172.18.0.9:4242/api/" # Temporary IP for debugging DNS issues
   }
   zip_path = "${path.module}/../../../dist/PoC-Materials/PoC-Materials.zip"
 }

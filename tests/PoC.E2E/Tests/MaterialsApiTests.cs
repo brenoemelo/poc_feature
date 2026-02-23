@@ -99,6 +99,21 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         await base.InitializeAsync();
         // Ensure flag is enabled for happy path
         await FeatureManager.EnableFlagAsync("materials-crud");
+        
+        // Active Polling since Unleash updates asynchronously
+        for (int i = 0; i < 20; i++)
+        {
+            var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
+            var response = await Client.ExecuteAsync(request);
+
+            // When the flag is enabled, it returns 200 OK (even if empty) instead of 404 (disabled)
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                break;
+            }
+
+            await Task.Delay(1000); // 1-second interval
+        }
     }
 
     public override async Task DisposeAsync()

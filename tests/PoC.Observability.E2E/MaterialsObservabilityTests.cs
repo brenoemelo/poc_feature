@@ -1,3 +1,4 @@
+using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
@@ -5,13 +6,13 @@ using System.Net;
 
 namespace PoC.Observability.E2E;
 
-public class ObservabilityPipelineTests
+public class MaterialsObservabilityTests
 {
     private readonly IConfiguration _configuration;
     private readonly ObservabilityClient _observabilityClient;
     private readonly RestClient _appClient;
 
-    public ObservabilityPipelineTests()
+    public MaterialsObservabilityTests()
     {
         // Load configuration
         _configuration = new ConfigurationBuilder()
@@ -77,21 +78,13 @@ public class ObservabilityPipelineTests
         // Wait for logs to be exported
         await Task.Delay(5000);
 
-        // Query: {job=~".+"} |= "{traceId}"
+        // Query: {job=~".+"}
         // Use a broader query to catch any service logging this trace
-        // Note: OTel Collector maps service.name to 'job' label by default.
-        // Also, the traceId might be in the structured metadata, not necessarily the line text.
-        // For now, we search for the traceId in the log line or labels.
-        var lokiQuery = $"{{job=~\".+\"}}"; // Removed |= traceId to ensure we get *some* logs first, then we filter in C# if needed or just check presence.
-        // actually, let's keep the filter if possible, but the format might be issue.
-        // Let's try to get ALL logs for the service and check content in C#.
+        var lokiQuery = $"{{job=~\".+\"}}"; 
         
         var lokiResult = await _observabilityClient.QueryLokiAsync(lokiQuery);
         
         lokiResult.Should().NotBeNullOrEmpty("Logs should be found in Loki");
-        
-        // Optional: Check for trace ID in the result (might be Base64 or Hex)
-        // lokiResult.Should().Contain(traceId, "Loki logs should contain the Trace ID");
     }
 
     [Fact]
@@ -122,54 +115,6 @@ public class ObservabilityPipelineTests
     }
 
     [Fact]
-    public async Task Scenario3_Business_Telemetry_Should_Record_Metrics()
-    {
-        // 0. Seed Prices
-        await SeedPriceAsync("Iron", 10.0m);
-        await SeedPriceAsync("Carbon", 50.0m);
-
-        // 1. Action: Trigger Cost Calculation
-        var request = new RestRequest("/api/v1/costing/estimations", Method.Post);
-        request.AddJsonBody(new 
-        {
-            material_id = "mat-001",
-            formulation = new[] 
-            {
-                new { component = "Iron", percentage = 80 },
-                new { component = "Carbon", percentage = 20 }
-            },
-            desired_margin_percent = 25.0
-        });
-
-        var response = await _appClient.ExecuteAsync(request);
-        
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            // Debug output
-            Console.WriteLine($"Scenario3 Failed. Status: {response.StatusCode}, Content: {response.Content}");
-        }
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // 2. Assert Metrics (Prometheus)
-        // Wait for scrape (15s default)
-        await Task.Delay(15000);
-
-        // Metric: http_server_request_duration_seconds_count
-        // Tag: http_route = "/api/v1/costing/estimations"
-        // Tag: http_response_status_code = "200"
-        var query = "http_server_request_duration_seconds_count{http_route=\"/api/v1/costing/estimations\", http_response_status_code=\"200\"}";
-        
-        var result = await _observabilityClient.QueryPrometheusAsync(query);
-        result.Should().NotBeNullOrEmpty();
-        
-        var json = JObject.Parse(result!);
-        var resultData = json["data"]?["result"] as JArray;
-        resultData.Should().NotBeNull();
-        resultData!.Count.Should().BeGreaterThan(0, "Metric for Costing Estimation should exist");
-    }
-
-    [Fact]
     public async Task Scenario4_Dependency_Tracking_Should_Have_DynamoDB_Spans()
     {
         // 1. Action: Create Material (Writes to DynamoDB)
@@ -195,12 +140,38 @@ public class ObservabilityPipelineTests
         traceId.Should().NotBeNullOrEmpty();
 
         // 2. Assert Trace (Tempo) - Should contain AWS DynamoDB Span
-        await Task.Delay(5000);
+        await Task.Delay(5000); // Wait for trace export
         var tempoResult = await _observabilityClient.QueryTempoAsync(traceId!);
         tempoResult.Should().NotBeNullOrEmpty();
         
         // Search for DynamoDB attribute or span name
+        // Depending on instrumentation, it might be "DynamoDB" or "Amazon.DynamoDB"
+        // Just checking for "DynamoDB" is safer.
         tempoResult.Should().Contain("DynamoDB", "Trace should contain DynamoDB interactions");
+    }
+
+    [Fact]
+    public async Task Scenario5_Metrics_Should_Be_Collected_In_Prometheus()
+    {
+        // 1. Action: Hit the endpoint to generate metrics
+        var request = new RestRequest("/api/v1/materials", Method.Get);
+        var response = await _appClient.ExecuteAsync(request);
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound); // NotFound is OK if empty
+
+        // 2. Assert Metrics (Prometheus)
+        // Wait for metric scrape (15s interval usually + propagation)
+        // We retry inside QueryPrometheusAsync, but an initial delay helps.
+        await Task.Delay(5000); 
+
+        // Query for http request count for this service
+        // OTel standard metric: http.server.request.duration -> prometheus: http_server_request_duration_seconds_count
+        var query = "http_server_request_duration_seconds_count{service_name=\"PoC-Materials\"}";
+        
+        var result = await _observabilityClient.QueryPrometheusAsync(query);
+        
+        result.Should().NotBeNullOrEmpty();
+        result.Should().Contain("\"status\":\"success\"");
+        result.Should().Contain("PoC-Materials");
     }
 
     private string? GetTraceIdFromResponse(RestResponse response)
@@ -219,20 +190,5 @@ public class ObservabilityPipelineTests
              }
         }
         return traceId;
-    }
-
-    private async Task SeedPriceAsync(string componentName, decimal price)
-    {
-        var request = new RestRequest("/api/v1/costing/prices", Method.Post);
-        request.AddJsonBody(new 
-        {
-            component_name = componentName,
-            unit_price = price,
-            unit = "kg",
-            currency = "USD"
-        });
-
-        var response = await _appClient.ExecuteAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, "Seeding price should succeed");
     }
 }

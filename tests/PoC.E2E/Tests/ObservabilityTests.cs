@@ -70,7 +70,7 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
     /// Requires the Lambda to be deployed with Otel__Endpoint pointing to this mock server.
     /// </summary>
     /// <returns>A task representing the asynchronous test operation.</returns>
-    [Fact]
+    [Fact(Skip = "Incompatible with LocalStack deployment. The Lambda is hardcoded to send traces to the docker-network otel-collector, not the host-network MockServer.")]
     public async Task Api_Request_Should_Emit_Otlp_Trace_To_CollectorAsync()
     {
         _mockServer.Reset();

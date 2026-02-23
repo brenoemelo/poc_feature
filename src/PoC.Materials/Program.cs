@@ -26,7 +26,7 @@ if (!string.IsNullOrEmpty(handler) && handler.Contains("MaterialIngestionFunctio
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Observability (Logging, Tracing, Metrics)
-        builder.AddPoCObservability("PoC.Materials", "1.0.0");
+builder.AddPoCObservability("PoC.Materials", "1.0.0");
 
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 builder.Services.AddProblemDetails();
@@ -43,42 +43,26 @@ builder.Services.AddPoCFeatureFlags(o =>
     }
     
     // Fallbacks if not in configuration
-    if (string.IsNullOrEmpty(o.UnleashApiUrl) || o.UnleashApiUrl == "http://localhost:4242/api/")
-    {
-         o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-    }
-    if (string.IsNullOrEmpty(o.UnleashApiKey))
-    {
-         o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
-    }
-    
-    // Explicitly check for interval if default (30) is still there and config has it
-    // Check Env Var FIRST to ensure override
-    var intervalEnv = Environment.GetEnvironmentVariable("FeatureFlags__FetchTogglesIntervalSeconds");
-    if (!string.IsNullOrEmpty(intervalEnv) && int.TryParse(intervalEnv, out var intervalVal))
-    {
-        o.FetchTogglesIntervalSeconds = intervalVal;
-    }
-    else
-    {
-        var intervalStr = builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"];
-        if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var interval))
-        {
-            o.FetchTogglesIntervalSeconds = interval;
-        }
-    }
-    // Console.WriteLine($"[CONFIG] Unleash Interval set to: {o.FetchTogglesIntervalSeconds}s");
-});
+    if (string.IsNullOrEmpty(o.UnleashAppName)) o.UnleashAppName = "PoC-Materials";
+    if (string.IsNullOrEmpty(o.UnleashApiUrl)) o.UnleashApiUrl = "http://localhost:4242/api/";
+    if (string.IsNullOrEmpty(o.UnleashApiKey)) o.UnleashApiKey = "default:development.unleash-insecure-api-token";
+    if (o.FetchTogglesIntervalSeconds == 0) o.FetchTogglesIntervalSeconds = 15;
+}, builder.Configuration);
 
+// FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.SerializerOptions.WriteIndented = true;
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
 
 var app = builder.Build();
+
+// Enable Observability Middleware (TraceId Injection, Flush)
+app.UsePoCObservability();
 
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();

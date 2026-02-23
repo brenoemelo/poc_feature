@@ -21,6 +21,22 @@ public class PopulatorTests : ApiTestBase
         await FeatureManager.EnableFlagAsync("population-jobs");
         await FeatureManager.EnableFlagAsync("materials-crud");
         await FeatureManager.EnableFlagAsync("price-ingestion");
+        
+        // Active Polling since Unleash updates asynchronously
+        for (int i = 0; i < 20; i++)
+        {
+            var request = new RestRequest("/api/v1/populator/jobs", Method.Post);
+            request.AddJsonBody(new { }); // Invalid body
+            var response = await Client.ExecuteAsync(request);
+
+            // If flag is enabled, it will return 400 Bad Request. If disabled, 404 Not Found.
+            if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                break;
+            }
+
+            await Task.Delay(1000); // 1-second interval
+        }
     }
 
     public override async Task DisposeAsync()

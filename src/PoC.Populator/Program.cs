@@ -78,7 +78,7 @@ public class Program
                 }
             }
             // Console.WriteLine($"[CONFIG] Unleash Interval set to: {options.FetchTogglesIntervalSeconds}s");
-        });
+        }, builder.Configuration);
 
         // JSON Configuration
         builder.Services.ConfigureHttpJsonOptions(options =>

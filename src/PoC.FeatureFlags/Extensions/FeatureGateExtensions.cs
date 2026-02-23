@@ -15,11 +15,11 @@ public static partial class FeatureGateExtensions
     {
         return builder.AddEndpointFilter(async (context, next) =>
         {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("FeatureGate");
-            var unleash = context.HttpContext.RequestServices.GetRequiredService<Unleash.IUnleash>();
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<IFeatureClient>>();
+            var featureClient = context.HttpContext.RequestServices.GetRequiredService<IFeatureClient>();
 
-            // Evaluate the feature flag via Unleash directly
-            var isEnabled = unleash.IsEnabled(flagKey);
+            // Evaluate the feature flag via OpenFeature API
+            var isEnabled = await featureClient.GetBooleanValueAsync(flagKey, false);
 
             if (!isEnabled)
             {

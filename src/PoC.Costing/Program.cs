@@ -78,7 +78,7 @@ builder.Services.AddPoCFeatureFlags(o =>
         }
     }
     Console.WriteLine($"[CONFIG] Unleash Interval set to: {o.FetchTogglesIntervalSeconds}s");
-});
+}, builder.Configuration);
 
         builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
         builder.Services.AddSingleton<ICostCalculator, CostCalculator>();

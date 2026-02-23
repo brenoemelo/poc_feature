@@ -247,15 +247,12 @@ def main():
         write_log(f"--- Deploying {svc} ---", "INFO")
         run_terraform(svc_dir)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(services_to_deploy), 8)) as executor:
-        futures = {executor.submit(deploy_svc, svc): svc for svc in services_to_deploy}
-        for future in concurrent.futures.as_completed(futures):
-            svc = futures[future]
-            try:
-                future.result()
-            except Exception as e:
-                write_log(f"Terraform deploy failed for {svc}", "ERROR")
-                sys.exit(1)
+    for svc in services_to_deploy:
+        try:
+            deploy_svc(svc)
+        except Exception as e:
+            write_log(f"Terraform deploy failed for {svc}", "ERROR")
+            sys.exit(1)
                 
     # 5. Verify Resources
     verify_aws_resources()

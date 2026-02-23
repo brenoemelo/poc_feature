@@ -13,12 +13,25 @@ public static class FeatureFlagsExtensions
 {
     public static IServiceCollection AddPoCFeatureFlags(
         this IServiceCollection services,
-        Action<FeatureFlagOptions> configureOptions)
+        Action<FeatureFlagOptions> configureOptions,
+        IConfiguration configuration)
     {
-        var options = new FeatureFlagOptions();
+        var options = new FeatureFlagOptions
+        {
+            UnleashApiUrl = configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/",
+            UnleashApiKey = configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token",
+            UnleashAppName = configuration["FeatureFlags:UnleashAppName"] ?? "default-app",
+            UnleashInstanceId = configuration["FeatureFlags:UnleashInstanceId"] ?? "default-instance",
+        };
+
+        if (int.TryParse(configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+        {
+            options.FetchTogglesIntervalSeconds = interval;
+        }
+
         configureOptions(options);
 
-        // Register Unleash Client
+        // Register Unleash Client (Internal)
         services.AddSingleton<IUnleash>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<IUnleash>>();
@@ -44,13 +57,21 @@ public static class FeatureFlagsExtensions
             };
 
             var factory = new UnleashClientFactory();
-            return factory.CreateClient(settings, synchronousInitialization: true);
+            var client = factory.CreateClient(settings, synchronousInitialization: false);
+            
+            // Set OpenFeature Provider
+            Api.Instance.SetProviderAsync(new UnleashFeatureProvider(client)).Wait();
+
+            return client;
         });
 
-        // Register OpenFeature Provider (Custom Wrapper or Contrib)
-        // Since we didn't pull the heavy Contrib package, we can use a simple adapter or just expose IUnleash directly.
-        // For this PoC, let's expose IUnleash as the primary mechanism, but ideally we'd wrap it for OpenFeature.
-        // Given the prompt "Separar melhor", satisfying the dependency on Unleash is sufficient.
+        // Register OpenFeature Client for consumers
+        services.AddSingleton<IFeatureClient>(sp =>
+        {
+            // Resolve IUnleash to ensure it's initialized and the provider is set
+            sp.GetRequiredService<IUnleash>();
+            return Api.Instance.GetClient();
+        });
 
         return services;
     }
