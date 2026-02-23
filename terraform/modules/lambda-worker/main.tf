@@ -12,6 +12,7 @@ resource "aws_sns_topic_subscription" "this" {
   protocol             = "sqs"
   endpoint             = aws_sqs_queue.this.arn
   raw_message_delivery = true
+  filter_policy        = var.filter_policy
 }
 
 # 2. Compute (Lambda)

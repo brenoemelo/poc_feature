@@ -143,3 +143,6 @@ terraform.rc
 
 # Ignore the Terraform binary
 terraform.exe
+
+# Ignore dynamically downloaded local binaries
+.bin/

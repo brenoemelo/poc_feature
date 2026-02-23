@@ -6,7 +6,8 @@ data "aws_api_gateway_rest_api" "shared" {
 # We skip the python replacement step as the lambda names match the spec.
 resource "null_resource" "deploy_openapi" {
   triggers = {
-    openapi_hash = filemd5("${path.module}/../../../docs/openapi.yaml")
+    openapi_hash   = filemd5("${path.module}/../../../docs/openapi.yaml")
+    always_run     = timestamp()
   }
 
   provisioner "local-exec" {

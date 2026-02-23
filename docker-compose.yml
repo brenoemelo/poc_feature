@@ -9,7 +9,7 @@ services:
       - DEBUG=${DEBUG:-0}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AWS_DEFAULT_REGION=us-east-1
-      - EDGE_PORT=4566
+      - GATEWAY_LISTEN=0.0.0.0:4566
       - TZ=Etc/UTC
       - LAMBDA_DOCKER_NETWORK=poc_feature_poc-net
       - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=60 # Increase startup timeout for .NET

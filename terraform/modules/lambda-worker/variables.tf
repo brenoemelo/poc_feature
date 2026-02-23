@@ -57,3 +57,9 @@ variable "batch_size" {
   type        = number
   default     = 10
 }
+
+variable "filter_policy" {
+  description = "JSON filter policy for SNS subscription"
+  type        = string
+  default     = null
+}

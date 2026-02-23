@@ -319,17 +319,28 @@ public partial class PopulatorWorkerFunction
                         PublishBatchRequestEntries = entries
                     }).ContinueWith(t => 
                     {
-                        if (t.IsCompletedSuccessfully)
+                        try
                         {
-                            Interlocked.Add(ref publishedCount, t.Result.Successful.Count);
-                            if (t.Result.Failed.Count > 0)
+                            if (t.IsCompletedSuccessfully && t.Result != null)
                             {
-                                _logger.LogError("Failed to publish {FailedCount} messages in a batch.", t.Result.Failed.Count);
+                                if (t.Result.Successful != null)
+                                {
+                                    Interlocked.Add(ref publishedCount, t.Result.Successful.Count);
+                                }
+                                
+                                if (t.Result.Failed != null && t.Result.Failed.Count > 0)
+                                {
+                                    _logger.LogError("Failed to publish {FailedCount} messages in a batch.", t.Result.Failed.Count);
+                                }
+                            }
+                            else if (t.IsFaulted)
+                            {
+                                _logger.LogError(t.Exception, "Error publishing batch.");
                             }
                         }
-                        else if (t.IsFaulted)
+                        catch (Exception ex)
                         {
-                            _logger.LogError(t.Exception, "Error publishing batch.");
+                            _logger.LogError(ex, "Error handling publish batch result.");
                         }
                     }));
                 }

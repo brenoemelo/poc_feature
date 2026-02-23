@@ -27,8 +27,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\PoC.Observability\PoC.Observability.csproj" />
-  </ItemGroup>
+
 
 </Project>

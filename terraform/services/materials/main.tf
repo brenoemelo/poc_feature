@@ -90,4 +90,8 @@ module "materials_worker" {
     "Materials__TableName" = aws_dynamodb_table.materials.name
     "OTEL_SERVICE_NAME"    = "PoC-Materials-Ingestion"
   })
+
+  filter_policy = jsonencode({
+    EventType = ["MaterialCreated"]
+  })
 }

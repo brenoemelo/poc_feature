@@ -79,4 +79,8 @@ module "costing_worker" {
     "Costing__TableName" = aws_dynamodb_table.costing.name
     "OTEL_SERVICE_NAME"  = "PoC-Costing-PriceIngestion"
   })
+
+  filter_policy = jsonencode({
+    EventType = ["PriceUpdated"]
+  })
 }

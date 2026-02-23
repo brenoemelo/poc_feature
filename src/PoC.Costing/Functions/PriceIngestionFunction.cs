@@ -119,28 +119,35 @@ public sealed partial class PriceIngestionFunction
 
         using var doc = JsonDocument.Parse(record.Body);
         var root = doc.RootElement;
+        string? messageJson;
 
-        // Try to get MessageAttributes from the SNS body if not present in SQS record attributes
-        // Standard SNS to SQS JSON format: "MessageAttributes": { "Key": { "Type": "String", "Value": "..." } }
-        if (root.TryGetProperty("MessageAttributes", out var msgAttrs) && 
-            msgAttrs.TryGetProperty("EventType", out var eventTypeProp) &&
-            eventTypeProp.TryGetProperty("Value", out var eventTypeValue))
+        // Check if it is an SNS Envelope (RawMessageDelivery = false)
+        if (root.ValueKind == JsonValueKind.Object && 
+            root.TryGetProperty("Type", out var typeProp) && 
+            typeProp.GetString() == "Notification" &&
+            root.TryGetProperty("Message", out var messageProp))
         {
-             var eventType = eventTypeValue.GetString();
-             if (string.IsNullOrEmpty(eventType) || !string.Equals(eventType, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
-             {
-                 LogIgnoringEventTypeFromBody(eventType ?? "null");
-                 return;
-             }
+            messageJson = messageProp.GetString();
+
+            // Try to get MessageAttributes from the SNS body if not present in SQS record attributes
+            if (root.TryGetProperty("MessageAttributes", out var msgAttrs) && 
+                msgAttrs.TryGetProperty("EventType", out var eventTypeProp) &&
+                eventTypeProp.TryGetProperty("Value", out var eventTypeValue))
+            {
+                 var eventType = eventTypeValue.GetString();
+                 if (string.IsNullOrEmpty(eventType) || !string.Equals(eventType, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
+                 {
+                     LogIgnoringEventTypeFromBody(eventType ?? "null");
+                     return;
+                 }
+            }
+        }
+        else
+        {
+            // Assume Raw Message (RawMessageDelivery = true)
+            messageJson = record.Body;
         }
 
-        if (!root.TryGetProperty("Message", out var messageProperty))
-        {
-            LogRecordNoMessageProperty(record.MessageId);
-            return;
-        }
-
-        var messageJson = messageProperty.GetString();
         if (string.IsNullOrEmpty(messageJson))
         {
             LogRecordEmptyMessage(record.MessageId);

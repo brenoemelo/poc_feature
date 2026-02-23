@@ -555,7 +555,7 @@ components:
     ValidationError:
       description: Validation error (RFC 7807 ProblemDetails).
       content:
-        application/problem+json:
+        application/json:
           schema:
             type: object
             properties:
