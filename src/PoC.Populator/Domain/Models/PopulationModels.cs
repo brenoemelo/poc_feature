@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace PoC.Shared.Models;
+namespace PoC.Populator.Domain.Models;
 
 public sealed record PopulationRequest(
     [property: JsonPropertyName("target")] string Target = "materials",

@@ -1,4 +1,5 @@
 using PoC.Shared.Common;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 
 namespace PoC.Populator.Domain.Interfaces;

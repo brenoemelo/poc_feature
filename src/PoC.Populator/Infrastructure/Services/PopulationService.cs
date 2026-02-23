@@ -3,6 +3,7 @@ using Amazon.SQS.Model;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Shared.Common;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 using System.Text.Json;
 

@@ -2,6 +2,7 @@ using Bogus;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Infrastructure;
 using PoC.Shared.Common;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 using System.Net.Http.Json;
 using System.Text.Json;

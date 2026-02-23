@@ -6,7 +6,9 @@ using PoC.Populator.Domain.Services;
 using PoC.Populator.Functions;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Populator.Infrastructure.Services;
-using PoC.Shared.Validators;
+using PoC.Populator.Domain.Models;
+using PoC.Populator.Domain.Validators;
+using PoC.Shared.Models;
 
 namespace PoC.Populator.Infrastructure;
 

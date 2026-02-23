@@ -5,7 +5,7 @@ using PoC.Costing.Domain.Services;
 
 using PoC.FeatureFlags.Extensions;
 using PoC.Shared.Common;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Models;
 
 namespace PoC.Costing.API.Endpoints;

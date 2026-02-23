@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using PoC.FeatureFlags.Extensions;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Shared.Common;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Shared.Extensions;
+using PoC.Populator.Domain.Models;
+using PoC.Populator.Domain.Validators;
 using PoC.Shared.Models;
 
 namespace PoC.Populator.API.Endpoints;

@@ -1,7 +1,7 @@
 using FluentValidation;
-using PoC.Shared.Models;
+using PoC.Populator.Domain.Models;
 
-namespace PoC.Shared.Validators;
+namespace PoC.Populator.Domain.Validators;
 
 public class PopulationRequestValidator : AbstractValidator<PopulationRequest>
 {

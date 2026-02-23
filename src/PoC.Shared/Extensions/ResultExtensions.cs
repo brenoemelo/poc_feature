@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PoC.Shared.Common;
 
-namespace PoC.Shared.Infrastructure.Extensions;
+namespace PoC.Shared.Extensions;
 
 public static class ResultExtensions
 {

@@ -4,7 +4,7 @@ using PoC.Materials.API.Extensions;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
 using PoC.Shared.Common;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Models;
 
 namespace PoC.Materials.API.Endpoints;

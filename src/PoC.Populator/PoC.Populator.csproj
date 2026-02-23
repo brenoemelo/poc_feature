@@ -15,7 +15,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
-    <ProjectReference Include="../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj" />
     <ProjectReference Include="../PoC.Observability/PoC.Observability.csproj" />
     <ProjectReference Include="../PoC.FeatureFlags/PoC.FeatureFlags.csproj" />
   </ItemGroup>

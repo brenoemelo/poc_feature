@@ -22,7 +22,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoC.Shared\PoC.Shared.csproj" />
-    <ProjectReference Include="..\..\src\PoC.Shared.Infrastructure\PoC.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PoC.FeatureFlags\PoC.FeatureFlags.csproj" />
     <ProjectReference Include="..\..\src\PoC.Observability\PoC.Observability.csproj" />
   </ItemGroup>

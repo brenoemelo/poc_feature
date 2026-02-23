@@ -11,6 +11,7 @@ using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
 using PoC.Observability.Extensions;
 using PoC.Shared.Events;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
