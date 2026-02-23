@@ -26,6 +26,11 @@ public class ObservabilityOptions
     public string? OtlpEndpoint { get; set; }
 
     /// <summary>
+    /// The OTLP Protocol (e.g., "grpc" or "http/protobuf").
+    /// </summary>
+    public string? OtlpProtocol { get; set; }
+
+    /// <summary>
     /// The deployment environment (e.g., "Production", "Development").
     /// </summary>
     public string Environment { get; set; } = "Development";

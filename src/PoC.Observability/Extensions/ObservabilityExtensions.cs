@@ -79,6 +79,7 @@ public static class ObservabilityExtensions
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e1) ? e1 : false,
             ServiceName = "UnknownService",
             OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };
@@ -115,6 +116,7 @@ public static class ObservabilityExtensions
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e2) ? e2 : false,
             ServiceName = "UnknownService",
             OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };
@@ -169,7 +171,14 @@ public static class ObservabilityExtensions
                 logging.AddOtlpExporter(otlp =>
                 {
                     otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                    otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                    {
+                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                    }
+                    else
+                    {
+                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    }
                 });
             }
 
@@ -199,7 +208,14 @@ public static class ObservabilityExtensions
                     tracing.AddOtlpExporter(otlp =>
                     {
                         otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                        if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                        {
+                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                        }
+                        else
+                        {
+                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                        }
                     });
                 }
 
@@ -224,7 +240,14 @@ public static class ObservabilityExtensions
                     metrics.AddOtlpExporter(otlp =>
                     {
                         otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                        if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                        {
+                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                        }
+                        else
+                        {
+                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                        }
                     });
                 }
 

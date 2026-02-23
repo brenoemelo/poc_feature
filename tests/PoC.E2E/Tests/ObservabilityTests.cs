@@ -120,4 +120,38 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
         TraceIdPattern.IsMatch(traceIdValue!).Should().BeTrue(
             because: $"TraceId '{traceIdValue}' must match W3C format (32 hex chars)");
     }
+
+    /// <summary>
+    /// Scenario D: Verify that Grafana (Loki) successfully receives telemetry logs over OTLP.
+    /// This requires the local docker compose stack to be running (Loki at localhost:3100).
+    /// </summary>
+    /// <returns>A task representing the asynchronous test operation.</returns>
+    [Fact]
+    public async Task Grafana_Should_Receive_TelemetryAsync()
+    {
+        // 1. Generate real traffic on the Materials API to trigger OTel emissions
+        var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+        
+        // We don't assert IsSuccessful because Unleash sync delay might return 404.
+        // Whether it's 200 or 404, the API still emits a trace!
+        var traceIdHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        var traceId = traceIdHeader?.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace(because: "Trace ID should be returned to trace in Grafana");
+
+        // Allow some buffer for the OpenTelemetry Collector's batch processor to flush (default ~5s-10s) + Loki ingestion
+        await Task.Delay(TimeSpan.FromSeconds(15));
+
+        // 2. Query Loki for any logs tagged with this trace ID
+        var lokiClient = new RestClient("http://localhost:3100");
+        
+        // Typical OTel -> Loki mapping uses job as service.name
+        var query = $"{{job=\"PoC-Materials\"}} |= `{traceId}`";
+        var lokiRequest = new RestRequest($"/loki/api/v1/query?query={Uri.EscapeDataString(query)}", Method.Get);
+
+        var lokiResponse = await lokiClient.ExecuteAsync(lokiRequest);
+
+        lokiResponse.IsSuccessful.Should().BeTrue(because: $"Loki should be reachable at localhost:3100. Error: {lokiResponse.ErrorMessage}");
+        lokiResponse.Content.Should().Contain(traceId, because: $"Loki should have ingested logs containing the Trace ID '{traceId}' from the PoC-Materials service via the OTel Collector.");
+    }
 }

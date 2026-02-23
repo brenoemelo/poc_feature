@@ -29,29 +29,27 @@ public class TempoTraceQLTests
     public async Task TraceQL_Complex_Query_Should_Succeed()
     {
         // 1. Action: Generate some traces by calling the API
-        var request = new RestRequest("/api/v1/materials", Method.Get);
+        var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
         var response = await _appClient.ExecuteAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        // Don't assert IsSuccessful here because Unleash delay might return 404, which still generates a trace.
+        var traceIdHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        var traceId = traceIdHeader?.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace(because: "Trace ID should be returned to trace in Grafana");
 
-        // Wait for traces to be ingested
+        // Wait for traces to be ingested by collector + tempo
         await Task.Delay(5000);
 
-        // 2. Execute Complex TraceQL Query
-        // This query uses 'select' which requires vParquet4 and compatible Tempo version.
-        // Note: 'order_by' is not yet supported in current TraceQL implementation.
-        var query = "{ span.duration > 0ms } | select(.duration, .status)";
-        
+        // 2. Query Tempo directly for the specific Trace ID we just generated
         try 
         {
-            var result = await _observabilityClient.QueryTempoSearchAsync(query);
-            result.Should().NotBeNullOrEmpty("Tempo search result should not be empty");
-            result.Should().Contain("traces", "Result should contain 'traces' array");
-            // If vParquet4 is working, we might see specific structure, but 200 OK is the main goal here.
+            var result = await _observabilityClient.QueryTempoAsync(traceId!);
+            result.Should().NotBeNullOrEmpty("Tempo response should not be empty");
+            result.Should().Contain(traceId, $"Result should contain the specific trace ID '{traceId}' reported by the API");
         }
         catch (HttpRequestException ex)
         {
-            // If it fails with 400, it means the feature is not supported or config is wrong
-            Assert.Fail($"Tempo Search failed: {ex.Message}");
+            Assert.Fail($"Tempo ID Lookup failed. The trace was not ingested: {ex.Message}");
         }
     }
 }

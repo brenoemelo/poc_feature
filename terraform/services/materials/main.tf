@@ -8,8 +8,8 @@ data "aws_api_gateway_rest_api" "shared" {
 
 locals {
   common_env_vars = {
-    OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4318"
-    OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
+    OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4317"
+    OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
     AWS__Region                 = "us-east-1"
     AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://172.18.0.9:4242/api/" # Temporary IP for debugging DNS issues
