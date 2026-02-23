@@ -26,13 +26,18 @@ public static class ObservabilityExtensions
         try
         {
             var tracerProvider = services.GetService<TracerProvider>();
-            tracerProvider?.ForceFlush();
-
             var meterProvider = services.GetService<MeterProvider>();
-            meterProvider?.ForceFlush();
-
             var loggerProvider = services.GetService<LoggerProvider>();
-            loggerProvider?.ForceFlush();
+
+            var flushTasks = new List<Task>();
+            if (tracerProvider != null) flushTasks.Add(Task.Run(() => tracerProvider.ForceFlush()));
+            if (meterProvider != null) flushTasks.Add(Task.Run(() => meterProvider.ForceFlush()));
+            if (loggerProvider != null) flushTasks.Add(Task.Run(() => loggerProvider.ForceFlush()));
+
+            if (flushTasks.Any())
+            {
+                Task.WaitAll([.. flushTasks], TimeSpan.FromSeconds(3));
+            }
         }
         catch (Exception ex)
         {
@@ -59,9 +64,6 @@ public static class ObservabilityExtensions
         {
             options.ServiceName = serviceName;
             options.ServiceVersion = serviceVersion;
-            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-            options.Environment = builder.Environment.EnvironmentName;
-            options.ExportToConsole = builder.Environment.IsDevelopment();
         });
     }
 
@@ -72,10 +74,13 @@ public static class ObservabilityExtensions
         this WebApplicationBuilder builder,
         Action<ObservabilityOptions> configureOptions)
     {
-        // ServiceName is required, so we initialize with a placeholder that must be overwritten or we check it later.
-        // However, since we are creating the object here, the caller must set it via the Action.
-        // To satisfy the 'required' modifier, we provide a default which the caller should override.
-        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        var options = new ObservabilityOptions 
+        { 
+            ServiceName = "UnknownService",
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            Environment = builder.Environment.EnvironmentName,
+            ExportToConsole = builder.Environment.IsDevelopment()
+        };
         configureOptions(options);
 
         ConfigureObservability(builder.Services, builder.Logging, options);
@@ -94,9 +99,6 @@ public static class ObservabilityExtensions
         {
             options.ServiceName = serviceName;
             options.ServiceVersion = serviceVersion;
-            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-            options.Environment = builder.Environment.EnvironmentName;
-            options.ExportToConsole = builder.Environment.IsDevelopment();
         });
     }
 
@@ -107,7 +109,13 @@ public static class ObservabilityExtensions
         this HostApplicationBuilder builder,
         Action<ObservabilityOptions> configureOptions)
     {
-        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        var options = new ObservabilityOptions 
+        { 
+            ServiceName = "UnknownService",
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            Environment = builder.Environment.EnvironmentName,
+            ExportToConsole = builder.Environment.IsDevelopment()
+        };
         configureOptions(options);
 
         ConfigureObservability(builder.Services, builder.Logging, options);
@@ -175,8 +183,7 @@ public static class ObservabilityExtensions
                     .AddSource(options.ServiceName)
                     .AddAspNetCoreInstrumentation(o => o.RecordException = true)
                     .AddHttpClientInstrumentation()
-                    .AddAWSInstrumentation() // Requires OpenTelemetry.Instrumentation.AWS
-                    .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true);
+                    .AddAWSInstrumentation(); // Requires OpenTelemetry.Instrumentation.AWS
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {

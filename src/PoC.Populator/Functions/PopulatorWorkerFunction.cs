@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
+using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Populator.Domain.Models;
@@ -67,7 +68,7 @@ public partial class PopulatorWorkerFunction
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
-            builder.AddPoCObservability("PoC.Populator.Worker", "1.0.0");
+            builder.AddPoCObservability(ObservabilityConstants.PopulatorWorkerActivitySourceName, "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();

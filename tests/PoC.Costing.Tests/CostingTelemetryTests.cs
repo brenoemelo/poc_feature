@@ -5,7 +5,7 @@ using PoC.Costing.Domain.Services;
 using PoC.Costing.Infrastructure;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
-using PoC.Shared.Tests;
+using PoC.Observability.Tests;
 using Xunit;
 
 namespace PoC.Costing.Tests;

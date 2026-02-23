@@ -3,7 +3,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace PoC.Shared.Tests;
+namespace PoC.Observability.Tests;
 
 public class LoggingTelemetryTests : IClassFixture<OtelTestFixture>
 {

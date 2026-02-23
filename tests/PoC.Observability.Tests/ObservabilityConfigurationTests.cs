@@ -8,7 +8,7 @@ using OpenTelemetry.Metrics;
 using PoC.Observability.Extensions;
 using Xunit;
 
-namespace PoC.Shared.Tests;
+namespace PoC.Observability.Tests;
 
 public class ObservabilityConfigurationTests
 {

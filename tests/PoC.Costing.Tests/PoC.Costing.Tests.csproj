@@ -7,10 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="8.0.0" />
+    <ProjectReference Include="..\..\src\PoC.Shared\PoC.Shared.csproj" />
+    <ProjectReference Include="..\..\src\PoC.Observability\PoC.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.9.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -21,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoC.Costing\PoC.Costing.csproj" />
     <ProjectReference Include="..\PoC.Shared.Tests\PoC.Shared.Tests.csproj" />
+    <ProjectReference Include="..\PoC.Observability.Tests\PoC.Observability.Tests.csproj" />
   </ItemGroup>
 
 </Project>

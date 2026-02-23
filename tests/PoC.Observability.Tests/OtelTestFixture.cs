@@ -7,7 +7,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Microsoft.Extensions.Logging;
 
-namespace PoC.Shared.Tests;
+namespace PoC.Observability.Tests;
 
 public class OtelTestFixture : IDisposable
 {
