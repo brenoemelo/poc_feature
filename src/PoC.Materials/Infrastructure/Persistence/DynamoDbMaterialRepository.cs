@@ -33,19 +33,13 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
                 Limit = limit
             };
 
-            if (!string.IsNullOrEmpty(cursor))
+            var cursorResult = ParseCursor(cursor);
+            if (cursorResult.IsFailure)
             {
-                try
-                {
-                    var json = Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
-                    var doc = Document.FromJson(json);
-                    request.ExclusiveStartKey = doc.ToAttributeMap();
-                }
-                catch
-                {
-                    return Result.Failure<PagedResult<MaterialFormulation>>(new Error("Pagination.InvalidCursor", "The provided cursor is invalid."));
-                }
+                return Result.Failure<PagedResult<MaterialFormulation>>(cursorResult.Error);
             }
+
+            request.ExclusiveStartKey = cursorResult.Value;
 
             var response = await client.QueryAsync(request);
             var items = new List<MaterialFormulation>();
@@ -57,13 +51,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
                 .Where(entity => entity is not null)
                 .Select(entity => MapToDomain(entity!)));
 
-            string? nextCursor = null;
-            if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
-            {
-                var lastKeyDoc = Document.FromAttributeMap(response.LastEvaluatedKey);
-                var json = lastKeyDoc.ToJson();
-                nextCursor = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
-            }
+            var nextCursor = GetNextCursor(response.LastEvaluatedKey);
 
             return Result.Success(new PagedResult<MaterialFormulation>(items, nextCursor));
         }
@@ -163,19 +151,13 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
                 Limit = limit
             };
 
-            if (!string.IsNullOrEmpty(cursor))
+            var cursorResult = ParseCursor(cursor);
+            if (cursorResult.IsFailure)
             {
-                try
-                {
-                    var json = Encoding.UTF8.GetString(Convert.FromBase64String(cursor));
-                    var doc = Document.FromJson(json);
-                    request.ExclusiveStartKey = doc.ToAttributeMap();
-                }
-                catch
-                {
-                    return Result.Failure<PagedResult<string>>(new Error("Pagination.InvalidCursor", "The provided cursor is invalid."));
-                }
+                return Result.Failure<PagedResult<string>>(cursorResult.Error);
             }
+
+            request.ExclusiveStartKey = cursorResult.Value;
 
             var response = await client.QueryAsync(request);
             var uniqueComponents = new HashSet<string>();
@@ -195,13 +177,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
                 }
             }
             
-            string? nextCursor = null;
-            if (response.LastEvaluatedKey != null && response.LastEvaluatedKey.Count > 0)
-            {
-                var lastKeyDoc = Document.FromAttributeMap(response.LastEvaluatedKey);
-                var json = lastKeyDoc.ToJson();
-                nextCursor = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
-            }
+            var nextCursor = GetNextCursor(response.LastEvaluatedKey);
 
             LogUniqueComponents(uniqueComponents.Count);
             return Result.Success(new PagedResult<string>(uniqueComponents, nextCursor));
@@ -224,11 +200,16 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
             var request = new PutItemRequest
             {
                 TableName = _options.TableName,
-                Item = itemDocument.ToAttributeMap()
+                Item = itemDocument.ToAttributeMap(),
+                ConditionExpression = "attribute_not_exists(material_id)"
             };
 
             await client.PutItemAsync(request);
             return Result.Success();
+        }
+        catch (ConditionalCheckFailedException)
+        {
+            return Result.Failure(Error.ConditionNotMet);
         }
         catch (Exception ex)
         {
@@ -290,6 +271,36 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
             Properties = domain.Properties,
             Version = domain.Version
         };
+    }
+
+    private static Result<Dictionary<string, AttributeValue>?> ParseCursor(string? cursor)
+    {
+        if (string.IsNullOrEmpty(cursor))
+        {
+            return Result.Success<Dictionary<string, AttributeValue>?>(null);
+        }
+
+        try
+        {
+            var json = Cursor.FromBase64(cursor);
+            var doc = Document.FromJson(json);
+            return Result.Success<Dictionary<string, AttributeValue>?>(doc.ToAttributeMap());
+        }
+        catch
+        {
+            return Result.Failure<Dictionary<string, AttributeValue>?>(new Error("Pagination.InvalidCursor", "The provided cursor is invalid."));
+        }
+    }
+
+    private static string? GetNextCursor(Dictionary<string, AttributeValue>? lastEvaluatedKey)
+    {
+        if (lastEvaluatedKey == null || lastEvaluatedKey.Count == 0)
+        {
+            return null;
+        }
+
+        var doc = Document.FromAttributeMap(lastEvaluatedKey);
+        return Cursor.ToBase64(doc.ToJson());
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllAsync] Listing materials (Limit: {limit}, Cursor: {cursor})")]

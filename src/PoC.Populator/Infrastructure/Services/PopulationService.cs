@@ -1,6 +1,7 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Options;
+using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Populator.Domain.Models;
@@ -11,7 +12,7 @@ namespace PoC.Populator.Infrastructure.Services;
 
 public sealed partial class PopulationService(
     IAmazonSQS sqsClient,
-    IOptions<PopulatorOptions> options,
+    IOptions<AwsOptions> awsOptions,
     ILogger<PopulationService> logger) : IPopulationService
 {
     private readonly ILogger<PopulationService> _logger = logger;
@@ -30,7 +31,7 @@ public sealed partial class PopulationService(
             int totalBatches = (int)Math.Ceiling((double)request.Count / batchSize);
             LogSplittingRecords(request.Count, totalBatches);
 
-            var queueUrl = options.Value.QueueUrl;
+            var queueUrl = awsOptions.Value.SqsQueueUrl;
 
             var sendTasks = new List<Task>();
 

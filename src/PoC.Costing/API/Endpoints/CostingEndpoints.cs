@@ -136,6 +136,7 @@ public static partial class CostingEndpoints
         [FromBody] CostCalculationRequest request,
         [FromServices] ICostingRepository repository,
         [FromServices] ICostCalculator costCalculator,
+        [FromServices] PoC.Costing.Infrastructure.BusinessMetrics metrics,
         [FromServices] IValidator<CostCalculationRequest> validator,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
@@ -172,6 +173,7 @@ public static partial class CostingEndpoints
             [new Link("self", selfUrl, "POST")]);
             
         LogCalculationSuccess(logger, result.Value.TotalCost, result.Value.Breakdown?.Count ?? 0);
+        metrics.RecordCalculation((double)result.Value.TotalCost);
 
         return Results.Ok(response);
     }

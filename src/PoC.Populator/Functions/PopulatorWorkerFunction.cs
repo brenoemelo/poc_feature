@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.SimpleNotificationService;
@@ -7,15 +8,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using PoC.Populator.Domain.Services;
-using PoC.Populator.Infrastructure;
-using PoC.Populator.Configuration;
 using PoC.Observability;
 using PoC.Observability.Extensions;
-using PoC.Shared.Events;
+using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Models;
+using PoC.Populator.Domain.Services;
+using PoC.Populator.Infrastructure;
+using PoC.Shared.Events;
 using PoC.Shared.Models;
-using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 #nullable enable
@@ -107,7 +107,6 @@ public partial class PopulatorWorkerFunction
     private readonly ILogger<PopulatorWorkerFunction> _logger;
     private readonly IAmazonSimpleNotificationService _snsClient;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<PopulatorOptions> _options;
     private readonly string _topicArn;
 
     public PopulatorWorkerFunction()
@@ -116,7 +115,6 @@ public partial class PopulatorWorkerFunction
         _logger = host.Services.GetRequiredService<ILogger<PopulatorWorkerFunction>>();
         _snsClient = host.Services.GetRequiredService<IAmazonSimpleNotificationService>();
         _httpClientFactory = host.Services.GetRequiredService<IHttpClientFactory>();
-        _options = host.Services.GetRequiredService<IOptions<PopulatorOptions>>();
         _serviceProvider = host.Services;
         
         var awsOptions = host.Services.GetRequiredService<IOptions<AwsOptions>>().Value;
@@ -128,14 +126,12 @@ public partial class PopulatorWorkerFunction
         IAmazonSimpleNotificationService snsClient, 
         IHttpClientFactory httpClientFactory,
         ILogger<PopulatorWorkerFunction> logger,
-        IOptions<PopulatorOptions> options,
         IServiceProvider serviceProvider,
         string topicArn)
     {
         _snsClient = snsClient;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _options = options;
         _serviceProvider = serviceProvider;
         _topicArn = topicArn;
     }

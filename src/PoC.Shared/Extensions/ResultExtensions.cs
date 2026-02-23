@@ -25,7 +25,14 @@ public static class ResultExtensions
                 Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4"
             }, statusCode: StatusCodes.Status404NotFound, contentType: "application/problem+json"),
             
-            "MissingPrices" or "CurrencyMismatch" or "InvalidMargin" or "Error.ConditionNotMet" => Results.Json(new ProblemDetails
+            "Error.ConditionNotMet" => Results.Json(new ProblemDetails
+            {
+                Title = "Conflict",
+                Detail = error.Description,
+                Status = StatusCodes.Status409Conflict
+            }, statusCode: StatusCodes.Status409Conflict, contentType: "application/problem+json"),
+
+            "MissingPrices" or "CurrencyMismatch" or "InvalidMargin" => Results.Json(new ProblemDetails
             {
                 Title = "Validation Error",
                 Detail = error.Description,

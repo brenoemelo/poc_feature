@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PoC.Materials.Domain.Interfaces;
 using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
+using PoC.Shared.Common;
 using PoC.Shared.Events;
 using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -114,7 +115,7 @@ public sealed partial class MaterialIngestionFunction
         if (result.IsFailure)
         {
             // Idempotency: version conflict means item already exists — safe to skip.
-            if (result.Error.Code == "DynamoDb.Error" && result.Error.Description.Contains("conditional request failed", StringComparison.OrdinalIgnoreCase))
+            if (result.Error == Error.ConditionNotMet)
             {
                 _metrics.RecordIngestion("skipped_idempotent");
                 LogMaterialSkippedIdempotent(materialEvent.Material.MaterialId);

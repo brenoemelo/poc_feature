@@ -2,15 +2,14 @@ using Amazon.SQS;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using PoC.Populator.Domain.Services;
-using PoC.Populator.Functions;
-using PoC.Populator.Domain.Interfaces;
-using PoC.Populator.Infrastructure.Services;
-using PoC.Populator.Domain.Models;
-using PoC.Populator.Domain.Validators;
-using PoC.Shared.Models;
-
 using PoC.Populator.Configuration;
+using PoC.Populator.Domain.Interfaces;
+using PoC.Populator.Domain.Models;
+using PoC.Populator.Domain.Services;
+using PoC.Populator.Domain.Validators;
+using PoC.Populator.Functions;
+using PoC.Populator.Infrastructure.Services;
+using PoC.Shared.Models;
 
 namespace PoC.Populator.Infrastructure;
 

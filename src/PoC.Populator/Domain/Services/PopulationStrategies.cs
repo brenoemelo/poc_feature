@@ -1,5 +1,6 @@
 using Bogus;
 using Microsoft.Extensions.Options;
+using PoC.Populator.Configuration;
 using PoC.Populator.Infrastructure;
 using PoC.Shared.Common;
 using PoC.Populator.Domain.Models;
