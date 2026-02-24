@@ -3,6 +3,8 @@ using Amazon.Lambda.SQSEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Instrumentation.AWSLambda;
+using OpenTelemetry.Trace;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
 using PoC.Observability.Extensions;
@@ -13,8 +15,11 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PoC.Costing.Functions;
 
-public sealed partial class PriceIngestionFunction
+public sealed partial class PriceIngestionFunction : IAsyncDisposable
 {
+    private readonly IHost _host;
+    public IServiceProvider Services => _host.Services;
+
     private readonly ICostingRepository _repository;
     private readonly ILogger<PriceIngestionFunction> _logger;
 
@@ -56,47 +61,67 @@ public sealed partial class PriceIngestionFunction
 
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
-        var host = builder.Build();
+        _host = builder.Build();
+        _host.Start();
 
-        _repository = host.Services.GetRequiredService<ICostingRepository>();
-        _logger = host.Services.GetRequiredService<ILogger<PriceIngestionFunction>>();
+        _repository = _host.Services.GetRequiredService<ICostingRepository>();
+        _logger = _host.Services.GetRequiredService<ILogger<PriceIngestionFunction>>();
     }
 
     public PriceIngestionFunction(ICostingRepository repository, ILogger<PriceIngestionFunction> logger)
     {
         _repository = repository;
         _logger = logger;
+        _host = null!; // Mocking constructor
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_host is IAsyncDisposable asyncDisposable)
+        {
+            await asyncDisposable.DisposeAsync();
+        }
+        else
+        {
+            _host?.Dispose();
+        }
     }
 
 #pragma warning disable VSTHRD200
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        var batchResponse = new SQSBatchResponse();
-
-        LogProcessingBatch(sqsEvent.Records.Count);
-
-        foreach (var record in sqsEvent.Records)
+        var tracerProvider = _host.Services.GetService<TracerProvider>();
+        if (tracerProvider != null)
         {
-            try
-            {
-                await ProcessSqsRecordAsync(record);
-            }
-            catch (Exception ex)
-            {
-                LogProcessingError(ex, record.MessageId);
-                batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
-                {
-                    ItemIdentifier = record.MessageId
-                });
-            }
+            return await AWSLambdaWrapper.Trace(tracerProvider, (_, _) => ProcessEvent(), sqsEvent, context);
         }
+        return await ProcessEvent();
 
-        LogBatchComplete(
-            sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
-            batchResponse.BatchItemFailures.Count);
+        async Task<SQSBatchResponse> ProcessEvent()
+        {
+            var batchResponse = new SQSBatchResponse();
 
-        return batchResponse;
+            _logger.LogInformation("Processing {Count} records...", sqsEvent.Records.Count);
+
+            foreach (var record in sqsEvent.Records)
+            {
+                try
+                {
+                    await ProcessSqsRecordAsync(record);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing SQS record {MessageId}", record.MessageId);
+                    batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                    {
+                        ItemIdentifier = record.MessageId
+                    });
+                }
+            }
+
+            return batchResponse;
+        }
     }
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)

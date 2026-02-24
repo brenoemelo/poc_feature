@@ -1,5 +1,5 @@
 using FluentValidation;
-using PoC.Populator.Domain.Models;
+using PoC.Shared.Models;
 
 namespace PoC.Populator.Domain.Validators;
 

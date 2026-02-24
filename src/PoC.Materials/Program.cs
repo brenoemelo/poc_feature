@@ -51,6 +51,20 @@ var app = builder.Build();
 // Enable Observability Middleware (TraceId Injection, Flush)
 app.UsePoCObservability();
 
+// Middleware to fix double slashes from LocalStack/APIGW
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"[Middleware] Incoming Request: {context.Request.Method} {context.Request.Path}");
+    Console.WriteLine($"[Middleware] Environment: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
+
+    if (context.Request.Path.Value?.Contains("//") == true)
+    {
+        context.Request.Path = context.Request.Path.Value.Replace("//", "/");
+        Console.WriteLine($"[Middleware] Fixed Path: {context.Request.Path}");
+    }
+    await next(context);
+});
+
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();
 

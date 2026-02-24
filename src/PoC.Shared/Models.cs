@@ -1,21 +1,23 @@
+using System.Text.Json.Serialization;
+
 namespace PoC.Shared.Models;
 
 public sealed record MaterialFormulation(
-    string MaterialId,
-    string Name,
-    Density? Density,
-    List<FormulationComponent> Formulation,
-    Dictionary<string, string> Properties,
-    int? Version
+    [property: JsonPropertyName("material_id")] string MaterialId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("density")] Density? Density,
+    [property: JsonPropertyName("formulation")] List<FormulationComponent> Formulation,
+    [property: JsonPropertyName("properties")] Dictionary<string, string> Properties,
+    [property: JsonPropertyName("version")] int? Version
 );
 
 public sealed record Density(
-    double Value,
-    string Unit
+    [property: JsonPropertyName("value")] double Value,
+    [property: JsonPropertyName("unit")] string Unit
 );
 
 public sealed record FormulationComponent(
-    string Component,
-    double Percentage,
-    string Type
+    [property: JsonPropertyName("component")] string Component,
+    [property: JsonPropertyName("percentage")] double Percentage,
+    [property: JsonPropertyName("type")] string Type
 );

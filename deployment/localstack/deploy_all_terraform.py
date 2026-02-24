@@ -199,65 +199,100 @@ def main():
     write_log(">>> STARTING TERRAFORM DEPLOYMENT <<<", "INFO")
     write_log(f"Parameters: SkipBuild={args.skip_build}, Service={args.service or 'ALL'}", "INFO")
 
-    # 1. Validation
+    # 1. Validation Stage
+    write_log(">>> STAGE 1: VALIDATION <<<", "INFO")
+    
     write_log("Checking Docker...", "INFO")
     if not ensure_docker_running():
-        write_log("Docker is not running. Please start Docker Desktop.", "ERROR")
+        write_log(">>> VALIDATION FAILED: Docker is not running. <<<", "ERROR")
         sys.exit(1)
 
     write_log("Checking Terraform...", "INFO")
-    print("Checking Terraform...", flush=True)
     if not ensure_terraform_installed():
-        write_log("Terraform not found and failed to download.", "ERROR")
+        write_log(">>> VALIDATION FAILED: Terraform not found. <<<", "ERROR")
         sys.exit(1)
          
     if not aws_helpers.validate_aws_connection():
-         write_log("AWS Connection Failed. Aborting.", "ERROR")
+         write_log(">>> VALIDATION FAILED: AWS Connection Failed. <<<", "ERROR")
          sys.exit(1)
+         
+    write_log(">>> VALIDATION SUCCESSFUL <<<", "SUCCESS")
 
     services_to_deploy = [args.service] if args.service else ["materials", "costing", "populator", "datahelper", "gateway"]
 
     # 2. Build Stage (with Code Review/Clean enforcement)
     if not args.skip_build:
-        write_log(">>> FULL CLEAN AND BUILD STAGE <<<", "INFO")
+        write_log(">>> STAGE 2: BUILD <<<", "INFO")
+        build_errors = []
+        
         for svc in services_to_deploy:
             try:
                 clean_build_and_zip(svc)
             except Exception as e:
                 write_log(f"Build failed for {svc}: {e}", "ERROR")
-                sys.exit(1)
+                build_errors.append(svc)
+        
+        if build_errors:
+            write_log(">>> BUILD STAGE FAILED <<<", "ERROR")
+            write_log(f"The following services failed to build: {', '.join(build_errors)}", "ERROR")
+            write_log("Pipeline stopped due to build errors.", "ERROR")
+            sys.exit(1)
+            
+        write_log(">>> BUILD STAGE SUCCESSFUL <<<", "SUCCESS")
     
     # 3. Deploy Shared Infrastructure
     shared_dir = os.path.join(TERRAFORM_ROOT, "shared")
-    write_log(">>> DEPLOYING SHARED INFRASTRUCTURE <<<", "INFO")
+    write_log(">>> STAGE 3: DEPLOY SHARED INFRASTRUCTURE <<<", "INFO")
     try:
         run_terraform(shared_dir)
     except Exception as e:
         write_log(f"Failed to deploy shared infrastructure: {e}", "ERROR")
+        write_log(">>> SHARED INFRASTRUCTURE DEPLOY FAILED. ABORTING. <<<", "ERROR")
         sys.exit(1)
         
-    # 4. Deploy Services in Parallel
-    write_log(">>> DEPLOYING SERVICES (PARALLEL) <<<", "INFO")
+    # 4. Deploy Services
+    write_log(">>> STAGE 4: DEPLOY SERVICES <<<", "INFO")
     
-    def deploy_svc(svc):
+    deploy_errors = []
+    
+    # Using a simpler loop for better error handling visibility than parallel for now, 
+    # or strictly handling parallel errors. The original code defined 'deploy_svc' but didn't use parallel execution in the 'for' loop shown in the snippet (it just called it).
+    # Wait, the original code had `deploy_svc` defined but the snippet shows `for svc in services_to_deploy: deploy_svc(svc)`. It wasn't actually parallel in the snippet I read?
+    # Let's check the snippet again.
+    # Lines 250-255:
+    # for svc in services_to_deploy:
+    #    try:
+    #        deploy_svc(svc)
+    #    except Exception as e:
+    #        ... sys.exit(1)
+    # So it was sequential.
+    
+    for svc in services_to_deploy:
         svc_dir = os.path.join(TERRAFORM_ROOT, "services", svc)
         if not os.path.exists(svc_dir):
             write_log(f"Terraform directory not found for {svc}: {svc_dir}", "WARN")
-            return
+            continue
+            
         write_log(f"--- Deploying {svc} ---", "INFO")
-        run_terraform(svc_dir)
-
-    for svc in services_to_deploy:
         try:
-            deploy_svc(svc)
+            run_terraform(svc_dir)
         except Exception as e:
-            write_log(f"Terraform deploy failed for {svc}", "ERROR")
-            sys.exit(1)
+             write_log(f"Deployment failed for {svc}: {e}", "ERROR")
+             deploy_errors.append(svc)
+             
+    if deploy_errors:
+        write_log(">>> DEPLOYMENT STAGE FAILED <<<", "ERROR")
+        write_log(f"The following services failed to deploy: {', '.join(deploy_errors)}", "ERROR")
+        write_log("Pipeline stopped due to deployment errors.", "ERROR")
+        sys.exit(1)
+        
+    write_log(">>> DEPLOYMENT STAGE SUCCESSFUL <<<", "SUCCESS")
                 
     # 5. Verify Resources
+    write_log(">>> STAGE 5: VERIFICATION <<<", "INFO")
     verify_aws_resources()
             
-    write_log(">>> TERRAFORM DEPLOYMENT COMPLETED SUCCESSFULLY <<<", "SUCCESS")
+    write_log(">>> PIPELINE COMPLETED SUCCESSFULLY <<<", "SUCCESS")
 
 if __name__ == "__main__":
     main()

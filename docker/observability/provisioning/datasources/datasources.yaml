@@ -55,3 +55,15 @@ datasources:
           matcherRegex: "trace_id=(\\w+)"
           name: TraceID
           url: "$${__value.raw}"
+
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    orgId: 1
+    url: http://pyroscope:4040
+    basicAuth: false
+    isDefault: false
+    version: 1
+    editable: false
+    apiVersion: 1
+    uid: pyroscope

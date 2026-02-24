@@ -28,12 +28,12 @@ public class FeatureFlagTests
         var config = new ConfigurationBuilder().Build();
 
         // Act
-        services.AddPoCFeatureFlags(options =>
+        services.AddPoCFeatureFlags(config, options =>
         {
             options.UnleashApiUrl = "http://fake-unleash/api/";
             options.UnleashApiKey = "some-key";
             options.UnleashAppName = "TestApp";
-        }, config);
+        });
 
         var serviceProvider = services.BuildServiceProvider();
 

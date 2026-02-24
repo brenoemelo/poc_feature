@@ -30,7 +30,8 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.14.1" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />  
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AWSLambda" Version="1.15.0" />
     </ItemGroup>
   
   <ItemGroup>

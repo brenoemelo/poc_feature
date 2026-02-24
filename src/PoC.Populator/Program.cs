@@ -32,7 +32,7 @@ public class Program
         var handler = Environment.GetEnvironmentVariable("_HANDLER");
         if (!string.IsNullOrEmpty(handler) && handler.Contains("PopulatorWorkerFunction"))
         {
-            var wrapper = new PopulatorWorkerFunction();
+            await using var wrapper = new PopulatorWorkerFunction();
             await LambdaBootstrapBuilder.Create<SQSEvent>(wrapper.FunctionHandler, new DefaultLambdaJsonSerializer())
                 .Build()
                 .RunAsync();
@@ -60,6 +60,19 @@ public class Program
         });
 
         var app = builder.Build();
+
+        // Enable Observability Middleware (TraceId Injection, Flush)
+        app.UsePoCObservability();
+
+        // Middleware to fix double slashes from LocalStack/APIGW
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.Value?.Contains("//") == true)
+            {
+                context.Request.Path = context.Request.Path.Value.Replace("//", "/");
+            }
+            await next(context);
+        });
 
         app.MapGroup("/api/v1/populator")
            .MapPopulatorEndpoints();

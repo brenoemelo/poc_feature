@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Instrumentation.AWSLambda; // Added
+using OpenTelemetry.Trace; // Added
 using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Populator.Configuration;
@@ -22,8 +24,21 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PoC.Populator.Functions;
 
-public partial class PopulatorWorkerFunction
+public partial class PopulatorWorkerFunction : IAsyncDisposable
 {
+    public IServiceProvider Services => _hostLazy.Value.Services;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hostLazy.IsValueCreated)
+        {
+            if (_hostLazy.Value is IAsyncDisposable asyncDisposable)
+                await asyncDisposable.DisposeAsync();
+            else
+                _hostLazy.Value.Dispose();
+        }
+    }
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Received null event or records")]
     private partial void LogNullEvent();
 
@@ -140,30 +155,41 @@ public partial class PopulatorWorkerFunction
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        if (_logger == null)
+        var tracerProvider = _hostLazy.Value.Services.GetService<TracerProvider>();
+        if (tracerProvider != null)
         {
-            Console.WriteLine("CRITICAL: Logger is not initialized!");
+            await AWSLambdaWrapper.Trace(tracerProvider, (_, _) => ProcessEvent(), ev, context);
             return;
         }
+        await ProcessEvent();
 
-        if (ev == null || ev.Records == null)
+        async Task ProcessEvent()
         {
-            LogNullEvent();
-            return;
-        }
+            if (_logger == null)
+            {
+                Console.WriteLine("CRITICAL: Logger is not initialized!");
+                return;
+            }
 
-        // Parallel processing of SQS messages
-        // We use Task.WhenAll to process all messages concurrently
-        var processingTasks = ev.Records.Select(ProcessMessageAsync);
-        
-        try
-        {
-            await Task.WhenAll(processingTasks);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing one or more messages in the batch.");
-            throw; // Re-throw to let Lambda know (partial batch failure handling might be needed in real prod)
+            if (ev == null || ev.Records == null)
+            {
+                LogNullEvent();
+                return;
+            }
+
+            // Parallel processing of SQS messages
+            // We use Task.WhenAll to process all messages concurrently
+            var processingTasks = ev.Records.Select(ProcessMessageAsync);
+            
+            try
+            {
+                await Task.WhenAll(processingTasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing one or more messages in the batch.");
+                throw; // Re-throw to let Lambda know (partial batch failure handling might be needed in real prod)
+            }
         }
     }
 

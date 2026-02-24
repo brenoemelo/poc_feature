@@ -29,7 +29,7 @@ public class Program
         var handler = Environment.GetEnvironmentVariable("_HANDLER");
         if (!string.IsNullOrEmpty(handler) && handler.Contains("PriceIngestionFunction"))
         {
-            var wrapper = new PriceIngestionFunction();
+            await using var wrapper = new PriceIngestionFunction();
             await LambdaBootstrapBuilder.Create<SQSEvent>(wrapper.FunctionHandler, new DefaultLambdaJsonSerializer())
                 .Build()
                 .RunAsync();
@@ -76,6 +76,19 @@ public class Program
         });
 
         var app = builder.Build();
+
+        // Enable Observability Middleware (TraceId Injection, Flush)
+        app.UsePoCObservability();
+
+        // Middleware to fix double slashes from LocalStack/APIGW
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.Value?.Contains("//") == true)
+            {
+                context.Request.Path = context.Request.Path.Value.Replace("//", "/");
+            }
+            await next(context);
+        });
 
         app.MapGroup("/api/v1/costing")
            .MapCostingEndpoints();

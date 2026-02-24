@@ -12,7 +12,8 @@ locals {
     OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
     AWS__Region                 = "us-east-1"
     AWS__ServiceUrl             = "http://localstack:4566"
-    FeatureFlags__UnleashApiUrl = "http://172.18.0.9:4242/api/" # Temporary IP for debugging DNS issues
+    FeatureFlags__UnleashApiUrl = "http://host.docker.internal:4242/api/" # Use host.docker.internal for stable access
+    FeatureFlags__FetchTogglesIntervalSeconds = "1"
   }
   zip_path = "${path.module}/../../../dist/PoC-Materials/PoC-Materials.zip"
 }
@@ -61,6 +62,7 @@ module "materials_api" {
     "Materials__TableName"   = aws_dynamodb_table.materials.name
     "OTEL_SERVICE_NAME"      = "PoC-Materials"
     "Observability__Enabled" = "true"
+    "ASPNETCORE_ENVIRONMENT" = "Development"
   })
 }
 
@@ -91,6 +93,7 @@ module "materials_worker" {
     "Materials__TableName"   = aws_dynamodb_table.materials.name
     "OTEL_SERVICE_NAME"      = "PoC-Materials-Ingestion"
     "Observability__Enabled" = "true"
+    "ASPNETCORE_ENVIRONMENT" = "Development"
   })
 
   filter_policy = jsonencode({

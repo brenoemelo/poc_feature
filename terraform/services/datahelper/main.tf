@@ -8,11 +8,12 @@ data "aws_api_gateway_rest_api" "shared" {
 
 locals {
   common_env_vars = {
-    OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4318"
-    OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
+    OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4317"
+    OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
     AWS__Region                 = "us-east-1"
-    AWS__LocalStackUrl          = "http://localstack:4566"
-    FeatureFlags__UnleashApiUrl = "http://unleash:4242/api/"
+    AWS__ServiceUrl             = "http://localstack:4566"
+    FeatureFlags__UnleashApiUrl = "http://host.docker.internal:4242/api/" # Use host.docker.internal for stable access
+    FeatureFlags__FetchTogglesIntervalSeconds = "1"
   }
   zip_path = "${path.module}/../../../dist/PoC-DataHelper/PoC-DataHelper.zip"
 }
@@ -30,7 +31,9 @@ module "datahelper_api" {
   lambda_role_arn = data.aws_iam_role.lambda_exec.arn
 
   environment_variables = merge(local.common_env_vars, {
-    "OTEL_SERVICE_NAME" = "PoC-DataHelper"
+    "OTEL_SERVICE_NAME"      = "PoC-DataHelper"
+    "Observability__Enabled" = "true"
+    "ASPNETCORE_ENVIRONMENT" = "Development"
   })
 }
 

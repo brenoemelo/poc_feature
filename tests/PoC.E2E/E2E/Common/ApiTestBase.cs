@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using RestSharp;
 
@@ -43,6 +44,17 @@ public abstract class ApiTestBase : IAsyncLifetime
         {
             // Revert any flags modified during the test
             await FeatureManager.ResetAllTrackedFlagsAsync();
+        }
+    }
+
+    protected async Task WaitForFlagAsync(string resource, Method method, HttpStatusCode expectedStatus)
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            var request = new RestRequest(resource, method);
+            var response = await Client.ExecuteAsync(request);
+            if (response.StatusCode == expectedStatus) return;
+            await Task.Delay(1000);
         }
     }
 }
