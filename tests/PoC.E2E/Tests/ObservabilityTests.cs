@@ -14,14 +14,6 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
 {
     private static readonly Regex TraceIdPattern = new(@"^[0-9a-f]{32}$", RegexOptions.Compiled);
 
-    private readonly OtlpMockServer _mockServer;
-
-    public ObservabilityTests()
-    {
-        var port = int.Parse(Config["OtlpMockPort"] ?? "14318");
-        _mockServer = new OtlpMockServer(port);
-    }
-
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -31,13 +23,12 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
 
     public override async Task DisposeAsync()
     {
-        _mockServer.Dispose();
         await base.DisposeAsync();
     }
 
     public void Dispose()
     {
-        _mockServer.Dispose();
+        // No additional cleanup needed
     }
 
     /// <summary>
@@ -66,29 +57,49 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
     }
 
     /// <summary>
-    /// Scenario B: Verify that the API emits OTLP trace data to the mock collector.
-    /// Requires the Lambda to be deployed with Otel__Endpoint pointing to this mock server.
+    /// Scenario B: Verify that the API emits OTLP trace data to the real collector and it reaches Tempo.
+    /// This test queries the Tempo API to confirm trace persistence.
     /// </summary>
     /// <returns>A task representing the asynchronous test operation.</returns>
-    [Fact(Skip = "Incompatible with LocalStack deployment. The Lambda is hardcoded to send traces to the docker-network otel-collector, not the host-network MockServer.")]
+    [Fact]
     public async Task Api_Request_Should_Emit_Otlp_Trace_To_CollectorAsync()
     {
-        _mockServer.Reset();
-
+        // 1. Make a request to the API
         var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
         var response = await Client.ExecuteAsync(request);
 
         response.IsSuccessful.Should().BeTrue(
-            because: $"the API call must succeed before checking traces. Status: {response.StatusCode}, Content: {response.Content}");
+            because: $"the API call must succeed. Status: {response.StatusCode}");
 
-        var received = await _mockServer.WaitForTraceAsync(TimeSpan.FromSeconds(10));
+        // 2. Extract TraceId from response header
+        var traceIdHeader = response.Headers!
+            .FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        
+        traceIdHeader.Should().NotBeNull("API response must contain X-Trace-Id header");
+        var traceId = traceIdHeader!.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace("TraceId must be valid");
 
-        received.Should().BeTrue(
-            because: "the mock OTLP collector should have received at least one trace export. " +
-                     "Ensure the Lambda is deployed with Otel__Endpoint=http://host.docker.internal:{_mockServer.Port} and Otel__Protocol=http");
+        // 3. Poll Tempo API to verify trace existence
+        // Tempo is exposed on port 3200 in docker-compose
+        var tempoClient = new RestClient("http://localhost:3200");
+        var tempoRequest = new RestRequest($"/api/traces/{traceId}", Method.Get);
+        
+        // Retry loop for eventual consistency (Collector -> Batch -> Tempo)
+        bool traceFound = false;
+        for (int i = 0; i < 10; i++)
+        {
+            var tempoResponse = await tempoClient.ExecuteAsync(tempoRequest);
+            if (tempoResponse.IsSuccessful && tempoResponse.Content!.Contains(traceId!))
+            {
+                traceFound = true;
+                break;
+            }
 
-        var payloads = _mockServer.GetTracePayloadsAsString();
-        payloads.Should().NotBeEmpty(because: "trace payloads should have been captured");
+            await Task.Delay(1000); // Wait 1s before retry
+        }
+
+        traceFound.Should().BeTrue(
+            because: $"Trace {traceId} should be visible in Tempo (http://localhost:3200) within 10 seconds");
     }
 
     /// <summary>

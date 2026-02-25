@@ -47,7 +47,7 @@ services:
   # Tempo (Distributed Tracing Backend)
   # -----------------------------------------------------
   tempo:
-    image: grafana/tempo:2.7.1
+    image: grafana/tempo:2.10.0
     container_name: tempo
     command: [ "-config.file=/etc/tempo.yaml" ]
     user: root # Avoid permission issues
@@ -55,8 +55,7 @@ services:
       - ./docker/observability/tempo.yaml:/etc/tempo.yaml
       - tempo-data:/tmp/tempo
     ports:
-      - "3200:3200" # Tempo HTTP
-      - "4319:4317" # OTLP gRPC (Mapped to 4319 to avoid conflict with Collector)
+      - "3200:3200"
     networks:
       - poc-net
 

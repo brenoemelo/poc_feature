@@ -6,11 +6,14 @@ using PoC.Materials.Infrastructure;
 using PoC.Shared.Common;
 using PoC.Shared.Extensions;
 using PoC.Shared.Models;
+using System.Diagnostics;
 
 namespace PoC.Materials.API.Endpoints;
 
 public static partial class MaterialsEndpoints
 {
+    private static readonly ActivitySource ActivitySource = new("PoC-Materials");
+
     public static RouteGroupBuilder MapMaterialsEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", GetAllMaterialsAsync)
@@ -93,6 +96,10 @@ public static partial class MaterialsEndpoints
         int limit = 10,
         string? cursor = null)
     {
+        using var activity = ActivitySource.StartActivity("Manual.GetAllMaterials");
+        activity?.SetTag("manual.trace", "true");
+        activity?.SetTag("http.limit", limit);
+
         LogListingMaterials(logger, limit, cursor);
         var result = await repository.GetAllAsync(limit, cursor);
         

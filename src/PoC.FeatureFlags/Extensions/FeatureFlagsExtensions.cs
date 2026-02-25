@@ -56,7 +56,7 @@ public static class FeatureFlagsExtensions
             };
 
             var factory = new UnleashClientFactory();
-            var client = factory.CreateClient(settings, synchronousInitialization: false);
+            var client = factory.CreateClient(settings, synchronousInitialization: true);
             
             // Set OpenFeature Provider
             Api.Instance.SetProviderAsync(new UnleashFeatureProvider(client)).Wait();

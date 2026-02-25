@@ -6,6 +6,13 @@ data "aws_api_gateway_rest_api" "shared" {
   name = "Material-Formulation-API"
 }
 
+data "terraform_remote_state" "shared" {
+  backend = "local"
+  config = {
+    path = "../../shared/terraform.tfstate"
+  }
+}
+
 locals {
   common_env_vars = {
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4317"
@@ -73,6 +80,61 @@ resource "aws_lambda_permission" "apigw" {
   function_name = module.materials_api.lambda_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${data.aws_api_gateway_rest_api.shared.execution_arn}/*/*/*"
+}
+
+# API Gateway Integration
+resource "aws_api_gateway_resource" "materials" {
+  rest_api_id = data.aws_api_gateway_rest_api.shared.id
+  parent_id   = data.terraform_remote_state.shared.outputs.v1_resource_id
+  path_part   = "materials"
+}
+
+resource "aws_api_gateway_method" "materials_any" {
+  rest_api_id   = data.aws_api_gateway_rest_api.shared.id
+  resource_id   = aws_api_gateway_resource.materials.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "materials_integration" {
+  rest_api_id             = data.aws_api_gateway_rest_api.shared.id
+  resource_id             = aws_api_gateway_method.materials_any.resource_id
+  http_method             = aws_api_gateway_method.materials_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = module.materials_api.invoke_arn
+}
+
+resource "aws_api_gateway_resource" "proxy" {
+  rest_api_id = data.aws_api_gateway_rest_api.shared.id
+  parent_id   = aws_api_gateway_resource.materials.id
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "proxy_any" {
+  rest_api_id   = data.aws_api_gateway_rest_api.shared.id
+  resource_id   = aws_api_gateway_resource.proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "proxy_integration" {
+  rest_api_id             = data.aws_api_gateway_rest_api.shared.id
+  resource_id             = aws_api_gateway_method.proxy_any.resource_id
+  http_method             = aws_api_gateway_method.proxy_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = module.materials_api.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "prod" {
+  rest_api_id = data.aws_api_gateway_rest_api.shared.id
+  stage_name  = "prod"
+
+  depends_on = [
+    aws_api_gateway_integration.materials_integration,
+    aws_api_gateway_integration.proxy_integration
+  ]
 }
 
 # Worker Lambda
