@@ -38,6 +38,7 @@ def validate_aws_connection():
 
 def get_common_env_vars():
     env_vars = {
+        "Observability__Enabled": "true",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318",
         "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "FeatureFlags__UnleashApiUrl": "http://unleash:4242/api/",

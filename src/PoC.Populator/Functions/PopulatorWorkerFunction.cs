@@ -8,8 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenTelemetry.Instrumentation.AWSLambda; // Added
-using OpenTelemetry.Trace; // Added
 using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Populator.Configuration;
@@ -114,7 +112,7 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     // Phase 3: Activity Source for Manual Tracing
-    private static readonly ActivitySource _activitySource = new("PoC-Populator-Worker");
+    private static readonly ActivitySource _activitySource = new(ObservabilityConstants.PopulatorWorkerActivitySourceName);
 
     private static IHost HostInstance => _hostLazy.Value;
 
@@ -153,14 +151,15 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
 
 #pragma warning disable VSTHRD200
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
-#pragma warning restore VSTHRD200
     {
-        var tracerProvider = _hostLazy.Value.Services.GetService<TracerProvider>();
-        if (tracerProvider != null)
-        {
-            await AWSLambdaWrapper.Trace(tracerProvider, (_, _) => ProcessEvent(), ev, context);
-            return;
-        }
+        // We use manual activity creation per message in ProcessMessageAsync
+        // to handle SQS Batch propagation correctly.
+        // A top-level span for the batch can be added here if needed, 
+        // but AWSLambdaWrapper is not compatible with typed SQSEvent.
+        
+        using var activity = _activitySource.StartActivity("ProcessBatch", ActivityKind.Server);
+        activity?.SetTag("faas.execution", context.AwsRequestId);
+        
         await ProcessEvent();
 
         async Task ProcessEvent()

@@ -1,22 +1,23 @@
+using System.Diagnostics;
+using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Instrumentation.AWSLambda;
-using OpenTelemetry.Trace;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
 using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
-using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PoC.Costing.Functions;
 
 public sealed partial class PriceIngestionFunction : IAsyncDisposable
 {
+    private static readonly ActivitySource _activitySource = new("PoC.Costing.PriceIngestion");
+
     private readonly IHost _host;
     public IServiceProvider Services => _host.Services;
 
@@ -91,14 +92,13 @@ public sealed partial class PriceIngestionFunction : IAsyncDisposable
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        var tracerProvider = _host.Services.GetService<TracerProvider>();
-        if (tracerProvider != null)
-        {
-            return await AWSLambdaWrapper.Trace(tracerProvider, (_, _) => ProcessEvent(), sqsEvent, context);
-        }
+        using var activity = _activitySource.StartActivity("ProcessBatch", ActivityKind.Server);
+        activity?.SetTag("faas.execution", context.AwsRequestId);
+        activity?.SetTag("messaging.batch.message_count", sqsEvent.Records.Count);
+
         return await ProcessEvent();
 
-        async Task<SQSBatchResponse> ProcessEvent()
+    async Task<SQSBatchResponse> ProcessEvent()
         {
             var batchResponse = new SQSBatchResponse();
 

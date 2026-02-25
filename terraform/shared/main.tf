@@ -50,11 +50,29 @@ resource "aws_iam_role_policy" "lambda_extra" {
           "sqs:ReceiveMessage",
           "sqs:DeleteMessage",
           "sqs:GetQueueAttributes",
-          "dynamodb:*"
+          "dynamodb:*",
+          "s3:*"
         ]
         Effect   = "Allow"
         Resource = "*"
       }
     ]
   })
+}
+
+# S3 Buckets
+resource "aws_s3_bucket" "materials_data" {
+  bucket = "poc-materials-data"
+}
+
+resource "aws_s3_bucket" "flags" {
+  bucket = "flags"
+}
+
+# Initial Feature Flags file
+resource "aws_s3_object" "flags_json" {
+  bucket  = aws_s3_bucket.flags.id
+  key     = "flags.json"
+  content = jsonencode({ "population-jobs" : { "default" : true } })
+  content_type = "application/json"
 }

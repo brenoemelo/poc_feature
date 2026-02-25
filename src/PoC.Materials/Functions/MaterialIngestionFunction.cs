@@ -7,6 +7,7 @@ using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
 using PoC.Shared.Common;
 using PoC.Shared.Events;
+using System.Diagnostics;
 using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -17,6 +18,7 @@ public sealed partial class MaterialIngestionFunction
     private readonly IMaterialRepository _repository;
     private readonly ILogger<MaterialIngestionFunction> _logger;
     private readonly MaterialsMetrics _metrics;
+    private static readonly ActivitySource _activitySource = new("PoC.Materials.Ingestion");
 
     public MaterialIngestionFunction()
     {
@@ -43,6 +45,10 @@ public sealed partial class MaterialIngestionFunction
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
+        using var activity = _activitySource.StartActivity("ProcessBatch", ActivityKind.Server);
+        activity?.SetTag("faas.execution", context.AwsRequestId);
+        activity?.SetTag("messaging.batch.message_count", sqsEvent.Records.Count);
+
         var batchResponse = new SQSBatchResponse();
 
         LogProcessingBatch(sqsEvent.Records.Count);
@@ -53,6 +59,8 @@ public sealed partial class MaterialIngestionFunction
             string status = "success";
             try
             {
+                // Link to the parent trace if available in message attributes
+                // For now, just process
                 await ProcessSqsRecordAsync(record);
             }
             catch (Exception ex)

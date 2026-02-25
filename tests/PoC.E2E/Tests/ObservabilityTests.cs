@@ -154,4 +154,34 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
         lokiResponse.IsSuccessful.Should().BeTrue(because: $"Loki should be reachable at localhost:3100. Error: {lokiResponse.ErrorMessage}");
         lokiResponse.Content.Should().Contain(traceId, because: $"Loki should have ingested logs containing the Trace ID '{traceId}' from the PoC-Materials service via the OTel Collector.");
     }
+
+    /// <summary>
+    /// Scenario E: Verify that Grafana (Tempo) successfully receives telemetry traces over OTLP.
+    /// This requires the local docker compose stack to be running (Tempo at localhost:3200).
+    /// </summary>
+    /// <returns>A task representing the asynchronous test operation.</returns>
+    [Fact]
+    public async Task Grafana_Should_Receive_TraceAsync()
+    {
+        // 1. Generate real traffic on the Materials API to trigger OTel emissions
+        var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+        
+        var traceIdHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        var traceId = traceIdHeader?.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace(because: "Trace ID should be returned to trace in Grafana");
+
+        // Allow some buffer for the OpenTelemetry Collector's batch processor to flush (default ~5s-10s) + Tempo ingestion
+        await Task.Delay(TimeSpan.FromSeconds(15));
+
+        // 2. Query Tempo for the trace
+        var tempoClient = new RestClient("http://localhost:3200");
+        
+        var tempoRequest = new RestRequest($"/api/traces/{traceId}", Method.Get);
+
+        var tempoResponse = await tempoClient.ExecuteAsync(tempoRequest);
+
+        tempoResponse.IsSuccessful.Should().BeTrue(because: $"Tempo should be reachable at localhost:3200 and find the trace '{traceId}'. Error: {tempoResponse.ErrorMessage}");
+        tempoResponse.Content.Should().Contain(traceId, because: $"Tempo should have ingested a trace containing the Trace ID '{traceId}' from the PoC-Materials service via the OTel Collector.");
+    }
 }

@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import shutil
 import platform
+import stat
 import urllib.request
 import zipfile
 import concurrent.futures
@@ -87,6 +88,29 @@ def clean_build_and_zip(service_name):
         raise Exception(f"Failed to create zip at {zip_path}")
     
     write_log(f"[{service_name}] Build Artifact Created: {zip_path}", "SUCCESS")
+
+def on_rm_error(func, path, exc_info):
+    """
+    Error handler for shutil.rmtree to remove read-only files (Windows).
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+def reset_dist_folder():
+    """
+    Deletes the dist folder if it exists and recreates it.
+    """
+    if os.path.exists(DIST_DIR):
+        write_log(f"Cleaning existing dist folder: {DIST_DIR}...", "INFO")
+        try:
+            shutil.rmtree(DIST_DIR, onerror=on_rm_error)
+        except Exception as e:
+            write_log(f"Failed to delete dist folder: {e}. Attempting to ignore errors...", "WARN")
+            shutil.rmtree(DIST_DIR, ignore_errors=True)
+            
+    if not os.path.exists(DIST_DIR):
+        os.makedirs(DIST_DIR)
+        write_log(f"Created dist folder: {DIST_DIR}", "INFO")
 
 def run_terraform(directory):
     write_log(f"Running Terraform in {directory}...", "INFO")
@@ -223,6 +247,14 @@ def main():
     # 2. Build Stage (with Code Review/Clean enforcement)
     if not args.skip_build:
         write_log(">>> STAGE 2: BUILD <<<", "INFO")
+        
+        # Reset dist folder before building
+        try:
+            reset_dist_folder()
+        except Exception as e:
+            write_log(f"Failed to reset dist folder: {e}", "ERROR")
+            sys.exit(1)
+            
         build_errors = []
         
         for svc in services_to_deploy:

@@ -50,6 +50,7 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
     [Fact]
     public async Task Materials_Lifecycle_HappyPath_Should_CreateQueryDeleteAndReturn404Async()
     {
+        Console.WriteLine("[Test] Starting Materials_Lifecycle_HappyPath");
         // Flags enabled in InitializeAsync
         var materialId = $"e2e-{Guid.NewGuid():N}";
         
@@ -70,36 +71,48 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
             },
             Version: null);
 
+        Console.WriteLine($"[Test] Creating material {materialId}...");
         var createRequest = new RestRequest("/api/v1/materials", Method.Post);
         createRequest.AddJsonBody(material);
         
         var createResponse = await Client.ExecuteAsync<ApiResponse<MaterialFormulation>>(createRequest);
+        Console.WriteLine($"[Test] Create Status: {createResponse.StatusCode}");
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created, because: $"creation should succeed. Content: {createResponse.Content}");
         _createdIds.Add(materialId);
 
+        Console.WriteLine("[Test] Listing materials...");
         var listRequest = new RestRequest("/api/v1/materials?limit=100", Method.Get);
         var listResponse = await Client.ExecuteAsync<PagedResponse<MaterialFormulation>>(listRequest);
+        Console.WriteLine($"[Test] List Status: {listResponse.StatusCode}");
 
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK, because: $"listing materials should succeed. Content: {listResponse.Content}");
         listResponse.Data.Should().NotBeNull();
         listResponse.Data!.Data.Should().NotBeNull();
         listResponse.Data.Data.Should().NotBeEmpty(because: "listing should return at least some materials");
 
+        Console.WriteLine("[Test] Getting material...");
         var getRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Get);
         var getResponse = await Client.ExecuteAsync<ApiResponse<MaterialFormulation>>(getRequest);
+        Console.WriteLine($"[Test] Get Status: {getResponse.StatusCode}");
 
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK, because: $"material {materialId} must exist. Content: {getResponse.Content}");
         getResponse.Data.Should().NotBeNull();
         getResponse.Data!.Data.Should().NotBeNull();
         getResponse.Data!.Data.MaterialId.Should().Be(materialId);
 
+        Console.WriteLine("[Test] Deleting material...");
         var deleteRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Delete);
         var deleteResponse = await Client.ExecuteAsync(deleteRequest);
+        Console.WriteLine($"[Test] Delete Status: {deleteResponse.StatusCode}");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent, because: "successful deletion should return 204");
 
+        Console.WriteLine("[Test] Verifying 404 after delete...");
         var getAfterDeleteRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Get);
         var getAfterDeleteResponse = await Client.ExecuteAsync(getAfterDeleteRequest);
-        getAfterDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "deleted material should not be found");
+        Console.WriteLine($"[Test] Get After Delete Status: {getAfterDeleteResponse.StatusCode}");
+        getAfterDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        
+        Console.WriteLine("[Test] Finished successfully");
     }
 
     [Fact]

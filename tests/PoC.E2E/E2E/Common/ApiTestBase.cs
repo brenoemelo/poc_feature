@@ -49,12 +49,31 @@ public abstract class ApiTestBase : IAsyncLifetime
 
     protected async Task WaitForFlagAsync(string resource, Method method, HttpStatusCode expectedStatus)
     {
+        Console.WriteLine($"[ApiTestBase] Waiting for flag on {resource}...");
+
         for (int i = 0; i < 20; i++)
         {
             var request = new RestRequest(resource, method);
-            var response = await Client.ExecuteAsync(request);
-            if (response.StatusCode == expectedStatus) return;
+
+            try
+            {
+                var response = await Client.ExecuteAsync(request);
+                Console.WriteLine($"[ApiTestBase] Attempt {i}: {response.StatusCode}");
+
+                if (response.StatusCode == expectedStatus)
+                {
+                    Console.WriteLine("[ApiTestBase] Flag active!");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ApiTestBase] Exception during wait: {ex.Message}");
+            }
+
             await Task.Delay(1000);
         }
+
+        Console.WriteLine("[ApiTestBase] Timeout waiting for flag.");
     }
 }

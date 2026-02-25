@@ -54,15 +54,25 @@ app.UsePoCObservability();
 // Middleware to fix double slashes from LocalStack/APIGW
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[Middleware] Incoming Request: {context.Request.Method} {context.Request.Path}");
-    Console.WriteLine($"[Middleware] Environment: {Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}");
-
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    logger.LogDebug("[Middleware] Processing request: {Method} {Path}", context.Request.Method, context.Request.Path);
+    
     if (context.Request.Path.Value?.Contains("//") == true)
     {
         context.Request.Path = context.Request.Path.Value.Replace("//", "/");
-        Console.WriteLine($"[Middleware] Fixed Path: {context.Request.Path}");
+        logger.LogDebug("[Middleware] Fixed Path: {Path}", context.Request.Path);
     }
-    await next(context);
+    
+    try 
+    {
+        await next(context);
+        logger.LogDebug("[Middleware] Request processed successfully: {StatusCode}", context.Response.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[Middleware] Request failed with exception");
+        throw;
+    }
 });
 
 app.MapGroup("/api/v1/materials")
