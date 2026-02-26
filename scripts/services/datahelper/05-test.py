@@ -15,8 +15,8 @@ def smoke_test():
 
     api_gateway_id = SERVICE_CONFIG["CustomApiId"]
     endpoint_url = (
-        f"{SERVICE_CONFIG['EndpointUrl']}/restapis/"
-        f"{api_gateway_id}/{SERVICE_CONFIG['Stage']}/_user_request_/api/v1/datahelper/version"
+        f"{SERVICE_CONFIG['EndpointUrl']}/_aws/execute-api/"
+        f"{api_gateway_id}/{SERVICE_CONFIG['Stage']}/api/v1/datahelper/version"
     )
 
     write_log(f"Testing API Endpoint: {endpoint_url}", "INFO")

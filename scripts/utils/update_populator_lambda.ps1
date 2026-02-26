@@ -14,7 +14,12 @@ if (Test-Path $zipPath) { Remove-Item $zipPath }
 Compress-Archive -Path "$publishDir\*" -DestinationPath $zipPath
 
 Write-Host "Updating Lambda Function Code..."
-aws --endpoint-url=http://localhost:4566 lambda update-function-code `
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+
+aws --endpoint-url=$EndpointUrl lambda update-function-code `
     --function-name $functionName `
     --zip-file "fileb://$zipPath"
 

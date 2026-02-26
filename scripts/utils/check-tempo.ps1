@@ -1,7 +1,21 @@
 $ErrorActionPreference = "Stop"
 
 # Configuration
-$ApiUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_/api/v1/materials?limit=1"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$BaseUrl = if ($Global:Config) { 
+    if ($Global:Config.ApiGateway.UrlTemplate) {
+        $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+    } else {
+        $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+    }
+} else { 
+    "http://localhost:4566/_aws/execute-api/material-api/prod" 
+}
+if ($BaseUrl.EndsWith("/")) { $BaseUrl = $BaseUrl.TrimEnd("/") }
+
+$ApiUrl = "$BaseUrl/api/v1/materials?limit=1"
 $TempoUrl = "http://localhost:3200/api/traces"
 
 Write-Output "Starting debug_tempo.ps1"

@@ -11,4 +11,9 @@ Assert-Command "docker"
 Assert-Command "aws"
 
 # Check AWS Connection
-Assert-AwsConnection -EndpointUrl "http://localhost:4566"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+
+Assert-AwsConnection -EndpointUrl $EndpointUrl

@@ -36,7 +36,20 @@ function Test-Endpoint {
     }
 }
 
-$baseUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$baseUrl = if ($Global:Config) { 
+    if ($Global:Config.ApiGateway.UrlTemplate) {
+        $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+    } else {
+        $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+    }
+} else { 
+    "http://localhost:4566/_aws/execute-api/material-api/prod" 
+}
+
+if ($baseUrl.EndsWith("/")) { $baseUrl = $baseUrl.TrimEnd("/") }
 
 # 1. Check Materials API
 Test-Endpoint -Url "$baseUrl/api/v1/materials" -Description "Materials API Health"

@@ -1,7 +1,24 @@
 
 $ErrorActionPreference = "Stop"
 
-$PopulatorUrl = "http://localhost:4566/_aws/execute-api/material-api/prod/api/v1/populator/jobs"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+
+# Construct Populator URL dynamically
+$BaseUrl = if ($Global:Config) { 
+    if ($Global:Config.ApiGateway.UrlTemplate) {
+        $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+    } else {
+        $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+    }
+} else { 
+    "http://localhost:4566/_aws/execute-api/material-api/prod" 
+}
+if ($BaseUrl.EndsWith("/")) { $BaseUrl = $BaseUrl.TrimEnd("/") }
+
+$PopulatorUrl = "$BaseUrl/api/v1/populator/jobs"
 
 Write-Host "Triggering Ensure Prices..."
 $Payload = @{
@@ -24,7 +41,7 @@ Write-Host "Checking Lambda Logs (polling for 30s)..."
 
 for ($i = 0; $i -lt 6; $i++) {
     Start-Sleep -Seconds 5
-    $LogEvents = aws --endpoint-url=http://localhost:4566 logs filter-log-events --log-group-name /aws/lambda/PoC-Populator-Worker --start-time $StartTimeUnix --limit 20 --interleaved --output json | ConvertFrom-Json
+    $LogEvents = aws --endpoint-url=$EndpointUrl logs filter-log-events --log-group-name /aws/lambda/PoC-Populator-Worker --start-time $StartTimeUnix --limit 20 --interleaved --output json | ConvertFrom-Json
     
     if ($LogEvents.events) {
         break

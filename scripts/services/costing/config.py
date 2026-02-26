@@ -17,7 +17,8 @@ SERVICE_CONFIG = {
     "ZipPath": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../PoC-Costing.zip")),
     "ProjectFile": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src/PoC.Costing/PoC.Costing.csproj")),
     "CustomApiId": CONFIG["ApiGateway"]["Id"],
-    "MaterialsApiUrl": f"{AWS_ENDPOINT_URL}/restapis/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/_user_request_/",
+    "ApiUrl": CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=CONFIG["ApiGateway"]["Id"], stage=CONFIG["ApiGateway"]["Stage"]),
+    "MaterialsApiUrl": CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=CONFIG["ApiGateway"]["Id"], stage=CONFIG["ApiGateway"]["Stage"]) + "api/v1/materials",
     "Stage": CONFIG["ApiGateway"]["Stage"],
     "Region": AWS_REGION,
     "EndpointUrl": AWS_ENDPOINT_URL

@@ -9,10 +9,9 @@ Write-Log "STEP 1: Validation" -Level INFO
 Assert-Command "aws"
 
 # Check AWS Connection
-aws sts get-caller-identity --endpoint-url http://localhost:4566 --no-cli-pager | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    Write-Log "AWS Connection (LocalStack) Verified." -Level SUCCESS
-} else {
-    Write-Log "Failed to connect to LocalStack." -Level ERROR
-    exit 1
-}
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+
+Assert-AwsConnection -EndpointUrl $EndpointUrl

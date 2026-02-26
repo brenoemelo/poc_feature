@@ -11,6 +11,10 @@ import requests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
 import aws_helpers
 
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import CONFIG
+
 def test_costing_flow():
     # 1. Ingest a Price
     queue_name = "costing-ingestion-queue"
@@ -88,7 +92,7 @@ def test_costing_flow():
     print("DEBUG: Calculating Cost via API...")
     # We need the API Gateway URL for Costing Service
     # Assuming standard localstack port and structure or using config
-    # The config.py uses: f"{AWS_ENDPOINT_URL}/restapis/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/_user_request_/api/v1/costing"
+    # The config.py uses: f"{AWS_ENDPOINT_URL}/_aws/execute-api/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/api/v1/costing"
     
     # Get API ID
     apigateway = aws_helpers.get_boto3_client("apigateway")
@@ -109,7 +113,11 @@ def test_costing_flow():
             aws_helpers.write_log(f"Error creating API Gateway: {e}", "ERROR")
             return
 
-    base_url = f"http://localhost:4566/restapis/{api_id}/prod/_user_request_/api/v1/costing"
+    if "UrlTemplate" in CONFIG["ApiGateway"]:
+        base_url = CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=api_id, stage="prod") + "api/v1/costing"
+    else:
+        base_url = f"http://localhost:4566/_aws/execute-api/{api_id}/prod/api/v1/costing"
+    
     aws_helpers.write_log(f"Using Costing API URL: {base_url}", "INFO")
     
     # Calculate Cost Request

@@ -1,22 +1,20 @@
 
 import boto3
 import os
+import sys
 
-# Set environment variables for LocalStack
-os.environ['AWS_ACCESS_KEY_ID'] = 'test'
-os.environ['AWS_SECRET_ACCESS_KEY'] = 'test'
-os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
-
-endpoint_url = "http://localhost:4566"
+# Add utils to path
+sys.path.append(os.path.dirname(__file__))
+import aws_helpers
 
 try:
-    apigateway = boto3.client('apigateway', endpoint_url=endpoint_url)
+    apigateway = aws_helpers.get_boto3_client('apigateway')
     apis = apigateway.get_rest_apis()
     print("REST APIs:")
     for item in apis.get('items', []):
         print(f"Name: {item['name']}, ID: {item['id']}")
         
-    lambda_client = boto3.client('lambda', endpoint_url=endpoint_url)
+    lambda_client = aws_helpers.get_boto3_client('lambda')
     functions = lambda_client.list_functions()
     print("\nLambda Functions:")
     for func in functions.get('Functions', []):

@@ -75,11 +75,16 @@ Write-Log "Saving event.json..." -Level INFO
 Set-Content "$PSScriptRoot/event.json" $EventJson -Encoding Ascii
 Write-Log "Event JSON created at $PSScriptRoot/event.json" -Level INFO
 
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+
 Write-Log "Starting invocation..." -Level INFO
 $OldEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $Output = aws lambda invoke --function-name $($ServiceConfig.Name) --payload "fileb://$PSScriptRoot/event.json" --endpoint-url http://localhost:4566 --cli-connect-timeout 10 --cli-read-timeout 60 --no-cli-pager "$PSScriptRoot/response.json" 2>&1
+    $Output = aws lambda invoke --function-name $($ServiceConfig.Name) --payload "fileb://$PSScriptRoot/event.json" --endpoint-url $EndpointUrl --cli-connect-timeout 10 --cli-read-timeout 60 --no-cli-pager "$PSScriptRoot/response.json" 2>&1
     Write-Log "DEBUG: ExitCode: $LASTEXITCODE" -Level INFO
     Write-Log "DEBUG: Output: $Output" -Level INFO
 } catch {

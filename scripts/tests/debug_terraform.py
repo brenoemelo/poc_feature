@@ -2,6 +2,10 @@ import subprocess
 import os
 import sys
 
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import CONFIG
+
 # Setup environment
 PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd()))
 BIN_DIR = os.path.join(PROJECT_ROOT, '.bin')
@@ -19,10 +23,10 @@ if not os.path.exists(TERRAFORM_EXE):
 os.environ["PATH"] = BIN_DIR + os.pathsep + os.environ["PATH"]
 
 env = os.environ.copy()
-env["AWS_ACCESS_KEY_ID"] = "test"
-env["AWS_SECRET_ACCESS_KEY"] = "test"
-env["AWS_DEFAULT_REGION"] = "us-east-1"
-env["AWS_ENDPOINT_URL"] = "http://localhost:4566"
+env["AWS_ACCESS_KEY_ID"] = CONFIG["Aws"].get("AccessKeyId", "test")
+env["AWS_SECRET_ACCESS_KEY"] = CONFIG["Aws"].get("SecretAccessKey", "test")
+env["AWS_DEFAULT_REGION"] = CONFIG["Aws"].get("Region", "us-east-1")
+env["AWS_ENDPOINT_URL"] = CONFIG["Aws"].get("LocalStackUrl", "http://localhost:4566")
 
 print("Running terraform init...")
 try:

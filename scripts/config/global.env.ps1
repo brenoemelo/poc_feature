@@ -14,6 +14,7 @@ $Global:Config = @{
     ApiGateway = @{
         Id = $ApiId
         Stage = "prod"
+        UrlTemplate = "http://localhost:4566/_aws/execute-api/{api_id}/{stage}/"
     }
     Project = @{
         Name = "PoC-Feature"

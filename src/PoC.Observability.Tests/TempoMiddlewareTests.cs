@@ -13,10 +13,10 @@ public class TempoMiddlewareTests
     // URL do Tempo exposta no docker-compose.yml
     private const string TempoBaseUrl = "http://localhost:3200"; 
     // URL do API Gateway no LocalStack (pode variar, verificar com `awslocal apigateway get-rest-apis`)
-    // Exemplo: http://localhost:4566/restapis/<api_id>/prod/_user_request_
+    // Exemplo: http://localhost:4566/_aws/execute-api/<api_id>/prod/
     // ID da API atual: material-api
     // IMPORTANTE: Manter a barra no final para que o BaseAddress funcione corretamente com URIs relativas
-    private const string AppBaseUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_/";
+    private const string AppBaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod/";
 
     public TempoMiddlewareTests()
     {

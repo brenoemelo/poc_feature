@@ -10,11 +10,25 @@ if (Test-Path $EnvFile) {
     }
 }
 
-$ApiId = "material-api"
+# Load Global Config (Single Source of Truth)
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$BaseUrl = if ($Global:Config) { 
+    if ($Global:Config.ApiGateway.UrlTemplate) {
+        $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+    } else {
+        $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+    }
+} else { 
+    "http://localhost:4566/_aws/execute-api/material-api/prod" 
+}
+
 if (-not [string]::IsNullOrWhiteSpace($API_GATEWAY_ID)) { 
     $ApiId = $API_GATEWAY_ID 
+    $BaseUrl = "http://localhost:4566/_aws/execute-api/$ApiId/prod"
 }
-$BaseUrl = "http://localhost:4566/restapis/$ApiId/prod/_user_request_"
+
+if ($BaseUrl.EndsWith("/")) { $BaseUrl = $BaseUrl.TrimEnd("/") }
 $PopulatorUrl = "$BaseUrl/api/v1/populator/jobs"
 $MaterialsCountUrl = "$BaseUrl/api/v1/materials/count"
 $MaterialsUrl = "$BaseUrl/api/v1/materials"

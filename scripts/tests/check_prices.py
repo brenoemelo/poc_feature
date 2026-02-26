@@ -7,8 +7,12 @@ import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../services/costing')))
 from config import RESOURCES, CONFIG
 
-AWS_ENDPOINT = "http://localhost:4566"
-REGION = "us-east-1"
+# Add utils to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
+import aws_helpers
+
+AWS_ENDPOINT = aws_helpers.AWS_ENDPOINT_URL
+REGION = aws_helpers.AWS_REGION
 
 dynamodb = boto3.resource('dynamodb', endpoint_url=AWS_ENDPOINT, region_name=REGION)
 materials_table = dynamodb.Table(RESOURCES['DynamoDb']['MaterialsTable'])

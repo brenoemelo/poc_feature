@@ -145,7 +145,7 @@ module "populator_worker" {
   
   # Merges common variables with specific variables for this service
   environment_variables = merge(local.common_env_vars, {
-    MATERIALS_API_URL = "http://localstack:4566/restapis/material-api/prod/_user_request_/"
+    MATERIALS_API_URL = "http://localstack:4566/_aws/execute-api/material-api/prod/"
   })
 }
 

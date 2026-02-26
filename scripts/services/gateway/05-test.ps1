@@ -29,7 +29,7 @@ Write-Log "Stage Found." -Level SUCCESS
 # 3. Optional: Verify URL Reachability (if services are up)
 # Since Gateway pipeline runs independently, services might not be up.
 # But we can check if the endpoint is listening (even if it returns 500/403).
-$ApiUrl = "$($ServiceConfig.EndpointUrl)/restapis/$($ServiceConfig.ApiId)/$($ServiceConfig.Stage)/_user_request_"
+$ApiUrl = "$($ServiceConfig.EndpointUrl)/_aws/execute-api/$($ServiceConfig.ApiId)/$($ServiceConfig.Stage)/"
 Write-Log "API URL: $ApiUrl" -Level INFO
 
 Write-Log "Smoke Tests Passed." -Level SUCCESS

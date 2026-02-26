@@ -9,7 +9,8 @@ CONFIG = {
     "ApiGateway": {
         "Id": "material-api",
         "Name": "Material-Formulation-API",
-        "Stage": "prod"
+        "Stage": "prod",
+        "UrlTemplate": "http://localhost:4566/_aws/execute-api/{api_id}/{stage}/"
     },
     "Project": {
         "Name": "PoC-Feature",

@@ -2,9 +2,14 @@
 $ErrorActionPreference = "Stop"
 Start-Transcript -Path "test_price_ingestion.log" -Append
 
-$EndpointUrl = "http://localhost:4566"
-$Region = "us-east-1"
-$TopicArn = "arn:aws:sns:us-east-1:000000000000:material-events"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+$AccountId = if ($Global:Config) { $Global:Config.Aws.AccountId } else { "000000000000" }
+$Region = if ($Global:Config) { $Global:Config.Aws.Region } else { "us-east-1" }
+
+$TopicArn = "arn:aws:sns:$Region:$AccountId:material-events"
 $TableName = "costing-prices-table"
 
 # 1. Generate Test Data

@@ -6,7 +6,15 @@ function Get-AwsIdentity {
 }
 
 function Assert-AwsConnection {
-    param([string]$EndpointUrl = "http://localhost:4566")
+    param([string]$EndpointUrl)
+    
+    # Load Global Config
+    $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+    if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+    if (-not $EndpointUrl) {
+        $EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+    }
+
     Write-Log "Verifying AWS Connection to $EndpointUrl..." -Level INFO
     aws sts get-caller-identity --endpoint-url $EndpointUrl --cli-connect-timeout 5 --cli-read-timeout 10 --no-cli-pager 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {

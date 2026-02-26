@@ -7,15 +7,19 @@ import json
 import subprocess
 from botocore.exceptions import ClientError
 
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import CONFIG
+
 # Add utils to path to import logger
 sys.path.append(os.path.dirname(__file__))
 from logger import write_log
 
 # Global Configuration
-AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", "http://localhost:4566")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "test")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "test")
+AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", CONFIG["Aws"].get("LocalStackUrl", "http://localhost:4566"))
+AWS_REGION = os.getenv("AWS_REGION", CONFIG["Aws"].get("Region", "us-east-1"))
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", CONFIG["Aws"].get("AccessKeyId", "test"))
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", CONFIG["Aws"].get("SecretAccessKey", "test"))
 
 def get_boto3_client(service_name):
     return boto3.client(
