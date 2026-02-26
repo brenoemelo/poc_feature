@@ -1,7 +1,12 @@
 # Load Global Config
 $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
 if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
-$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
-$Region = if ($Global:Config) { $Global:Config.Aws.Region } else { "us-east-1" }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$EndpointUrl = $Global:Config.Aws.LocalStackUrl
+$Region = $Global:Config.Aws.Region
 
 aws dynamodb list-tables --endpoint-url $EndpointUrl --region $Region

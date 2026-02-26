@@ -3,9 +3,14 @@ $ErrorActionPreference = "Stop"
 # Load Global Config
 $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
 if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
-$EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
-$AccountId = if ($Global:Config) { $Global:Config.Aws.AccountId } else { "000000000000" }
-$Region = if ($Global:Config) { $Global:Config.Aws.Region } else { "us-east-1" }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$EndpointUrl = $Global:Config.Aws.LocalStackUrl
+$AccountId = $Global:Config.Aws.AccountId
+$Region = $Global:Config.Aws.Region
 
 $TraceId = "0af7651916cd43dd8448eb211c80319c"
 $SpanId = "b7ad6b7169203331"

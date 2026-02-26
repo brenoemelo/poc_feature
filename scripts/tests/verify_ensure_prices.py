@@ -6,11 +6,11 @@ import sys
 import os
 
 # Add parent directory to path to import config
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../services/costing')))
-from config import RESOURCES, CONFIG
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import RESOURCES, CONFIG
 
-AWS_ENDPOINT = CONFIG['Aws'].get('LocalStackUrl', "http://localhost:4566")
-REGION = CONFIG['Aws'].get('Region', "us-east-1")
+AWS_ENDPOINT = CONFIG['Aws']['LocalStackUrl']
+REGION = CONFIG['Aws']['Region']
 API_GATEWAY_ID = CONFIG['ApiGateway']['Id']
 STAGE = CONFIG['ApiGateway']['Stage']
 if "UrlTemplate" in CONFIG["ApiGateway"]:

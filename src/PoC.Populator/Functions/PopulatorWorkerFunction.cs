@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Populator.Configuration;
@@ -195,10 +197,17 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
     private async Task ProcessMessageAsync(SQSEvent.SQSMessage message)
     {
         // Phase 3: Extract Parent Trace Context
-        var parentContext = ExtractParentContext(message);
+        var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, message.MessageAttributes, (attributes, key) =>
+        {
+            if (attributes.TryGetValue(key, out var value))
+            {
+                return new[] { value.StringValue };
+            }
+            return Enumerable.Empty<string>();
+        });
 
         // Start a new Activity linked to the parent context
-        using var activity = _activitySource.StartActivity("ProcessSQSMessage", ActivityKind.Consumer, parentContext);
+        using var activity = _activitySource.StartActivity("ProcessSQSMessage", ActivityKind.Consumer, parentContext.ActivityContext);
 
         // Add tags to the activity
         activity?.SetTag("messaging.system", "aws.sqs");
@@ -376,19 +385,6 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
             activity?.SetStatus(ActivityStatusCode.Error, exc.Message);
             throw; 
         }
-    }
-
-    private static ActivityContext ExtractParentContext(SQSEvent.SQSMessage msg)
-    {
-        if (msg.MessageAttributes != null && 
-            msg.MessageAttributes.TryGetValue("traceparent", out var traceParentAttr) &&
-            !string.IsNullOrEmpty(traceParentAttr.StringValue) &&
-            ActivityContext.TryParse(traceParentAttr.StringValue, null, out var context))
-        {
-            return context;
-        }
-
-        return default;
     }
 
     private IPopulationStrategy GetStrategy(string target)

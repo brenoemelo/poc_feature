@@ -16,10 +16,10 @@ sys.path.append(os.path.dirname(__file__))
 from logger import write_log
 
 # Global Configuration
-AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", CONFIG["Aws"].get("LocalStackUrl", "http://localhost:4566"))
-AWS_REGION = os.getenv("AWS_REGION", CONFIG["Aws"].get("Region", "us-east-1"))
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", CONFIG["Aws"].get("AccessKeyId", "test"))
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", CONFIG["Aws"].get("SecretAccessKey", "test"))
+AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", CONFIG["Aws"]["LocalStackUrl"])
+AWS_REGION = os.getenv("AWS_REGION", CONFIG["Aws"]["Region"])
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", CONFIG["Aws"]["AccessKeyId"])
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", CONFIG["Aws"]["SecretAccessKey"])
 
 def get_boto3_client(service_name):
     return boto3.client(
@@ -50,7 +50,7 @@ def get_common_env_vars():
         "AWS_REGION": AWS_REGION,
         "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
         "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
-        "AWS_ENDPOINT_URL": "http://localstack:4566" # Explicitly point to LocalStack internal URL
+        "AWS_ENDPOINT_URL": CONFIG["Aws"]["LocalStackInternalUrl"] # Explicitly point to LocalStack internal URL
     }
     write_log(f"DEBUG: Common Env Vars: {env_vars}", "INFO")
     return env_vars

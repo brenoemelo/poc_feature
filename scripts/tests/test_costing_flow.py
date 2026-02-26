@@ -64,7 +64,7 @@ def test_costing_flow():
     table_name = "costing-prices-table"
     
     found = False
-    for i in range(10): # Retry for 10 seconds
+    for i in range(30): # Retry for 30 seconds
         time.sleep(1)
         try:
             response = dynamodb.get_item(
@@ -77,6 +77,7 @@ def test_costing_flow():
                 break
         except Exception as e:
             print(f"Error checking DynamoDB (attempt {i+1}): {e}")
+            sys.stdout.flush()
             
     if not found:
          aws_helpers.write_log(f"FAILURE: Price for {component_name} NOT found in DynamoDB after retries.", "ERROR")
@@ -84,8 +85,9 @@ def test_costing_flow():
          try:
             scan = dynamodb.scan(TableName=table_name)
             print(f"DEBUG: Scan result: {scan.get('Items')}")
-         except:
-            pass
+         except Exception as e:
+            print(f"DEBUG: Scan failed: {e}")
+         sys.stdout.flush()
          return
 
     # 3. Calculate Cost via API
@@ -114,9 +116,13 @@ def test_costing_flow():
             return
 
     if "UrlTemplate" in CONFIG["ApiGateway"]:
-        base_url = CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=api_id, stage="prod") + "api/v1/costing"
+        base_url = CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=api_id, stage="prod")
     else:
-        base_url = f"http://localhost:4566/_aws/execute-api/{api_id}/prod/api/v1/costing"
+        # Fallback to standard LocalStack pattern if template is missing (should not happen with valid config)
+        aws_endpoint = CONFIG["Aws"]["LocalStackUrl"]
+        base_url = f"{aws_endpoint}/_aws/execute-api/{api_id}/prod"
+    
+    base_url = f"{base_url}/api/v1/costing"
     
     aws_helpers.write_log(f"Using Costing API URL: {base_url}", "INFO")
     

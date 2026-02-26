@@ -144,10 +144,10 @@ def import_dynamodb_if_exists(directory):
 
     # Check if already in Terraform state
     env = os.environ.copy()
-    env["AWS_ENDPOINT_URL"] = "http://localhost:4566"
-    env["AWS_ACCESS_KEY_ID"] = "test"
-    env["AWS_SECRET_ACCESS_KEY"] = "test"
-    env["AWS_REGION"] = "us-east-1"
+    env["AWS_ENDPOINT_URL"] = CONFIG["Aws"]["LocalStackUrl"]
+    env["AWS_ACCESS_KEY_ID"] = CONFIG["Aws"]["AccessKeyId"]
+    env["AWS_SECRET_ACCESS_KEY"] = CONFIG["Aws"]["SecretAccessKey"]
+    env["AWS_REGION"] = CONFIG["Aws"]["Region"]
     
     try:
         result = subprocess.run(
@@ -183,10 +183,10 @@ def run_terraform(directory):
     
     # Use terraform directly, relying on AWS_ENDPOINT_URL for localstack
     env = os.environ.copy()
-    env["AWS_ENDPOINT_URL"] = "http://localhost:4566"
-    env["AWS_ACCESS_KEY_ID"] = "test"
-    env["AWS_SECRET_ACCESS_KEY"] = "test"
-    env["AWS_REGION"] = "us-east-1"
+    env["AWS_ENDPOINT_URL"] = CONFIG["Aws"]["LocalStackUrl"]
+    env["AWS_ACCESS_KEY_ID"] = CONFIG["Aws"]["AccessKeyId"]
+    env["AWS_SECRET_ACCESS_KEY"] = CONFIG["Aws"]["SecretAccessKey"]
+    env["AWS_REGION"] = CONFIG["Aws"]["Region"]
     
     try:
         # Increased timeouts to avoid failures on slow environments

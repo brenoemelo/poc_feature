@@ -11,8 +11,13 @@ function Assert-AwsConnection {
     # Load Global Config
     $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
     if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+    
+    if (-not $Global:Config) {
+        throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+    }
+
     if (-not $EndpointUrl) {
-        $EndpointUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl } else { "http://localhost:4566" }
+        $EndpointUrl = $Global:Config.Aws.LocalStackUrl
     }
 
     Write-Log "Verifying AWS Connection to $EndpointUrl..." -Level INFO
@@ -64,8 +69,26 @@ function Invoke-Aws {
         [int]$MaxRetries = 3
     )
 
-    $EndpointUrl = if ($env:AWS_ENDPOINT_URL) { $env:AWS_ENDPOINT_URL } else { "http://localhost:4566" }
-    $Region = if ($env:AWS_DEFAULT_REGION) { $env:AWS_DEFAULT_REGION } else { "us-east-1" }
+    # Load Global Config if not already loaded
+    if (-not $Global:Config) {
+        $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+        if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+    }
+    
+    if (-not $Global:Config) {
+        throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+    }
+
+    $EndpointUrl = if ($env:AWS_ENDPOINT_URL) { 
+        $env:AWS_ENDPOINT_URL 
+    } else { 
+        $Global:Config.Aws.LocalStackUrl 
+    }
+    $Region = if ($env:AWS_DEFAULT_REGION) { 
+        $env:AWS_DEFAULT_REGION 
+    } else { 
+        $Global:Config.Aws.Region 
+    }
 
     $cmdLine = "aws --endpoint-url $EndpointUrl --region $Region --no-cli-pager $Service $Command $Arguments"
     

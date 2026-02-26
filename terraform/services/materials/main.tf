@@ -17,6 +17,7 @@ locals {
   common_env_vars = {
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4317"
     OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
+    OTEL_PROPAGATORS            = "tracecontext,xray"
     AWS__Region                 = "us-east-1"
     AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://host.docker.internal:4242/api/" # Use host.docker.internal for stable access
@@ -28,9 +29,7 @@ locals {
 # DynamoDB
 resource "aws_dynamodb_table" "materials" {
   name           = "materials-table"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = 5
-  write_capacity = 5
+  billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "material_id"
 
   attribute {
@@ -47,8 +46,6 @@ resource "aws_dynamodb_table" "materials" {
     name            = "IX_Materials_By_Type"
     hash_key        = "record_type"
     range_key       = "material_id"
-    read_capacity   = 5
-    write_capacity  = 5
     projection_type = "ALL"
   }
 }
@@ -127,14 +124,34 @@ resource "aws_api_gateway_integration" "proxy_integration" {
   uri                     = module.materials_api.invoke_arn
 }
 
-resource "aws_api_gateway_deployment" "prod" {
+resource "aws_api_gateway_deployment" "this" {
   rest_api_id = data.aws_api_gateway_rest_api.shared.id
-  stage_name  = "prod"
+
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_resource.materials,
+      aws_api_gateway_method.materials_any,
+      aws_api_gateway_integration.materials_integration,
+      aws_api_gateway_resource.proxy,
+      aws_api_gateway_method.proxy_any,
+      aws_api_gateway_integration.proxy_integration,
+    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   depends_on = [
     aws_api_gateway_integration.materials_integration,
     aws_api_gateway_integration.proxy_integration
   ]
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.this.id
+  rest_api_id   = data.aws_api_gateway_rest_api.shared.id
+  stage_name    = "prod"
 }
 
 # Worker Lambda

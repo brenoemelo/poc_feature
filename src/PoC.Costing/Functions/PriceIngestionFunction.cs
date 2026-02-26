@@ -5,6 +5,8 @@ using Amazon.Lambda.SQSEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
 using PoC.Observability.Extensions;
@@ -106,6 +108,21 @@ public sealed partial class PriceIngestionFunction : IAsyncDisposable
 
             foreach (var record in sqsEvent.Records)
             {
+                // Extract parent context from SQS message attributes
+                var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, record.MessageAttributes, (attributes, key) =>
+                {
+                    if (attributes.TryGetValue(key, out var value))
+                    {
+                        return new[] { value.StringValue };
+                    }
+                    return Enumerable.Empty<string>();
+                });
+
+                // Start a new activity for processing this message, linked to the parent
+                using var messageActivity = _activitySource.StartActivity("ProcessMessage", ActivityKind.Consumer, parentContext.ActivityContext);
+                messageActivity?.SetTag("messaging.system", "sqs");
+                messageActivity?.SetTag("messaging.message_id", record.MessageId);
+
                 try
                 {
                     await ProcessSqsRecordAsync(record);
@@ -117,6 +134,7 @@ public sealed partial class PriceIngestionFunction : IAsyncDisposable
                     {
                         ItemIdentifier = record.MessageId
                     });
+                    messageActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 }
             }
 

@@ -7,6 +7,8 @@ using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
 using PoC.Shared.Common;
 using PoC.Shared.Events;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using System.Diagnostics;
 using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -57,10 +59,24 @@ public sealed partial class MaterialIngestionFunction
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string status = "success";
+
+            // Extract parent context from SQS message attributes
+            var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, record.MessageAttributes, (attributes, key) =>
+            {
+                if (attributes.TryGetValue(key, out var value))
+                {
+                    return new[] { value.StringValue };
+                }
+                return Enumerable.Empty<string>();
+            });
+
+            // Start a new activity for processing this message, linked to the parent
+            using var messageActivity = _activitySource.StartActivity("ProcessMessage", ActivityKind.Consumer, parentContext.ActivityContext);
+            messageActivity?.SetTag("messaging.system", "sqs");
+            messageActivity?.SetTag("messaging.message_id", record.MessageId);
+
             try
             {
-                // Link to the parent trace if available in message attributes
-                // For now, just process
                 await ProcessSqsRecordAsync(record);
             }
             catch (Exception ex)
@@ -71,6 +87,7 @@ public sealed partial class MaterialIngestionFunction
                 {
                     ItemIdentifier = record.MessageId
                 });
+                messageActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             }
             finally
             {

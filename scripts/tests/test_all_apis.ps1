@@ -61,7 +61,7 @@ if (-not $BaseUrl) {
             $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
         }
     } else { 
-        "http://localhost:4566/_aws/execute-api/material-api/prod/" 
+        throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
     }
 
     if ($LocalStackUrl.EndsWith("/")) { $LocalStackUrl = $LocalStackUrl.TrimEnd("/") }
@@ -69,7 +69,7 @@ if (-not $BaseUrl) {
     Write-Host "Checking LocalStack URL: $LocalStackUrl ..." -NoNewline
     # Simple check if LocalStack is up (not necessarily the API)
     try {
-        $LocalStackHealthUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl + "/_localstack/health" } else { "http://localhost:4566/_localstack/health" }
+        $LocalStackHealthUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl + "/_localstack/health" } else { throw "Global Config not loaded" }
         $test = Invoke-WebRequest -Uri $LocalStackHealthUrl -Method GET -ErrorAction SilentlyContinue
         if ($test.StatusCode -eq 200) {
              $BaseUrl = $LocalStackUrl

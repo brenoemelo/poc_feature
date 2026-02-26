@@ -23,10 +23,10 @@ if not os.path.exists(TERRAFORM_EXE):
 os.environ["PATH"] = BIN_DIR + os.pathsep + os.environ["PATH"]
 
 env = os.environ.copy()
-env["AWS_ACCESS_KEY_ID"] = CONFIG["Aws"].get("AccessKeyId", "test")
-env["AWS_SECRET_ACCESS_KEY"] = CONFIG["Aws"].get("SecretAccessKey", "test")
-env["AWS_DEFAULT_REGION"] = CONFIG["Aws"].get("Region", "us-east-1")
-env["AWS_ENDPOINT_URL"] = CONFIG["Aws"].get("LocalStackUrl", "http://localhost:4566")
+env["AWS_ACCESS_KEY_ID"] = CONFIG["Aws"]["AccessKeyId"]
+env["AWS_SECRET_ACCESS_KEY"] = CONFIG["Aws"]["SecretAccessKey"]
+env["AWS_DEFAULT_REGION"] = CONFIG["Aws"]["Region"]
+env["AWS_ENDPOINT_URL"] = CONFIG["Aws"]["LocalStackUrl"]
 
 print("Running terraform init...")
 try:

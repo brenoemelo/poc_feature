@@ -16,6 +16,7 @@ locals {
   common_env_vars = {
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://otel-collector:4317"
     OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
+    OTEL_PROPAGATORS            = "tracecontext,xray"
     AWS__Region                 = "us-east-1"
     AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://host.docker.internal:4242/api/" # Use host.docker.internal for stable access
