@@ -284,6 +284,117 @@ def remove_sns_topic(topic_arn):
         if e.response['Error']['Code'] != 'NotFound':
             write_log(f"Error deleting topic: {e}", "WARN")
 
+def cleanup_all_resources():
+    """
+    Deletes all resources in LocalStack to ensure a clean slate for Terraform.
+    EXCEPT DynamoDB tables (as per user request).
+    """
+    write_log(">>> STARTING LOCALSTACK CLEANUP <<<", "INFO")
+    
+    lambda_client = get_boto3_client("lambda")
+
+    # 0. Global Event Source Mappings (Clean these first to avoid conflicts)
+    try:
+        write_log("Cleaning all Event Source Mappings...", "INFO")
+        # List all mappings (no FunctionName filter)
+        paginator = lambda_client.get_paginator('list_event_source_mappings')
+        for page in paginator.paginate():
+            for mapping in page.get('EventSourceMappings', []):
+                uuid = mapping['UUID']
+                write_log(f"Removing ESM: {uuid}", "INFO")
+                try:
+                    lambda_client.delete_event_source_mapping(UUID=uuid)
+                except Exception as e:
+                    write_log(f"Error deleting ESM {uuid}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning ESMs: {e}", "WARN")
+
+    # 1. Lambdas
+    try:
+        paginator = lambda_client.get_paginator('list_functions')
+        for page in paginator.paginate():
+            for func in page.get('Functions', []):
+                remove_lambda_function(func['FunctionName'])
+    except Exception as e:
+        write_log(f"Error cleaning Lambdas: {e}", "WARN")
+
+    # 2. DynamoDB Tables - SKIPPED (User request: keep databases)
+    write_log("Skipping DynamoDB cleanup (keeping databases).", "INFO")
+    # try:
+    #     dynamodb = get_boto3_client("dynamodb")
+    #     tables = dynamodb.list_tables()
+    #     for table in tables.get('TableNames', []):
+    #         remove_dynamodb_table(table)
+    # except Exception as e:
+    #     write_log(f"Error cleaning DynamoDB: {e}", "WARN")
+
+    # 3. SQS Queues
+    try:
+        sqs = get_boto3_client("sqs")
+        queues = sqs.list_queues()
+        for queue_url in queues.get('QueueUrls', []):
+            remove_sqs_queue(queue_url)
+    except Exception as e:
+        write_log(f"Error cleaning SQS: {e}", "WARN")
+
+    # 4. SNS Topics
+    try:
+        sns = get_boto3_client("sns")
+        paginator = sns.get_paginator('list_topics')
+        for page in paginator.paginate():
+            for topic in page.get('Topics', []):
+                remove_sns_topic(topic['TopicArn'])
+    except Exception as e:
+        write_log(f"Error cleaning SNS: {e}", "WARN")
+
+    # 5. API Gateways
+    try:
+        apigw = get_boto3_client("apigateway")
+        apis = apigw.get_rest_apis()
+        for api in apis.get('items', []):
+            write_log(f"Removing API Gateway: {api['name']} ({api['id']})", "INFO")
+            try:
+                apigw.delete_rest_api(restApiId=api['id'])
+            except Exception as e:
+                write_log(f"Error deleting API Gateway {api['id']}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning API Gateways: {e}", "WARN")
+
+    # 6. S3 Buckets
+    try:
+        s3 = get_boto3_client("s3")
+        buckets = s3.list_buckets()
+        for bucket in buckets.get('Buckets', []):
+            name = bucket['Name']
+            write_log(f"Removing S3 Bucket: {name}", "INFO")
+            try:
+                # Delete objects first
+                objects = s3.list_objects_v2(Bucket=name)
+                if 'Contents' in objects:
+                    for obj in objects['Contents']:
+                        s3.delete_object(Bucket=name, Key=obj['Key'])
+                s3.delete_bucket(Bucket=name)
+            except Exception as e:
+                write_log(f"Error deleting S3 Bucket {name}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning S3: {e}", "WARN")
+        
+    # 7. CloudWatch Log Groups
+    try:
+        logs = get_boto3_client("logs")
+        paginator = logs.get_paginator('describe_log_groups')
+        for page in paginator.paginate():
+            for group in page.get('logGroups', []):
+                 write_log(f"Removing Log Group: {group['logGroupName']}", "INFO")
+                 try:
+                     logs.delete_log_group(logGroupName=group['logGroupName'])
+                 except Exception as e:
+                     write_log(f"Error deleting log group {group['logGroupName']}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning Log Groups: {e}", "WARN")
+        
+    write_log(">>> LOCALSTACK CLEANUP COMPLETED <<<", "SUCCESS")
+
 def invoke_lambda(function_name, payload={}):
     lambda_client = get_boto3_client("lambda")
     write_log(f"Invoking Lambda: {function_name}", "INFO")

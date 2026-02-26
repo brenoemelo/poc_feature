@@ -147,6 +147,7 @@ Scripts used to provision AWS resources (local or remote) must use **Terraform**
 ### 13.1. Safety & Pre-flight Checks
 * **Fail Fast:** The deployment pipeline (`deploy_all_terraform.py`) must immediately stop if any validation or build command fails.
 * **Connection Check:** Verify LocalStack/AWS connectivity before execution.
+* **Tooling:** NEVER USE TERRAFORM.EXE DIRECTLY, ALWAYS USE `d:\Projetos\poc_feature\deployment\localstack\deploy_all_terraform.py`.
 
 ### 13.2. Idempotency & Cleanup (Terraform)
 * **Declarative Configuration:** Use Terraform (`terraform plan / apply`) instead of imperative CLI commands to ensure idempotent deployments.

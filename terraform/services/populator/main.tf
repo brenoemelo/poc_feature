@@ -9,7 +9,8 @@ data "aws_api_gateway_rest_api" "shared" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  materials_api_url = "http://localstack:4566/restapis/${data.aws_api_gateway_rest_api.shared.id}/prod/_user_request_/"
+  # Updated to use the new LocalStack format to avoid deprecation warnings
+  materials_api_url = "http://localstack:4566/_aws/execute-api/${data.aws_api_gateway_rest_api.shared.id}/prod/"
   output_topic_arn  = "arn:aws:sns:us-east-1:${data.aws_caller_identity.current.account_id}:material-events"
   
   common_env_vars = {

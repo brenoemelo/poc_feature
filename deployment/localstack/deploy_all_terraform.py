@@ -112,6 +112,72 @@ def reset_dist_folder():
         os.makedirs(DIST_DIR)
         write_log(f"Created dist folder: {DIST_DIR}", "INFO")
 
+def import_dynamodb_if_exists(directory):
+    """
+    Checks if a DynamoDB table exists in LocalStack but is missing from Terraform state.
+    If so, imports it.
+    """
+    dir_name = os.path.basename(directory)
+    if "materials" in dir_name:
+        table_name = "materials-table"
+        resource_addr = "aws_dynamodb_table.materials"
+    elif "costing" in dir_name:
+        table_name = "costing-prices-table"
+        resource_addr = "aws_dynamodb_table.costing"
+    else:
+        return
+
+    write_log(f"[{dir_name}] Checking if table {table_name} needs import...", "INFO")
+
+    # Check if table exists in LocalStack
+    dynamodb = aws_helpers.get_boto3_client("dynamodb")
+    try:
+        dynamodb.describe_table(TableName=table_name)
+        table_exists = True
+    except Exception:
+        # Assuming ResourceNotFoundException or similar
+        table_exists = False
+
+    if not table_exists:
+        write_log(f"[{dir_name}] Table {table_name} does not exist in LocalStack. Terraform will create it.", "INFO")
+        return
+
+    # Check if already in Terraform state
+    env = os.environ.copy()
+    env["AWS_ENDPOINT_URL"] = "http://localhost:4566"
+    env["AWS_ACCESS_KEY_ID"] = "test"
+    env["AWS_SECRET_ACCESS_KEY"] = "test"
+    env["AWS_REGION"] = "us-east-1"
+    
+    try:
+        result = subprocess.run(
+            ["terraform", "state", "list", resource_addr],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            env=env
+        )
+        if resource_addr in result.stdout:
+            write_log(f"[{dir_name}] Table {table_name} is already in Terraform state.", "INFO")
+            return
+    except Exception as e:
+        write_log(f"[{dir_name}] Error checking terraform state: {e}", "WARN")
+        return
+
+    # Import the table
+    write_log(f"[{dir_name}] Importing existing table {table_name} into Terraform state...", "INFO")
+    try:
+        subprocess.run(
+            ["terraform", "import", resource_addr, table_name],
+            cwd=directory,
+            check=True,
+            env=env
+        )
+        write_log(f"[{dir_name}] Successfully imported {table_name}.", "SUCCESS")
+    except subprocess.CalledProcessError as e:
+        # If import fails (e.g. already managed but state check failed), we log and continue
+        write_log(f"[{dir_name}] Failed to import table {table_name}: {e}. Proceeding with apply...", "WARN")
+
 def run_terraform(directory):
     write_log(f"Running Terraform in {directory}...", "INFO")
     
@@ -120,10 +186,15 @@ def run_terraform(directory):
     env["AWS_ENDPOINT_URL"] = "http://localhost:4566"
     env["AWS_ACCESS_KEY_ID"] = "test"
     env["AWS_SECRET_ACCESS_KEY"] = "test"
+    env["AWS_REGION"] = "us-east-1"
     
     try:
         # Increased timeouts to avoid failures on slow environments
         subprocess.run(["terraform", "init"], cwd=directory, env=env, check=True, timeout=300)
+        
+        # Check and import DynamoDB tables if they exist (to avoid ResourceInUseException)
+        import_dynamodb_if_exists(directory)
+        
         subprocess.run(["terraform", "apply", "-auto-approve"], cwd=directory, env=env, check=True, timeout=600)
         write_log(f"Terraform apply successful for {os.path.basename(directory)}", "SUCCESS")
     except subprocess.TimeoutExpired as e:
@@ -216,12 +287,13 @@ def verify_aws_resources():
 def main():
     parser = argparse.ArgumentParser(description="Master Deployment Script with Terraform")
     parser.add_argument("--skip-build", action="store_true", help="Skip clean/build stage")
+    parser.add_argument("--clean", action="store_true", help="Clean all LocalStack resources before deployment")
     parser.add_argument("--service", type=str, help="Deploy a single service (e.g. materials, populator)")
     args = parser.parse_args()
 
     init_log("Terraform-Deploy", clean_all=True)
     write_log(">>> STARTING TERRAFORM DEPLOYMENT <<<", "INFO")
-    write_log(f"Parameters: SkipBuild={args.skip_build}, Service={args.service or 'ALL'}", "INFO")
+    write_log(f"Parameters: SkipBuild={args.skip_build}, Clean={args.clean}, Service={args.service or 'ALL'}", "INFO")
 
     # 1. Validation Stage
     write_log(">>> STAGE 1: VALIDATION <<<", "INFO")
@@ -241,6 +313,17 @@ def main():
          sys.exit(1)
          
     write_log(">>> VALIDATION SUCCESSFUL <<<", "SUCCESS")
+
+    # 1.5 Cleanup Stage
+    write_log(">>> STAGE 1.5: CLEANUP LOCALSTACK <<<", "INFO")
+    if args.clean:
+        try:
+            write_log("Cleanup flag detected. Removing all resources...", "INFO")
+            aws_helpers.cleanup_all_resources()
+        except Exception as e:
+            write_log(f"Cleanup failed: {e}", "WARN")
+    else:
+        write_log("Cleanup flag not provided. Skipping resource cleanup.", "INFO")
 
     services_to_deploy = [args.service] if args.service else ["materials", "costing", "populator", "datahelper", "gateway"]
 

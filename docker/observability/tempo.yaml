@@ -5,8 +5,8 @@ server:
 
 query_frontend:
   search:
-    max_duration: 0  # Permite buscar em todo o histórico, mas monitore o CPU
-    max_spans_per_span_set: 100 # Evita que uma query traga dados excessivos
+    max_duration: 0  # Allow querying over entire history, monitor CPU usage
+    max_spans_per_span_set: 100 # avoid high-cardinality queries
 
 distributor:
   receivers:
@@ -20,16 +20,16 @@ distributor:
 ingester:
   lifecycler:
     ring:
-      replication_factor: 1 # Para HA em produção, use 3
+      replication_factor: 1 #For HA in production use 3
       kvstore:
         store: inmemory
   max_block_duration: 5m
-  max_block_bytes: 100_000_000 # Aumentado para 100MB (mínimo recomendado para estabilidade)
-  trace_idle_period: 30s # Valor padrão que garante a completude do rastro
+  max_block_bytes: 100_000_000 # Increased to 100MB (minimum recommended for stability)
+  trace_idle_period: 30s # Default value that ensures trace completeness
 
 compactor:
   compaction:
-    block_retention: 168h # Retenção de 7 dias (padrão de mercado)
+    block_retention: 168h # Retention of 7 days (market standard)
     compacted_block_retention: 1h
 
 metrics_generator:
@@ -42,16 +42,17 @@ metrics_generator:
       concurrent_blocks: 20
   storage:
     path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: "http://prometheus:9090/api/v1/write" # Prometheus ingestion endpoint
+        send_exemplars: true # Correlates metric with trace exemplar
   traces_storage:
     path: /tmp/tempo/generator/traces
-    # Importante: Para ver os gráficos no Grafana, você precisará 
-    # configurar o remote_write para um Prometheus/Mimir
 
 storage:
   trace:
     backend: local
     block:
-      version: vParquet5 # Recomendado para Tempo 2.10+ (melhor performance TraceQL)
+      version: vParquet5
     wal:
       path: /tmp/tempo/wal
     local:

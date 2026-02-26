@@ -3,8 +3,8 @@ services:
     image: localstack/localstack:4.13.0
     container_name: localstack
     ports:
-      - 4566:4566 # LocalStack Gateway
-      - 4510-4559:4510-4559 # external services port range
+      - "4566:4566"
+      - "4510-4559:4510-4559"
     environment:
       - DEBUG=${DEBUG:-0}
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -12,11 +12,16 @@ services:
       - GATEWAY_LISTEN=0.0.0.0:4566
       - TZ=Etc/UTC
       - LAMBDA_DOCKER_NETWORK=poc_feature_poc-net
-      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=60 # Increase startup timeout for .NET
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=60
     volumes:
       - ${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./deploy:/opt/deploy # Artifacts zipped for Lambda creation
+      - ./deploy:/opt/deploy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -s http://localhost:4566/_localstack/health | grep '\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - poc-net
 
@@ -24,25 +29,28 @@ services:
   # OpenTelemetry Collector (The Gateway)
   # Receives OTLP (gRPC/HTTP) from .NET Apps
   # Exports to Tempo, Prometheus, Loki
-  # -----------------------------------------------------
+  # -----------------------------------------------------  
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.119.0
     container_name: otel-collector
+    restart: unless-stopped
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./docker/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
-      - "8889:8889" # Prometheus exporter metrics
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Internal Metrics
       - "13133:13133" # Health check extension
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
     networks:
       - poc-net
-    depends_on:
-      - tempo
-      - loki
-      - prometheus
-
   # -----------------------------------------------------
   # Tempo (Distributed Tracing Backend)
   # -----------------------------------------------------
@@ -50,7 +58,8 @@ services:
     image: grafana/tempo:2.10.0
     container_name: tempo
     command: [ "-config.file=/etc/tempo.yaml" ]
-    user: root # Avoid permission issues
+    user: root
+    restart: unless-stopped
     volumes:
       - ./docker/observability/tempo.yaml:/etc/tempo.yaml
       - tempo-data:/tmp/tempo
@@ -67,8 +76,7 @@ services:
     container_name: pyroscope
     ports:
       - "4040:4040"
-    command:
-      - "server"
+    command: ["server"]
     networks:
       - poc-net
 
@@ -78,16 +86,23 @@ services:
   prometheus:
     image: prom/prometheus:v3.1.0
     container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
-      - --web.enable-remote-write-receiver # Enable pushing metrics from OTel Collector
+      - --web.enable-remote-write-receiver
       - --enable-feature=exemplar-storage
       - --enable-feature=native-histograms
+      - --storage.tsdb.wal-compression
     volumes:
       - ./docker/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
       - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
+    healthcheck:
+       test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy"]
+       interval: 10s
+       timeout: 5s
+       retries: 3
     networks:
       - poc-net
 
@@ -97,8 +112,8 @@ services:
   loki:
     image: grafana/loki:3.6.6
     container_name: loki
-    command: -config.file=/etc/loki/local-config.yaml
-    user: root # Avoid permission issues
+    user: "0"
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
     volumes:
       - ./docker/observability/loki.yaml:/etc/loki/local-config.yaml
       - loki-data:/loki
@@ -111,24 +126,29 @@ services:
   # Grafana (The UI)
   # -----------------------------------------------------
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.0
     container_name: grafana
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
     volumes:
       - ./docker/observability/provisioning:/etc/grafana/provisioning # Auto-configure datasources and dashboards
       - ./docker/observability/dashboards:/etc/grafana/dashboards # JSON Dashboards
       - grafana-data:/var/lib/grafana
-    ports:
-      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
     networks:
       - poc-net
-    depends_on:
-      - tempo
-      - prometheus
-      - loki
 
   # -----------------------------------------------------
   # Feature Flag Management (Unleash + PostgreSQL)
@@ -139,22 +159,25 @@ services:
     image: postgres:15.5-alpine
     container_name: postgres
     environment:
+      POSTGRES_DB: unleash
       POSTGRES_USER: unleash_user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: unleash
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    networks:
-      - poc-net
     healthcheck:
-      test: [ "CMD", "pg_isready", "--username", "unleash_user", "--dbname", "unleash" ]
+      test: ["CMD-SHELL", "pg_isready -U unleash_user -d unleash"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - poc-net
 
   unleash:
     image: unleashorg/unleash-server:latest
     container_name: unleash
+    ports:
+      - "4242:4242"
     environment:
       DATABASE_HOST: postgres
       DATABASE_NAME: unleash
@@ -165,14 +188,12 @@ services:
       INIT_CLIENT_API_TOKENS: "*:development.unleash-insecure-api-token"
       INIT_ADMIN_API_TOKENS: "*:*.admin-token"
       UNLEASH_DEFAULT_ADMIN_PASSWORD: "password"
-    ports:
-      - "4242:4242"
-    networks:
-      - poc-net
     depends_on:
       postgres:
         condition: service_healthy
-
+    networks:
+      - poc-net
+      
   # -----------------------------------------------------
   # Unleash Initialization
   # Auto-configures Strategies and Flags
@@ -180,22 +201,27 @@ services:
   unleash-init:
     image: badouralix/curl-jq
     container_name: unleash-init
+    depends_on:
+      - unleash
     volumes:
       - ./scripts/init-unleash.sh:/init.sh
-      - ./src:/src
     command: [ "sh", "/init.sh" ]
     networks:
       - poc-net
-    depends_on:
-      - unleash
 
 networks:
   poc-net:
+    name: poc_feature_poc-net
     driver: bridge
 
 volumes:
   tempo-data:
-  prometheus-data:
+    name: poc_feature_tempo-data
   loki-data:
+    name: poc_feature_loki-data
+  prometheus-data:
+    name: poc_feature_prometheus-data
   grafana-data:
+    name: poc_feature_grafana-data
   postgres-data:
+    name: poc_feature_postgres-data

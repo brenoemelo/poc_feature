@@ -1,5 +1,7 @@
 # Automation Framework Guide
 
+> **⚠️ DEPRECATED:** This guide describes the legacy PowerShell-based deployment framework. The current supported deployment method uses the Python + Terraform pipeline. Please refer to [Terraform Deployment Pipeline](deployment-pipeline.md) for up-to-date instructions.
+
 **Role:** DevOps & SRE Documentation
 **Status:** Active
 **Scope:** LocalStack & AWS Deployment
