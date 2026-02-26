@@ -5,7 +5,7 @@ import argparse
 # Add utils to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../utils')))
 import aws_helpers
-from config import SERVICE_CONFIG
+from config import SERVICE_CONFIG, CONFIG
 
 def deploy():
     parser = argparse.ArgumentParser(description="Deploy Service")
@@ -67,7 +67,8 @@ def deploy():
     output_topic_arn = f"arn:aws:sns:{SERVICE_CONFIG['Region']}:000000000000:{SERVICE_CONFIG['OutputSnsTopic']}"
     
     # Ensure Materials API URL uses localstack hostname for internal communication
-    materials_api_url = SERVICE_CONFIG['MaterialsApiUrl'].replace("localhost", "localstack")
+    # Use LocalStackInternalUrl from global config
+    materials_api_url = f"{CONFIG['Aws']['LocalStackInternalUrl']}/_aws/execute-api/{SERVICE_CONFIG['CustomApiId']}/{SERVICE_CONFIG['Stage']}/api/v1/materials"
     
     worker_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['WorkerFunctionName'],

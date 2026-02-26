@@ -112,6 +112,43 @@ def reset_dist_folder():
         os.makedirs(DIST_DIR)
         write_log(f"Created dist folder: {DIST_DIR}", "INFO")
 
+def cleanup_local_terraform_state():
+    """
+    Deletes local Terraform state files (.terraform, .tfstate) to ensure a clean slate.
+    """
+    write_log("Cleaning local Terraform state files...", "INFO")
+    
+    dirs_to_clean = [os.path.join(TERRAFORM_ROOT, "shared")]
+    
+    # Add all service directories
+    services_root = os.path.join(TERRAFORM_ROOT, "services")
+    if os.path.exists(services_root):
+        for svc in os.listdir(services_root):
+            dirs_to_clean.append(os.path.join(services_root, svc))
+            
+    for directory in dirs_to_clean:
+        if not os.path.exists(directory):
+            continue
+            
+        # Delete .terraform directory
+        tf_dir = os.path.join(directory, ".terraform")
+        if os.path.exists(tf_dir):
+            try:
+                shutil.rmtree(tf_dir, onerror=on_rm_error)
+                write_log(f"Removed {tf_dir}", "INFO")
+            except Exception as e:
+                write_log(f"Failed to remove {tf_dir}: {e}", "WARN")
+
+        # Delete state files
+        for file in ["terraform.tfstate", "terraform.tfstate.backup"]:
+            tf_file = os.path.join(directory, file)
+            if os.path.exists(tf_file):
+                try:
+                    os.remove(tf_file)
+                    write_log(f"Removed {tf_file}", "INFO")
+                except Exception as e:
+                    write_log(f"Failed to remove {tf_file}: {e}", "WARN")
+
 def import_dynamodb_if_exists(directory):
     """
     Checks if a DynamoDB table exists in LocalStack but is missing from Terraform state.
@@ -319,7 +356,10 @@ def main():
     if args.clean:
         try:
             write_log("Cleanup flag detected. Removing all resources...", "INFO")
+            # Clean cloud resources
             aws_helpers.cleanup_all_resources()
+            # Clean local state
+            cleanup_local_terraform_state()
         except Exception as e:
             write_log(f"Cleanup failed: {e}", "WARN")
     else:

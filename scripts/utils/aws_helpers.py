@@ -396,6 +396,31 @@ def cleanup_all_resources():
                      write_log(f"Error deleting log group {group['logGroupName']}: {e}", "WARN")
     except Exception as e:
         write_log(f"Error cleaning Log Groups: {e}", "WARN")
+
+    # 8. IAM Roles (specifically lambda-role which causes conflicts)
+    try:
+        iam = get_boto3_client("iam")
+        role_name = "lambda-role"
+        try:
+            iam.get_role(RoleName=role_name)
+            write_log(f"Removing IAM Role: {role_name}", "INFO")
+            
+            # Detach managed policies
+            attached_policies = iam.list_attached_role_policies(RoleName=role_name)
+            for policy in attached_policies.get('AttachedPolicies', []):
+                iam.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+            
+            # Delete inline policies
+            inline_policies = iam.list_role_policies(RoleName=role_name)
+            for policy_name in inline_policies.get('PolicyNames', []):
+                iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+            
+            iam.delete_role(RoleName=role_name)
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchEntity':
+                write_log(f"Error cleaning IAM Role {role_name}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning IAM Roles: {e}", "WARN")
         
     write_log(">>> LOCALSTACK CLEANUP COMPLETED <<<", "SUCCESS")
 

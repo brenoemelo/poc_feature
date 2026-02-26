@@ -21,7 +21,8 @@ def test_costing_flow():
     aws_helpers.write_log(f"Testing price ingestion on queue: {queue_name}", "INFO")
     
     sqs = aws_helpers.get_boto3_client("sqs")
-    
+
+
     try:
         response = sqs.get_queue_url(QueueName=queue_name)
         queue_url = response['QueueUrl']
@@ -44,7 +45,15 @@ def test_costing_flow():
     
     # Wrap in SNS envelope structure
     message_body = {
-        "Message": json.dumps(price_event)
+        "Type": "Notification",
+        "MessageId": str(uuid.uuid4()),
+        "Message": json.dumps(price_event),
+        "MessageAttributes": {
+            "EventType": {
+                "Type": "String",
+                "Value": "PriceUpdated"
+            }
+        }
     }
     
     aws_helpers.write_log(f"Sending price update for: {component_name} ($10.0)", "INFO")
@@ -72,7 +81,18 @@ def test_costing_flow():
                 Key={'ComponentName': {'S': component_name}}
             )
             if 'Item' in response:
+                item = response['Item']
                 aws_helpers.write_log(f"SUCCESS: Price for {component_name} found in DynamoDB!", "SUCCESS")
+                
+                # Verify Content
+                stored_price = float(item.get('UnitPrice', {}).get('N', '0'))
+                stored_currency = item.get('Currency', {}).get('S', '')
+                
+                if abs(stored_price - unit_price) < 0.01 and stored_currency == currency:
+                    aws_helpers.write_log(f"Content Verification Passed: {stored_price} {stored_currency}", "SUCCESS")
+                else:
+                    aws_helpers.write_log(f"Content Verification Failed: Expected {unit_price} {currency}, Got {stored_price} {stored_currency}", "ERROR")
+
                 found = True
                 break
         except Exception as e:

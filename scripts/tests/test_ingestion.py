@@ -62,6 +62,7 @@ def test_ingestion():
     
     aws_helpers.write_log("Message sent. Waiting for processing...", "INFO")
     time.sleep(5) # Wait for Lambda to process
+    sys.stdout.flush()
     
     # Verify in DynamoDB
     dynamodb = aws_helpers.get_boto3_client("dynamodb")
