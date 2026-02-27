@@ -1,8 +1,18 @@
 
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$DefaultEndpoint = $Global:Config.Aws.LocalStackUrl
+
 function Get-Or-Create-ApiGateway {
     param(
         [string]$ApiName,
-        [string]$EndpointUrl = "http://localhost:4566"
+        [string]$EndpointUrl = $DefaultEndpoint
     )
 
     Write-Log "Checking for existing API Gateway: $ApiName" -Level INFO

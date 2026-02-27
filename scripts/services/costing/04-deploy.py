@@ -4,7 +4,7 @@ import os
 # Add utils to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../utils')))
 import aws_helpers
-from config import SERVICE_CONFIG
+from config import SERVICE_CONFIG, CONFIG
 
 def deploy():
     aws_helpers.write_log("STEP 4: Deploy Costing Service", "INFO")
@@ -44,7 +44,8 @@ def deploy():
     common_env = aws_helpers.get_common_env_vars()
     
     # Ensure Materials API URL uses localstack hostname for internal communication
-    materials_api_url = SERVICE_CONFIG['MaterialsApiUrl'].replace("localhost", "localstack")
+    # Use LocalStackInternalUrl from global config
+    materials_api_url = f"{CONFIG['Aws']['LocalStackInternalUrl']}/_aws/execute-api/{SERVICE_CONFIG['CustomApiId']}/{SERVICE_CONFIG['Stage']}/api/v1/materials"
     
     main_env_vars = {
         "OTEL_SERVICE_NAME": SERVICE_CONFIG['Name'],

@@ -5,14 +5,14 @@ using PoC.Costing.Domain.Services;
 
 using PoC.FeatureFlags.Extensions;
 using PoC.Shared.Common;
-using PoC.Shared.Infrastructure.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Models;
 
 namespace PoC.Costing.API.Endpoints;
 
 public static partial class CostingEndpoints
 {
-    [LoggerMessage(Level = LogLevel.Information, Message = "Upserting price for component: {ComponentName}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Upserting price for component: {componentName}")]
     private static partial void LogUpsertingPrice(ILogger logger, string componentName);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Retrieving all component prices")]
@@ -21,10 +21,10 @@ public static partial class CostingEndpoints
     [LoggerMessage(Level = LogLevel.Information, Message = "Retrieving count of component prices")]
     private static partial void LogRetrievingPricesCount(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Calculating cost for material: {MaterialId}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Calculating cost for material: {materialId}")]
     private static partial void LogCalculatingCost(ILogger logger, string materialId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Calculation success. TotalCost: {TotalCost}, BreakdownCount: {Count}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Calculation success. TotalCost: {totalCost}, BreakdownCount: {count}")]
     private static partial void LogCalculationSuccess(ILogger logger, decimal totalCost, int count);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Starting bulk cost calculation for all materials")]
@@ -33,10 +33,10 @@ public static partial class CostingEndpoints
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to fetch materials")]
     private static partial void LogFailedToFetchMaterials(ILogger logger, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping material {MaterialId}: {Error}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping material {materialId}: {error}")]
     private static partial void LogSkippingMaterial(ILogger logger, string materialId, string error);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Batch cost calculation completed. Processed {Count} materials")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Batch cost calculation completed. Processed {count} materials")]
     private static partial void LogBatchCalculationCompleted(ILogger logger, int count);
 
     public static RouteGroupBuilder MapCostingEndpoints(this RouteGroupBuilder group)
@@ -136,6 +136,7 @@ public static partial class CostingEndpoints
         [FromBody] CostCalculationRequest request,
         [FromServices] ICostingRepository repository,
         [FromServices] ICostCalculator costCalculator,
+        [FromServices] PoC.Costing.Infrastructure.BusinessMetrics metrics,
         [FromServices] IValidator<CostCalculationRequest> validator,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
@@ -171,10 +172,8 @@ public static partial class CostingEndpoints
             result.Value,
             [new Link("self", selfUrl, "POST")]);
             
-        logger.LogInformation(
-            "Calculation success. TotalCost: {TotalCost}, BreakdownCount: {Count}",
-            result.Value.TotalCost,
-            result.Value.Breakdown?.Count ?? 0);
+        LogCalculationSuccess(logger, result.Value.TotalCost, result.Value.Breakdown?.Count ?? 0);
+        metrics.RecordCalculation((double)result.Value.TotalCost);
 
         return Results.Ok(response);
     }
@@ -187,22 +186,23 @@ public static partial class CostingEndpoints
         LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
-        logger.LogInformation("Starting bulk cost calculation for all materials");
+        LogStartingBulkCalculation(logger);
         
-        IEnumerable<MaterialFormulation> materials;
+        List<MaterialFormulation> materials;
         try
         {
-            materials = await materialsClient.GetAllMaterialsAsync();
+            var materialsEnumerable = await materialsClient.GetAllMaterialsAsync();
+            materials = materialsEnumerable.ToList();
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to fetch materials");
+            LogFailedToFetchMaterials(logger, ex);
             return Results.Problem("Failed to fetch materials from Materials Service", statusCode: 502);
         }
 
         var selfUrl = linkGenerator.GetUriByName(httpContext, "CalculateAllCosts") ?? "/api/v1/costing/estimations/batch";
 
-        if (!materials.Any())
+        if (materials.Count == 0)
         {
             var emptyResponse = new ApiResponse<IReadOnlyList<CostCalculationResponse>>(
                 [],

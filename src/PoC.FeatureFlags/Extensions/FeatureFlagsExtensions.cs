@@ -13,44 +13,84 @@ public static class FeatureFlagsExtensions
 {
     public static IServiceCollection AddPoCFeatureFlags(
         this IServiceCollection services,
-        Action<FeatureFlagOptions> configureOptions)
+        IConfiguration configuration,
+        Action<FeatureFlagOptions>? configureOptions = null)
     {
         var options = new FeatureFlagOptions();
-        configureOptions(options);
+        
+        // 1. Bind from Configuration (appsettings.json + Environment Variables)
+        configuration.GetSection("FeatureFlags").Bind(options);
 
-        // Register Unleash Client
+        // DEBUG: Log configuration values
+        // Note: We need a logger here before we can use it in the singleton factory, 
+        // but we can't easily get one. 
+        // We will rely on the logger inside the factory, but we capture the options value now.
+        var useFake = options.UseFakeProvider;
+        var unleashUrl = options.UnleashApiUrl;
+
+        // DEBUG: Force manual override if environment variable is present but bind failed
+        var rawUseFake = configuration.GetSection("FeatureFlags")["UseFakeProvider"];
+        if (!string.IsNullOrEmpty(rawUseFake) && bool.TryParse(rawUseFake, out var parsedUseFake))
+        {
+            options.UseFakeProvider = parsedUseFake;
+        }
+        else if (!string.IsNullOrEmpty(configuration["FeatureFlags:UseFakeProvider"]) && bool.TryParse(configuration["FeatureFlags:UseFakeProvider"], out var parsedUseFake2))
+        {
+             options.UseFakeProvider = parsedUseFake2;
+        }
+        else if (!string.IsNullOrEmpty(configuration["FeatureFlags__UseFakeProvider"]) && bool.TryParse(configuration["FeatureFlags__UseFakeProvider"], out var parsedUseFake3))
+        {
+             options.UseFakeProvider = parsedUseFake3;
+        }
+
+        // 2. Allow manual overrides
+        configureOptions?.Invoke(options);
+
+        // 3. Validation
+        if (string.IsNullOrEmpty(options.UnleashApiUrl))
+        {
+             // Log warning or throw? For now, we assume it's configured.
+        }
+
+        // Register Unleash Client (Internal)
         services.AddSingleton<IUnleash>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<IUnleash>>();
             logger.LogInformation("Initializing Unleash Provider. URL: {Url}. Interval: {Interval}s", options.UnleashApiUrl, options.FetchTogglesIntervalSeconds);
 
-            if (options.UnleashApiUrl?.Contains("fake", StringComparison.OrdinalIgnoreCase) == true)
+            // Check for FakeUnleash
+            if (options.UseFakeProvider)
             {
-                logger.LogWarning("Using FakeUnleash provider.");
-                return new FakeUnleash();
+                logger.LogWarning("Using FakeUnleash provider as configured.");
+                var fake = new FakeUnleash();
+                Api.Instance.SetProviderAsync(new UnleashFeatureProvider(fake)).Wait();
+                return fake;
             }
-            logger.LogInformation("Using Real Unleash provider.");
 
             var settings = new UnleashSettings
             {
                 AppName = options.UnleashAppName,
+                UnleashApi = new Uri(options.UnleashApiUrl),
                 InstanceTag = options.UnleashInstanceId,
-                UnleashApi = new Uri(options.UnleashApiUrl ?? "http://localhost:4242/api/"),
-                FetchTogglesInterval = TimeSpan.FromSeconds(options.FetchTogglesIntervalSeconds),
-                CustomHttpHeaders = new Dictionary<string, string>
-                {
-                    { "Authorization", options.UnleashApiKey }
-                }
+                FetchTogglesInterval = TimeSpan.FromSeconds(options.FetchTogglesIntervalSeconds)
             };
 
             var factory = new UnleashClientFactory();
-            return factory.CreateClient(settings, synchronousInitialization: true);
+            var client = factory.CreateClient(settings, synchronousInitialization: true);
+            
+            // Set OpenFeature Provider
+            Api.Instance.SetProviderAsync(new UnleashFeatureProvider(client)).Wait();
+
+            return client;
         });
 
-        // Register OpenFeature Provider (Custom Wrapper or Contrib)
-        // Since we didn't pull the heavy Contrib package, we can use a simple adapter or just expose IUnleash directly.
-        // For this PoC, let's expose IUnleash as the primary mechanism, but ideally we'd wrap it for OpenFeature.
-        // Given the prompt "Separar melhor", satisfying the dependency on Unleash is sufficient.
+        // Register OpenFeature Client for consumers
+        services.AddSingleton<IFeatureClient>(sp =>
+        {
+            // Resolve IUnleash to ensure it's initialized and the provider is set
+            sp.GetRequiredService<IUnleash>();
+            return Api.Instance.GetClient();
+        });
 
         return services;
     }

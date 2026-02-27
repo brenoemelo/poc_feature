@@ -1,6 +1,4 @@
 $ErrorActionPreference = "Continue"
-Write-Warning "E2E Tests Disabled by user request."
-exit 0
 
 # 0. Initialize Logging (Modular Framework)
 try {
@@ -50,11 +48,27 @@ if ($API_FIXED_URL) {
 
 # If Fixed URL failed or not provided, try standard LocalStack localhost
 if (-not $BaseUrl) {
-    $LocalStackUrl = "http://localhost:4566/restapis/material-api/prod/_user_request_"
+    # 1.5 Load Global Config (Single Source of Truth)
+    $GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+    if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+    
+    $LocalStackUrl = if ($Global:Config) { 
+        if ($Global:Config.ApiGateway.UrlTemplate) {
+            $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+        } else {
+            $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+        }
+    } else { 
+        throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+    }
+
+    if ($LocalStackUrl.EndsWith("/")) { $LocalStackUrl = $LocalStackUrl.TrimEnd("/") }
+
     Write-Host "Checking LocalStack URL: $LocalStackUrl ..." -NoNewline
     # Simple check if LocalStack is up (not necessarily the API)
     try {
-        $test = Invoke-WebRequest -Uri "http://localhost:4566/_localstack/health" -Method GET -ErrorAction SilentlyContinue
+        $LocalStackHealthUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl + "/_localstack/health" } else { throw "Global Config not loaded" }
+        $test = Invoke-WebRequest -Uri $LocalStackHealthUrl -Method GET -UseBasicParsing -ErrorAction SilentlyContinue
         if ($test.StatusCode -eq 200) {
              $BaseUrl = $LocalStackUrl
              Write-Host " LocalStack is UP (Assuming API is deployed)" -ForegroundColor Green

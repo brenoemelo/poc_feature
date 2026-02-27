@@ -1,21 +1,23 @@
 import boto3
 import sys
+import os
 
-AWS_ENDPOINT = "http://localhost:4566"
-REGION = "us-east-1"
+# Add utils to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
+import aws_helpers
 
 def check_status():
     print("Checking AWS Resources...")
     
     # Lambda
-    lambda_client = boto3.client('lambda', endpoint_url=AWS_ENDPOINT, region_name=REGION)
+    lambda_client = aws_helpers.get_boto3_client('lambda')
     functions = lambda_client.list_functions()
     print("Lambda Functions:")
     for f in functions.get('Functions', []):
         print(f" - {f['FunctionName']}")
         
     # SQS
-    sqs = boto3.client('sqs', endpoint_url=AWS_ENDPOINT, region_name=REGION)
+    sqs = aws_helpers.get_boto3_client('sqs')
     queues = sqs.list_queues()
     print("\nSQS Queues:")
     for q_url in queues.get('QueueUrls', []):
@@ -23,7 +25,12 @@ def check_status():
         print(f" - {q_url}: {attrs.get('Attributes')}")
         
     # DynamoDB
-    dynamo = boto3.resource('dynamodb', endpoint_url=AWS_ENDPOINT, region_name=REGION)
+    dynamo = boto3.resource('dynamodb', 
+        endpoint_url=aws_helpers.AWS_ENDPOINT_URL, 
+        region_name=aws_helpers.AWS_REGION,
+        aws_access_key_id=aws_helpers.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=aws_helpers.AWS_SECRET_ACCESS_KEY)
+    
     for table_name in ['materials-table', 'costing-prices-table']:
         table = dynamo.Table(table_name)
         try:
@@ -37,7 +44,7 @@ def check_status():
             print(f"\nDynamoDB Table: {table_name} - Error: {e}")
 
     # Logs
-    logs = boto3.client('logs', endpoint_url=AWS_ENDPOINT, region_name=REGION)
+    logs = aws_helpers.get_boto3_client('logs')
     print("\nLog Groups:")
     groups = logs.describe_log_groups()
     for g in groups.get('logGroups', []):

@@ -17,6 +17,7 @@ SERVICE_CONFIG = {
     "ZipPath": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../PoC-Materials.zip")),
     "ProjectFile": os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../src/PoC.Materials/PoC.Materials.csproj")),
     "CustomApiId": CONFIG["ApiGateway"]["Id"],
+    "ApiUrl": CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=CONFIG["ApiGateway"]["Id"], stage=CONFIG["ApiGateway"]["Stage"]),
     "Stage": CONFIG["ApiGateway"]["Stage"],
     "Region": AWS_REGION,
     "EndpointUrl": AWS_ENDPOINT_URL

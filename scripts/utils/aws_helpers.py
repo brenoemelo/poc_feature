@@ -7,15 +7,19 @@ import json
 import subprocess
 from botocore.exceptions import ClientError
 
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import CONFIG
+
 # Add utils to path to import logger
 sys.path.append(os.path.dirname(__file__))
 from logger import write_log
 
 # Global Configuration
-AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", "http://localhost:4566")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "test")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "test")
+AWS_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL", CONFIG["Aws"]["LocalStackUrl"])
+AWS_REGION = os.getenv("AWS_REGION", CONFIG["Aws"]["Region"])
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", CONFIG["Aws"]["AccessKeyId"])
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", CONFIG["Aws"]["SecretAccessKey"])
 
 def get_boto3_client(service_name):
     return boto3.client(
@@ -38,13 +42,15 @@ def validate_aws_connection():
 
 def get_common_env_vars():
     env_vars = {
+        "Observability__Enabled": "true",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318",
         "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "FeatureFlags__UnleashApiUrl": "http://unleash:4242/api/",
+        "FeatureFlags__FetchTogglesIntervalSeconds": "1",
         "AWS_REGION": AWS_REGION,
         "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
         "AWS_SECRET_ACCESS_KEY": AWS_SECRET_ACCESS_KEY,
-        "AWS_ENDPOINT_URL": "http://localstack:4566" # Explicitly point to LocalStack internal URL
+        "AWS_ENDPOINT_URL": CONFIG["Aws"]["LocalStackInternalUrl"] # Explicitly point to LocalStack internal URL
     }
     write_log(f"DEBUG: Common Env Vars: {env_vars}", "INFO")
     return env_vars
@@ -312,6 +318,142 @@ def remove_sns_topic(topic_arn):
     except ClientError as e:
         if e.response['Error']['Code'] != 'NotFound':
             write_log(f"Error deleting topic: {e}", "WARN")
+
+def cleanup_all_resources():
+    """
+    Deletes all resources in LocalStack to ensure a clean slate for Terraform.
+    EXCEPT DynamoDB tables (as per user request).
+    """
+    write_log(">>> STARTING LOCALSTACK CLEANUP <<<", "INFO")
+    
+    lambda_client = get_boto3_client("lambda")
+
+    # 0. Global Event Source Mappings (Clean these first to avoid conflicts)
+    try:
+        write_log("Cleaning all Event Source Mappings...", "INFO")
+        # List all mappings (no FunctionName filter)
+        paginator = lambda_client.get_paginator('list_event_source_mappings')
+        for page in paginator.paginate():
+            for mapping in page.get('EventSourceMappings', []):
+                uuid = mapping['UUID']
+                write_log(f"Removing ESM: {uuid}", "INFO")
+                try:
+                    lambda_client.delete_event_source_mapping(UUID=uuid)
+                except Exception as e:
+                    write_log(f"Error deleting ESM {uuid}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning ESMs: {e}", "WARN")
+
+    # 1. Lambdas
+    try:
+        paginator = lambda_client.get_paginator('list_functions')
+        for page in paginator.paginate():
+            for func in page.get('Functions', []):
+                remove_lambda_function(func['FunctionName'])
+    except Exception as e:
+        write_log(f"Error cleaning Lambdas: {e}", "WARN")
+
+    # 2. DynamoDB Tables - SKIPPED (User request: keep databases)
+    write_log("Skipping DynamoDB cleanup (keeping databases).", "INFO")
+    # try:
+    #     dynamodb = get_boto3_client("dynamodb")
+    #     tables = dynamodb.list_tables()
+    #     for table in tables.get('TableNames', []):
+    #         remove_dynamodb_table(table)
+    # except Exception as e:
+    #     write_log(f"Error cleaning DynamoDB: {e}", "WARN")
+
+    # 3. SQS Queues
+    try:
+        sqs = get_boto3_client("sqs")
+        queues = sqs.list_queues()
+        for queue_url in queues.get('QueueUrls', []):
+            remove_sqs_queue(queue_url)
+    except Exception as e:
+        write_log(f"Error cleaning SQS: {e}", "WARN")
+
+    # 4. SNS Topics
+    try:
+        sns = get_boto3_client("sns")
+        paginator = sns.get_paginator('list_topics')
+        for page in paginator.paginate():
+            for topic in page.get('Topics', []):
+                remove_sns_topic(topic['TopicArn'])
+    except Exception as e:
+        write_log(f"Error cleaning SNS: {e}", "WARN")
+
+    # 5. API Gateways
+    try:
+        apigw = get_boto3_client("apigateway")
+        apis = apigw.get_rest_apis()
+        for api in apis.get('items', []):
+            write_log(f"Removing API Gateway: {api['name']} ({api['id']})", "INFO")
+            try:
+                apigw.delete_rest_api(restApiId=api['id'])
+            except Exception as e:
+                write_log(f"Error deleting API Gateway {api['id']}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning API Gateways: {e}", "WARN")
+
+    # 6. S3 Buckets
+    try:
+        s3 = get_boto3_client("s3")
+        buckets = s3.list_buckets()
+        for bucket in buckets.get('Buckets', []):
+            name = bucket['Name']
+            write_log(f"Removing S3 Bucket: {name}", "INFO")
+            try:
+                # Delete objects first
+                objects = s3.list_objects_v2(Bucket=name)
+                if 'Contents' in objects:
+                    for obj in objects['Contents']:
+                        s3.delete_object(Bucket=name, Key=obj['Key'])
+                s3.delete_bucket(Bucket=name)
+            except Exception as e:
+                write_log(f"Error deleting S3 Bucket {name}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning S3: {e}", "WARN")
+        
+    # 7. CloudWatch Log Groups
+    try:
+        logs = get_boto3_client("logs")
+        paginator = logs.get_paginator('describe_log_groups')
+        for page in paginator.paginate():
+            for group in page.get('logGroups', []):
+                 write_log(f"Removing Log Group: {group['logGroupName']}", "INFO")
+                 try:
+                     logs.delete_log_group(logGroupName=group['logGroupName'])
+                 except Exception as e:
+                     write_log(f"Error deleting log group {group['logGroupName']}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning Log Groups: {e}", "WARN")
+
+    # 8. IAM Roles (specifically lambda-role which causes conflicts)
+    try:
+        iam = get_boto3_client("iam")
+        role_name = "lambda-role"
+        try:
+            iam.get_role(RoleName=role_name)
+            write_log(f"Removing IAM Role: {role_name}", "INFO")
+            
+            # Detach managed policies
+            attached_policies = iam.list_attached_role_policies(RoleName=role_name)
+            for policy in attached_policies.get('AttachedPolicies', []):
+                iam.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+            
+            # Delete inline policies
+            inline_policies = iam.list_role_policies(RoleName=role_name)
+            for policy_name in inline_policies.get('PolicyNames', []):
+                iam.delete_role_policy(RoleName=role_name, PolicyName=policy_name)
+            
+            iam.delete_role(RoleName=role_name)
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchEntity':
+                write_log(f"Error cleaning IAM Role {role_name}: {e}", "WARN")
+    except Exception as e:
+        write_log(f"Error cleaning IAM Roles: {e}", "WARN")
+        
+    write_log(">>> LOCALSTACK CLEANUP COMPLETED <<<", "SUCCESS")
 
 def invoke_lambda(function_name, payload={}):
     lambda_client = get_boto3_client("lambda")

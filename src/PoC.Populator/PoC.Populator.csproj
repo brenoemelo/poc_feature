@@ -15,7 +15,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PoC.Shared/PoC.Shared.csproj" />
-    <ProjectReference Include="../PoC.Shared.Infrastructure/PoC.Shared.Infrastructure.csproj" />
     <ProjectReference Include="../PoC.Observability/PoC.Observability.csproj" />
     <ProjectReference Include="../PoC.FeatureFlags/PoC.FeatureFlags.csproj" />
   </ItemGroup>
@@ -32,6 +31,7 @@
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AWSLambda" Version="1.15.0" />
   </ItemGroup>
 
   <ItemGroup>

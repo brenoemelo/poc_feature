@@ -76,5 +76,53 @@ find /src -name "appsettings.json" -not -path "*/bin/*" -not -path "*/obj/*" | w
   }" "$file" > "$tmp" && mv "$tmp" "$file"
 done
 
-echo "Ensure you can login with user 'admin' and password 'password'."
+# 4. Ensure Admin User
+echo "Ensuring Admin User..."
+# Get Admin ID if exists
+ADMIN_ID=$(curl -s -H "Authorization: $ADMIN_TOKEN" "$API_URL/admin/user-admin" | jq -r '.users[] | select(.username=="admin") | .id')
+
+if [ -z "$ADMIN_ID" ] || [ "$ADMIN_ID" = "null" ]; then
+  echo "Creating admin user..."
+  curl -s -X POST -H "Authorization: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+    -d '{
+      "username": "admin",
+      "name": "Admin",
+      "email": "admin@example.com",
+      "rootRole": 1,
+      "password": "password"
+    }' \
+    "$API_URL/admin/user-admin" > /dev/null
+else
+  echo "Updating admin user (ID: $ADMIN_ID)..."
+  curl -s -X PUT -H "Authorization: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+    -d '{
+      "username": "admin",
+      "name": "Admin",
+      "email": "admin@example.com",
+      "rootRole": 1,
+      "password": "password"
+    }' \
+    "$API_URL/admin/user-admin/$ADMIN_ID" > /dev/null
+fi
+
+# 5. Ensure Backup Admin User (admin2)
+echo "Ensuring Backup Admin User (admin2)..."
+ADMIN2_ID=$(curl -s -H "Authorization: $ADMIN_TOKEN" "$API_URL/admin/user-admin" | jq -r '.users[] | select(.username=="admin2") | .id')
+
+if [ -z "$ADMIN2_ID" ] || [ "$ADMIN2_ID" = "null" ]; then
+  echo "Creating backup admin user 'admin2'..."
+  curl -s -X POST -H "Authorization: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+    -d '{
+      "username": "admin2",
+      "name": "Admin Backup",
+      "email": "admin2@example.com",
+      "rootRole": 1,
+      "password": "password"
+    }' \
+    "$API_URL/admin/user-admin" > /dev/null
+else
+  echo "Backup admin user 'admin2' already exists."
+fi
+
+echo "Ensure you can login with user 'admin' or 'admin2' and password 'password'."
 echo "Unleash initialization and configuration complete."

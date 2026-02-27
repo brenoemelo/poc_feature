@@ -10,7 +10,7 @@ def test():
     aws_helpers.write_log("STEP 5: Smoke Tests", "INFO")
     
     api_id = SERVICE_CONFIG['CustomApiId']
-    url = f"{SERVICE_CONFIG['EndpointUrl']}/restapis/{api_id}/{SERVICE_CONFIG['Stage']}/_user_request_/api/v1/costing/estimations"
+    url = f"{SERVICE_CONFIG['ApiUrl']}api/v1/costing/estimations"
     
     aws_helpers.write_log(f"Testing API Endpoint: {url}", "INFO")
     

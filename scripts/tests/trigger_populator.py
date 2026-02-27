@@ -1,7 +1,13 @@
 import requests
 import json
+import sys
+import os
 
-url = "http://localhost:4566/restapis/material-api/prod/_user_request_/api/v1/populator/jobs"
+# Add config to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import CONFIG
+
+url = CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=CONFIG["ApiGateway"]["Id"], stage=CONFIG["ApiGateway"]["Stage"]) + "api/v1/populator/jobs"
 headers = {"Content-Type": "application/json"}
 payload = {
     "target": "materials",

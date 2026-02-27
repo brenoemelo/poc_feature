@@ -6,14 +6,17 @@ import sys
 import os
 
 # Add parent directory to path to import config
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../services/costing')))
-from config import RESOURCES, CONFIG
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../config')))
+from global_config import RESOURCES, CONFIG
 
-AWS_ENDPOINT = "http://localhost:4566"
-REGION = "us-east-1"
+AWS_ENDPOINT = CONFIG['Aws']['LocalStackUrl']
+REGION = CONFIG['Aws']['Region']
 API_GATEWAY_ID = CONFIG['ApiGateway']['Id']
 STAGE = CONFIG['ApiGateway']['Stage']
-BASE_URL = f"{AWS_ENDPOINT}/restapis/{API_GATEWAY_ID}/{STAGE}/_user_request_"
+if "UrlTemplate" in CONFIG["ApiGateway"]:
+    BASE_URL = CONFIG["ApiGateway"]["UrlTemplate"].format(api_id=API_GATEWAY_ID, stage=STAGE)
+else:
+    BASE_URL = f"{AWS_ENDPOINT}/_aws/execute-api/{API_GATEWAY_ID}/{STAGE}"
 
 dynamodb = boto3.resource('dynamodb', endpoint_url=AWS_ENDPOINT, region_name=REGION)
 materials_table = dynamodb.Table(RESOURCES['DynamoDb']['MaterialsTable'])

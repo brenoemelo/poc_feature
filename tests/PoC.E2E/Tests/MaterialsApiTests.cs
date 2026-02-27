@@ -1,10 +1,11 @@
 using System.Net;
-using System.Text.Json.Serialization;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using FluentAssertions;
 using PoC.E2E.Common;
+using PoC.Shared.Common;
+using PoC.Shared.Models;
 using RestSharp;
 
 namespace PoC.E2E.Tests;
@@ -33,41 +34,85 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         return new AmazonDynamoDBClient(creds, config);
     }
 
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        
+        // 1. Enable Feature Flags
+        await FeatureManager.EnableFlagAsync("materials-crud");
+        await FeatureManager.EnableFlagAsync("view-all-components");
+        
+        // 2. Wait for flag propagation
+        // Use GET /api/v1/materials?limit=1 as probe
+        await WaitForFlagAsync("/api/v1/materials?limit=1", Method.Get, HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task Materials_Lifecycle_HappyPath_Should_CreateQueryDeleteAndReturn404Async()
     {
-        // Ensure flag is enabled
-        await FeatureManager.EnableFlagAsync("materials-crud");
-
+        Console.WriteLine("[Test] Starting Materials_Lifecycle_HappyPath");
+        // Flags enabled in InitializeAsync
         var materialId = $"e2e-{Guid.NewGuid():N}";
-        await InsertMaterialDirectlyAsync(materialId, "E2E Test Material");
+        
+        // Create Material via API
+        var material = new MaterialFormulation(
+            MaterialId: materialId,
+            Name: "E2E Test Material",
+            Density: new Density(1.2, "g/cm3"),
+            Formulation: new List<FormulationComponent>
+            {
+                new FormulationComponent("Polycarbonate", 60, "Base Polymer"),
+                new FormulationComponent("ABS", 40, "Impact Modifier")
+            },
+            Properties: new Dictionary<string, string>
+            {
+                ["tensile_strength"] = "120 MPa",
+                ["melting_point"] = "250C"
+            },
+            Version: null);
+
+        Console.WriteLine($"[Test] Creating material {materialId}...");
+        var createRequest = new RestRequest("/api/v1/materials", Method.Post);
+        createRequest.AddJsonBody(material);
+        
+        var createResponse = await Client.ExecuteAsync<ApiResponse<MaterialFormulation>>(createRequest);
+        Console.WriteLine($"[Test] Create Status: {createResponse.StatusCode}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created, because: $"creation should succeed. Content: {createResponse.Content}");
         _createdIds.Add(materialId);
 
+        Console.WriteLine("[Test] Listing materials...");
         var listRequest = new RestRequest("/api/v1/materials?limit=100", Method.Get);
-        var listResponse = await Client.ExecuteAsync<PagedResponse<MaterialResponse>>(listRequest);
+        var listResponse = await Client.ExecuteAsync<PagedResponse<MaterialFormulation>>(listRequest);
+        Console.WriteLine($"[Test] List Status: {listResponse.StatusCode}");
 
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK, because: $"listing materials should succeed. Content: {listResponse.Content}");
         listResponse.Data.Should().NotBeNull();
         listResponse.Data!.Data.Should().NotBeNull();
-        // Relaxing the check because with pagination and many items, the inserted item might not be on the first page.
-        // We verify specific item retrieval in the next step (GetById).
         listResponse.Data.Data.Should().NotBeEmpty(because: "listing should return at least some materials");
 
+        Console.WriteLine("[Test] Getting material...");
         var getRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Get);
-        var getResponse = await Client.ExecuteAsync<ApiResponse<MaterialResponse>>(getRequest);
+        var getResponse = await Client.ExecuteAsync<ApiResponse<MaterialFormulation>>(getRequest);
+        Console.WriteLine($"[Test] Get Status: {getResponse.StatusCode}");
 
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK, because: $"material {materialId} must exist. Content: {getResponse.Content}");
         getResponse.Data.Should().NotBeNull();
         getResponse.Data!.Data.Should().NotBeNull();
         getResponse.Data!.Data.MaterialId.Should().Be(materialId);
 
+        Console.WriteLine("[Test] Deleting material...");
         var deleteRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Delete);
         var deleteResponse = await Client.ExecuteAsync(deleteRequest);
+        Console.WriteLine($"[Test] Delete Status: {deleteResponse.StatusCode}");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent, because: "successful deletion should return 204");
 
+        Console.WriteLine("[Test] Verifying 404 after delete...");
         var getAfterDeleteRequest = new RestRequest($"/api/v1/materials/{materialId}", Method.Get);
         var getAfterDeleteResponse = await Client.ExecuteAsync(getAfterDeleteRequest);
-        getAfterDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "deleted material should not be found");
+        Console.WriteLine($"[Test] Get After Delete Status: {getAfterDeleteResponse.StatusCode}");
+        getAfterDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        
+        Console.WriteLine("[Test] Finished successfully");
     }
 
     [Fact]
@@ -94,11 +139,19 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         response.StatusCode.Should().NotBe(HttpStatusCode.NoContent, because: "must not return 204 when nothing is deleted");
     }
 
-    public override async Task InitializeAsync()
+    [Fact]
+    public async Task Get_Materials_WhenFlagDisabled_Should_Return_404Async()
     {
-        await base.InitializeAsync();
-        // Ensure flag is enabled for happy path
-        await FeatureManager.EnableFlagAsync("materials-crud");
+        // Arrange
+        await FeatureManager.DisableFlagAsync("materials-crud");
+        
+        // Act & Assert (Active Polling since Unleash updates asynchronously)
+        await WaitForFlagAsync("/api/v1/materials", Method.Get, HttpStatusCode.NotFound);
+
+        // Verify explicitly for S2699
+        var request = new RestRequest("/api/v1/materials", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "endpoint should be disabled when flag is off");
     }
 
     public override async Task DisposeAsync()
@@ -109,71 +162,6 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         }
 
         await base.DisposeAsync();
-    }
-
-    [Fact]
-    public async Task Get_Materials_WhenFlagDisabled_Should_Return_404Async()
-    {
-        // Arrange
-        await FeatureManager.DisableFlagAsync("materials-crud");
-        
-        // Wait for the flag change to propagate (Lambda polls every 1s in test env)
-        await Task.Delay(10000);
-
-        // Act
-        var request = new RestRequest("/api/v1/materials", Method.Get);
-        var response = await Client.ExecuteAsync(request);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound, because: "endpoint should be disabled when flag is off");
-    }
-
-    private async Task InsertMaterialDirectlyAsync(string materialId, string name)
-    {
-        using var client = CreateDynamoClient();
-        var request = new PutItemRequest
-        {
-            TableName = "materials-table",
-            Item = new Dictionary<string, AttributeValue>
-            {
-                ["material_id"] = new AttributeValue
-                {
-                    S = materialId
-                },
-                ["record_type"] = new AttributeValue
-                {
-                    S = "MATERIAL"
-                },
-                ["name"] = new AttributeValue
-                {
-                    S = name
-                },
-                ["formulation"] = new AttributeValue
-                {
-                    L = new List<AttributeValue>
-                    {
-                        new AttributeValue
-                        {
-                            M = new Dictionary<string, AttributeValue>
-                            {
-                                ["component"] = new AttributeValue { S = "Polycarbonate" },
-                                ["percentage"] = new AttributeValue { N = "60" },
-                                ["type"] = new AttributeValue { S = "Base Polymer" }
-                            }
-                        }
-                    }
-                },
-                ["properties"] = new AttributeValue
-                {
-                    M = new Dictionary<string, AttributeValue>
-                    {
-                        ["tensile_strength"] = new AttributeValue { S = "120 MPa" },
-                        ["melting_point"] = new AttributeValue { S = "250C" }
-                    }
-                }
-            }
-        };
-        await client.PutItemAsync(request);
     }
 
     private async Task DeleteDirectAsync(string materialId)
@@ -189,28 +177,4 @@ public class MaterialsApiTests : ApiTestBase, IAsyncLifetime
         };
         await client.DeleteItemAsync(request);
     }
-
-    public record MaterialResponse(
-        [property: JsonPropertyName("material_id")] string MaterialId,
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("properties")] Dictionary<string, string>? Properties);
-
-    public record ApiResponse<T>(
-        [property: JsonPropertyName("data")] T Data,
-        [property: JsonPropertyName("links")] List<Link> Links);
-
-    public record PagedResponse<T>(
-        [property: JsonPropertyName("data")] List<T> Data,
-        [property: JsonPropertyName("meta")] PaginationMeta Meta,
-        [property: JsonPropertyName("links")] List<Link> Links);
-
-    public record PaginationMeta(
-        [property: JsonPropertyName("limit")] int Limit,
-        [property: JsonPropertyName("count")] int Count,
-        [property: JsonPropertyName("nextCursor")] string? NextCursor);
-
-    public record Link(
-        [property: JsonPropertyName("rel")] string Rel,
-        [property: JsonPropertyName("href")] string Href,
-        [property: JsonPropertyName("method")] string Method);
 }

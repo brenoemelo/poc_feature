@@ -18,7 +18,7 @@ docker exec poc_feature-localstack-1 awslocal lambda list-functions
 ### 2. Verify Connectivity
 ```bash
 # Test the Materials endpoint (replace 'material-api' if needed)
-curl http://localhost:4566/restapis/material-api/prod/_user_request_/api/v1/materials
+curl http://localhost:4566/_aws/execute-api/material-api/prod/api/v1/materials
 ```
 
 ### 3. Queue Depth

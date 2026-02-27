@@ -1,9 +1,15 @@
 using Amazon.SQS;
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Interfaces;
+using PoC.Populator.Domain.Models;
+using PoC.Populator.Domain.Services;
+using PoC.Populator.Domain.Validators;
+using PoC.Populator.Functions;
 using PoC.Populator.Infrastructure.Services;
-using PoC.Shared.Validators;
+using PoC.Shared.Models;
 
 namespace PoC.Populator.Infrastructure;
 
@@ -13,39 +19,31 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssemblyContaining<PopulationRequestValidator>();
 
-        services.Configure<PopulatorOptions>(options =>
-        {
-            configuration.GetSection(PopulatorOptions.SectionName).Bind(options);
+        services.AddOptions<AwsOptions>()
+            .Bind(configuration.GetSection(AwsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-            if (string.IsNullOrEmpty(options.QueueUrl))
-            {
-                var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
-                if (string.IsNullOrEmpty(serviceUrl))
-                {
-                    var localStackHost = Environment.GetEnvironmentVariable("LOCALSTACK_HOSTNAME") ?? "localhost";
-                    var edgePort = Environment.GetEnvironmentVariable("EDGE_PORT") ?? "4566";
-                    serviceUrl = $"http://{localStackHost}:{edgePort}";
-                }
-                
-                var queueName = Environment.GetEnvironmentVariable("QUEUE_NAME") ?? "populator-queue";
-                options.QueueUrl = $"{serviceUrl}/000000000000/{queueName}";
-            }
-        });
+        services.AddOptions<ServiceOptions>()
+            .Bind(configuration.GetSection(ServiceOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<PopulatorOptions>()
+            .Bind(configuration.GetSection(PopulatorOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddSingleton<IAmazonSQS>(sp =>
         {
-            var opts = sp.GetRequiredService<IOptions<PopulatorOptions>>().Value;
+            var opts = sp.GetRequiredService<IOptions<AwsOptions>>().Value;
+            var serviceUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? opts.ServiceUrl;
+
             var sqsConfig = new AmazonSQSConfig
             {
-                ServiceURL = opts.QueueUrl.Substring(0, opts.QueueUrl.IndexOf("/000000000000", StringComparison.Ordinal)), // Extract base URL
-                AuthenticationRegion = "us-east-1"
+                ServiceURL = serviceUrl,
+                AuthenticationRegion = opts.Region
             };
-            
-            // Fallback if substring fails
-            if (string.IsNullOrEmpty(sqsConfig.ServiceURL))
-            {
-                 sqsConfig.ServiceURL = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL") ?? "http://localhost:4566";
-            }
             return new AmazonSQSClient(sqsConfig);
         });
         

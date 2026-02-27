@@ -2,8 +2,23 @@
 # Bypass SSL validation
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 
-$BaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
-$PopulatorUrl = "http://localhost:4566/_aws/execute-api/material-api/prod"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$BaseUrl = if ($Global:Config.ApiGateway.UrlTemplate) {
+    $Global:Config.ApiGateway.UrlTemplate.Replace("{api_id}", $Global:Config.ApiGateway.Id).Replace("{stage}", $Global:Config.ApiGateway.Stage)
+} else {
+    $Global:Config.Aws.LocalStackUrl + "/_aws/execute-api/" + $Global:Config.ApiGateway.Id + "/" + $Global:Config.ApiGateway.Stage
+}
+
+if ($BaseUrl.EndsWith("/")) { $BaseUrl = $BaseUrl.TrimEnd("/") }
+
+$PopulatorUrl = $BaseUrl
 
 function Invoke-Api {
     param([string]$Method, [string]$Uri, [string]$Body = $null)
@@ -58,8 +73,18 @@ if ($page1) {
     if ($nextLinkObj) {
         $nextLink = $nextLinkObj.href
         # Fix LocalStack generated URL
-        if ($nextLink -match "^https://localhost:4566/prod") {
-             $nextLink = $nextLink -replace "^https://localhost:4566/prod", "http://localhost:4566/_aws/execute-api/material-api/prod"
+        $LocalStackUrl = $Global:Config.Aws.LocalStackUrl
+        if ($nextLink -match "^https?://localhost:4566/prod") {
+             $ApiId = $Global:Config.ApiGateway.Id
+             $Stage = $Global:Config.ApiGateway.Stage
+             if ($Global:Config.ApiGateway.UrlTemplate) {
+                 $Template = $Global:Config.ApiGateway.UrlTemplate
+                 $BaseUrl = $Template.Replace("{api_id}", $ApiId).Replace("{stage}", $Stage)
+                 if ($BaseUrl.EndsWith("/")) { $BaseUrl = $BaseUrl.TrimEnd("/") }
+                 $nextLink = $nextLink -replace "^https?://localhost:4566/prod", $BaseUrl
+             } else {
+                 $nextLink = $nextLink -replace "^https?://localhost:4566/prod", "$LocalStackUrl/_aws/execute-api/$ApiId/$Stage"
+             }
         }
         Write-Host "Next Link found: $nextLink" -ForegroundColor Green
         

@@ -1,34 +1,66 @@
-using Amazon.DynamoDBv2.DataModel;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Options;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Shared.Common;
 using PoC.Shared.Models;
+using System.Text.Json;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
-public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, ILogger<DynamoDbCostingRepository> logger, IOptions<CostingOptions> options) : ICostingRepository
+public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, ILogger<DynamoDbCostingRepository> logger, IOptions<CostingOptions> options) : ICostingRepository
 {
     private readonly ILogger<DynamoDbCostingRepository> _logger = logger;
-    private readonly DynamoDBOperationConfig _dynamoConfig = new() { OverrideTableName = options.Value.TableName };
+    private readonly CostingOptions _options = options.Value;
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "[UpsertPrice] Processing {ComponentName}. Existing: {Exists}, Version: {Version}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "[UpsertPrice] Processing {componentName}. Existing: {exists}, Version: {version}")]
     private partial void LogUpsertPriceProcessing(string componentName, bool exists, int? version);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesAsync] Requested: {Requested}. Found: {Found}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesAsync] Requested: {requested}. Found: {found}")]
     private partial void LogGetPricesRequested(string requested, int found);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllPricesAsync] Found: {Found}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllPricesAsync] Found: {found}")]
     private partial void LogGetAllPricesFound(int found);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesCountAsync] Count: {Count}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[GetPricesCountAsync] Count: {count}")]
     private partial void LogGetPricesCount(int count);
 
     public async Task<Result> UpsertPriceAsync(ComponentPriceRequest request)
     {
         try
         {
-            var existing = await context.LoadAsync<ComponentPriceEntity>(request.ComponentName, _dynamoConfig);
-            var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
+            var tableName = _options.TableName;
+
+            // Optimistic Locking: Use ConditionExpression to ensure version match
+            // If the item doesn't exist, ensure ComponentName doesn't exist.
+            // If it exists, ensure Version matches.
+
+            var getRequest = new GetItemRequest
+            {
+                TableName = tableName,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    { "ComponentName", new AttributeValue { S = request.ComponentName } }
+                },
+                ConsistentRead = true // Important for OCC
+            };
+
+            var getResponse = await client.GetItemAsync(getRequest);
+            ComponentPriceEntity? existing = null;
+
+            if (getResponse.Item != null && getResponse.Item.Count > 0)
+            {
+                var doc = Document.FromAttributeMap(getResponse.Item);
+                existing = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson());
+            }
+
+            var entity = existing ?? new ComponentPriceEntity 
+            { 
+                ComponentName = request.ComponentName,
+                RecordType = "COMPONENT_PRICE",
+                Version = 0
+            };
 
             LogUpsertPriceProcessing(request.ComponentName, existing != null, existing?.Version);
 
@@ -37,17 +69,34 @@ public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, 
             entity.Currency = request.Currency;
             entity.UpdatedAt = DateTime.UtcNow;
 
-            // If item exists but has no version (e.g. manually inserted), skip version check to initialize it
-            // With SaveAsync, if Version is null, it usually treats as new item or ignores version check.
-#pragma warning disable CS0618 // Type or member is obsolete
-            var saveConfig = new DynamoDBOperationConfig 
-            { 
-                IgnoreNullValues = true,
-                OverrideTableName = _dynamoConfig.OverrideTableName 
+            // Increment version
+            var oldVersion = entity.Version;
+            entity.Version = (entity.Version ?? 0) + 1;
+
+            var itemJson = JsonSerializer.Serialize(entity);
+            var itemDoc = Document.FromJson(itemJson);
+            var itemAttributes = itemDoc.ToAttributeMap();
+
+            var putRequest = new PutItemRequest
+            {
+                TableName = tableName,
+                Item = itemAttributes,
+                ConditionExpression = existing == null 
+                    ? "attribute_not_exists(ComponentName)" 
+                    : "Version = :expectedVersion",
+                ExpressionAttributeValues = existing == null ? null : new Dictionary<string, AttributeValue>
+                {
+                    { ":expectedVersion", new AttributeValue { N = oldVersion.ToString() } }
+                }
             };
-            await context.SaveAsync(entity, saveConfig);
-#pragma warning restore CS0618 // Type or member is obsolete
+
+            await client.PutItemAsync(putRequest);
+            
             return Result.Success();
+        }
+        catch (ConditionalCheckFailedException)
+        {
+            return Result.Failure(new Error("Concurrency.Conflict", $"Price for {request.ComponentName} was modified by another transaction. Please retry."));
         }
         catch (Exception ex)
         {
@@ -59,25 +108,58 @@ public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, 
     {
         try
         {
-            var batch = context.CreateBatchGet<ComponentPriceEntity>(_dynamoConfig);
-            
-            // Deduplicate keys to avoid DynamoDB error
+            var tableName = _options.TableName;
             var uniqueNames = componentNames.Distinct().ToList();
+            
+            if (uniqueNames.Count == 0)
+            {
+                return Result.Success(new Dictionary<string, (decimal UnitPrice, string Currency)>());
+            }
+
+            var keys = new List<Dictionary<string, AttributeValue>>();
             
             foreach (var name in uniqueNames)
             {
-                batch.AddKey(name);
+                keys.Add(new Dictionary<string, AttributeValue>
+                {
+                    { "ComponentName", new AttributeValue { S = name } }
+                });
             }
 
-            await batch.ExecuteAsync();
-
-            LogGetPricesRequested(string.Join(",", componentNames), batch.Results.Count);
-
-            var result = batch.Results.ToDictionary(
-                p => p.ComponentName,
-                p => (p.UnitPrice, p.Currency));
+            // Note: BatchGetItem has a limit of 100 items. 
+            // For this PoC we assume the batch size is small.
+            // In production, this should be chunked.
             
-            return Result.Success(result);
+            var request = new BatchGetItemRequest
+            {
+                RequestItems = new Dictionary<string, KeysAndAttributes>
+                {
+                    {
+                        tableName,
+                        new KeysAndAttributes { Keys = keys }
+                    }
+                }
+            };
+
+            var response = await client.BatchGetItemAsync(request);
+            var results = new Dictionary<string, (decimal UnitPrice, string Currency)>();
+
+            if (response.Responses.TryGetValue(tableName, out var items))
+            {
+                foreach (var item in items)
+                {
+                    var doc = Document.FromAttributeMap(item);
+                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson(), SerializationDefaults.Options);
+                    if (entity != null)
+                    {
+                        results[entity.ComponentName] = (entity.UnitPrice, entity.Currency);
+                    }
+                }
+            }
+
+            LogGetPricesRequested(string.Join(",", uniqueNames), results.Count);
+            
+            return Result.Success(results);
         }
         catch (Exception ex)
         {
@@ -89,14 +171,43 @@ public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, 
     {
         try
         {
-            var conditions = new List<ScanCondition>();
-            // ScanAsync returns an AsyncSearch which we need to execute
-            var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
-            var prices = await search.GetRemainingAsync();
-            
-            LogGetAllPricesFound(prices.Count);
+            var tableName = _options.TableName;
+            var request = new QueryRequest
+            {
+                TableName = tableName,
+                IndexName = "IX_Prices_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    { ":v_type", new AttributeValue { S = "COMPONENT_PRICE" } }
+                }
+            };
 
-            var result = prices.Select(p => new ComponentPriceResponse(
+            var items = new List<ComponentPriceEntity>();
+            Dictionary<string, AttributeValue>? lastKey = null;
+
+            do
+            {
+                request.ExclusiveStartKey = lastKey;
+                var response = await client.QueryAsync(request);
+                
+                foreach (var item in response.Items)
+                {
+                    var doc = Document.FromAttributeMap(item);
+                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson(), SerializationDefaults.Options);
+                    if (entity != null)
+                    {
+                        items.Add(entity);
+                    }
+                }
+                
+                lastKey = response.LastEvaluatedKey;
+            }
+            while (lastKey != null && lastKey.Count > 0);
+            
+            LogGetAllPricesFound(items.Count);
+
+            var result = items.Select(p => new ComponentPriceResponse(
                 p.ComponentName,
                 p.UnitPrice,
                 p.Unit,
@@ -115,17 +226,34 @@ public sealed partial class DynamoDbCostingRepository(IDynamoDBContext context, 
     {
         try
         {
-            var conditions = new List<ScanCondition>();
-            // Using ScanAsync to get the count. 
-            // In a real production scenario with large datasets, this should be optimized 
-            // (e.g., keeping a counter, or using a GSI if applicable, or using Select=COUNT).
-            // For this PoC, scanning and counting is acceptable.
-            var search = context.ScanAsync<ComponentPriceEntity>(conditions, _dynamoConfig);
-            var count = await search.GetRemainingAsync();
+            var tableName = _options.TableName;
+            var request = new QueryRequest
+            {
+                TableName = tableName,
+                IndexName = "IX_Prices_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    { ":v_type", new AttributeValue { S = "COMPONENT_PRICE" } }
+                },
+                Select = Select.COUNT
+            };
+
+            var totalCount = 0;
+            Dictionary<string, AttributeValue>? lastKey = null;
+
+            do
+            {
+                request.ExclusiveStartKey = lastKey;
+                var response = await client.QueryAsync(request);
+                totalCount += response.Count ?? 0;
+                lastKey = response.LastEvaluatedKey;
+            }
+            while (lastKey != null && lastKey.Count > 0);
+
+            LogGetPricesCount(totalCount);
             
-            LogGetPricesCount(count.Count);
-            
-            return Result.Success(count.Count);
+            return Result.Success(totalCount);
         }
         catch (Exception ex)
         {

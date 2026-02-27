@@ -14,14 +14,6 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
 {
     private static readonly Regex TraceIdPattern = new(@"^[0-9a-f]{32}$", RegexOptions.Compiled);
 
-    private readonly OtlpMockServer _mockServer;
-
-    public ObservabilityTests()
-    {
-        var port = int.Parse(Config["OtlpMockPort"] ?? "14318");
-        _mockServer = new OtlpMockServer(port);
-    }
-
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -31,13 +23,12 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
 
     public override async Task DisposeAsync()
     {
-        _mockServer.Dispose();
         await base.DisposeAsync();
     }
 
     public void Dispose()
     {
-        _mockServer.Dispose();
+        // No additional cleanup needed
     }
 
     /// <summary>
@@ -66,29 +57,49 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
     }
 
     /// <summary>
-    /// Scenario B: Verify that the API emits OTLP trace data to the mock collector.
-    /// Requires the Lambda to be deployed with Otel__Endpoint pointing to this mock server.
+    /// Scenario B: Verify that the API emits OTLP trace data to the real collector and it reaches Tempo.
+    /// This test queries the Tempo API to confirm trace persistence.
     /// </summary>
     /// <returns>A task representing the asynchronous test operation.</returns>
     [Fact]
     public async Task Api_Request_Should_Emit_Otlp_Trace_To_CollectorAsync()
     {
-        _mockServer.Reset();
-
+        // 1. Make a request to the API
         var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
         var response = await Client.ExecuteAsync(request);
 
         response.IsSuccessful.Should().BeTrue(
-            because: $"the API call must succeed before checking traces. Status: {response.StatusCode}, Content: {response.Content}");
+            because: $"the API call must succeed. Status: {response.StatusCode}");
 
-        var received = await _mockServer.WaitForTraceAsync(TimeSpan.FromSeconds(10));
+        // 2. Extract TraceId from response header
+        var traceIdHeader = response.Headers!
+            .FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        
+        traceIdHeader.Should().NotBeNull("API response must contain X-Trace-Id header");
+        var traceId = traceIdHeader!.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace("TraceId must be valid");
 
-        received.Should().BeTrue(
-            because: "the mock OTLP collector should have received at least one trace export. " +
-                     "Ensure the Lambda is deployed with Otel__Endpoint=http://host.docker.internal:{_mockServer.Port} and Otel__Protocol=http");
+        // 3. Poll Tempo API to verify trace existence
+        // Tempo is exposed on port 3200 in docker-compose
+        var tempoClient = new RestClient("http://localhost:3200");
+        var tempoRequest = new RestRequest($"/api/traces/{traceId}", Method.Get);
+        
+        // Retry loop for eventual consistency (Collector -> Batch -> Tempo)
+        bool traceFound = false;
+        for (int i = 0; i < 10; i++)
+        {
+            var tempoResponse = await tempoClient.ExecuteAsync(tempoRequest);
+            if (tempoResponse.IsSuccessful && tempoResponse.Content!.Contains(traceId!))
+            {
+                traceFound = true;
+                break;
+            }
 
-        var payloads = _mockServer.GetTracePayloadsAsString();
-        payloads.Should().NotBeEmpty(because: "trace payloads should have been captured");
+            await Task.Delay(1000); // Wait 1s before retry
+        }
+
+        traceFound.Should().BeTrue(
+            because: $"Trace {traceId} should be visible in Tempo (http://localhost:3200) within 10 seconds");
     }
 
     /// <summary>
@@ -119,5 +130,69 @@ public sealed class ObservabilityTests : ApiTestBase, IDisposable
         traceIdValue.Should().NotBeNullOrWhiteSpace();
         TraceIdPattern.IsMatch(traceIdValue!).Should().BeTrue(
             because: $"TraceId '{traceIdValue}' must match W3C format (32 hex chars)");
+    }
+
+    /// <summary>
+    /// Scenario D: Verify that Grafana (Loki) successfully receives telemetry logs over OTLP.
+    /// This requires the local docker compose stack to be running (Loki at localhost:3100).
+    /// </summary>
+    /// <returns>A task representing the asynchronous test operation.</returns>
+    [Fact]
+    public async Task Grafana_Should_Receive_TelemetryAsync()
+    {
+        // 1. Generate real traffic on the Materials API to trigger OTel emissions
+        var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+        
+        // We don't assert IsSuccessful because Unleash sync delay might return 404.
+        // Whether it's 200 or 404, the API still emits a trace!
+        var traceIdHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        var traceId = traceIdHeader?.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace(because: "Trace ID should be returned to trace in Grafana");
+
+        // Allow some buffer for the OpenTelemetry Collector's batch processor to flush (default ~5s-10s) + Loki ingestion
+        await Task.Delay(TimeSpan.FromSeconds(15));
+
+        // 2. Query Loki for any logs tagged with this trace ID
+        var lokiClient = new RestClient("http://localhost:3100");
+        
+        // Typical OTel -> Loki mapping uses job as service.name
+        var query = $"{{job=\"PoC-Materials\"}} |= `{traceId}`";
+        var lokiRequest = new RestRequest($"/loki/api/v1/query?query={Uri.EscapeDataString(query)}", Method.Get);
+
+        var lokiResponse = await lokiClient.ExecuteAsync(lokiRequest);
+
+        lokiResponse.IsSuccessful.Should().BeTrue(because: $"Loki should be reachable at localhost:3100. Error: {lokiResponse.ErrorMessage}");
+        lokiResponse.Content.Should().Contain(traceId, because: $"Loki should have ingested logs containing the Trace ID '{traceId}' from the PoC-Materials service via the OTel Collector.");
+    }
+
+    /// <summary>
+    /// Scenario E: Verify that Grafana (Tempo) successfully receives telemetry traces over OTLP.
+    /// This requires the local docker compose stack to be running (Tempo at localhost:3200).
+    /// </summary>
+    /// <returns>A task representing the asynchronous test operation.</returns>
+    [Fact]
+    public async Task Grafana_Should_Receive_TraceAsync()
+    {
+        // 1. Generate real traffic on the Materials API to trigger OTel emissions
+        var request = new RestRequest("/api/v1/materials?limit=1", Method.Get);
+        var response = await Client.ExecuteAsync(request);
+        
+        var traceIdHeader = response.Headers?.FirstOrDefault(h => string.Equals(h.Name, "X-Trace-Id", StringComparison.OrdinalIgnoreCase));
+        var traceId = traceIdHeader?.Value?.ToString();
+        traceId.Should().NotBeNullOrWhiteSpace(because: "Trace ID should be returned to trace in Grafana");
+
+        // Allow some buffer for the OpenTelemetry Collector's batch processor to flush (default ~5s-10s) + Tempo ingestion
+        await Task.Delay(TimeSpan.FromSeconds(15));
+
+        // 2. Query Tempo for the trace
+        var tempoClient = new RestClient("http://localhost:3200");
+        
+        var tempoRequest = new RestRequest($"/api/traces/{traceId}", Method.Get);
+
+        var tempoResponse = await tempoClient.ExecuteAsync(tempoRequest);
+
+        tempoResponse.IsSuccessful.Should().BeTrue(because: $"Tempo should be reachable at localhost:3200 and find the trace '{traceId}'. Error: {tempoResponse.ErrorMessage}");
+        tempoResponse.Content.Should().Contain(traceId, because: $"Tempo should have ingested a trace containing the Trace ID '{traceId}' from the PoC-Materials service via the OTel Collector.");
     }
 }

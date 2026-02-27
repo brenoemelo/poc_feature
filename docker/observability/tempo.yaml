@@ -1,10 +1,12 @@
 server:
   http_listen_port: 3200
   grpc_listen_port: 9095
+  log_level: info
 
 query_frontend:
   search:
-    max_duration: 0
+    max_duration: 0  # Allow querying over entire history, monitor CPU usage
+    max_spans_per_span_set: 100 # avoid high-cardinality queries
 
 distributor:
   receivers:
@@ -14,47 +16,43 @@ distributor:
           endpoint: "0.0.0.0:4318"
         grpc:
           endpoint: "0.0.0.0:4317"
-  ring:
-    kvstore:
-      store: inmemory
 
 ingester:
   lifecycler:
     ring:
-      replication_factor: 1
+      replication_factor: 1 #For HA in production use 3
       kvstore:
         store: inmemory
-    heartbeat_period: 100ms
-  trace_idle_period: 10s
-  max_block_bytes: 1_000_000
   max_block_duration: 5m
-
-metrics_generator:
-  ring:
-    kvstore:
-      store: inmemory
-  registry:
-    external_labels:
-      source: tempo
-      cluster: docker-compose
-  storage:
-    path: /tmp/tempo/generator/wal
-    remote_write:
-      - url: http://prometheus:9090/api/v1/write
-        send_exemplars: true
+  max_block_bytes: 100_000_000 # Increased to 100MB (minimum recommended for stability)
+  trace_idle_period: 30s # Default value that ensures trace completeness
 
 compactor:
   compaction:
-    compaction_window: 1h
-    max_block_bytes: 100_000_000
-    block_retention: 1h
-    compacted_block_retention: 10m
+    block_retention: 168h # Retention of 7 days (market standard)
+    compacted_block_retention: 1h
+
+metrics_generator:
+  processor:
+    service_graphs:
+    span_metrics:
+    local_blocks:
+      filter_server_spans: false
+      flush_to_storage: true
+      concurrent_blocks: 20
+  storage:
+    path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: "http://prometheus:9090/api/v1/write" # Prometheus ingestion endpoint
+        send_exemplars: true # Correlates metric with trace exemplar
+  traces_storage:
+    path: /tmp/tempo/generator/traces
 
 storage:
   trace:
     backend: local
     block:
-      version: vParquet4
+      version: vParquet5
     wal:
       path: /tmp/tempo/wal
     local:
@@ -66,4 +64,4 @@ storage:
 overrides:
   defaults:
     metrics_generator:
-      processors: [service-graphs, span-metrics]
+      processors: [service-graphs, span-metrics, local-blocks]

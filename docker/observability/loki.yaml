@@ -28,33 +28,26 @@ schema_config:
         period: 24h
 
 ingester:
-  # Best Practice: chunk_target_size -> 1.5MB
   chunk_target_size: 1536000
-  # Best Practice: max_chunk_age -> 2h
   max_chunk_age: 2h
-  # Best Practice: chunk_idle_period -> 30m
-  chunk_idle_period: 30m
-  chunk_encoding: snappy # Snappy is faster, good for performance
+  chunk_idle_period: 2h
+  chunk_encoding: snappy
   wal:
     enabled: true
     dir: /loki/wal
-    replay_memory_ceiling: 4GB
+    replay_memory_ceiling: 4GB 
 
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
-  retention_enabled: true
+  retention_enabled: false
   retention_delete_delay: 2h
-  retention_delete_worker_count: 150
-  delete_request_store: filesystem
 
 limits_config:
-  retention_period: 168h # 7 days retention
+  allow_structured_metadata: true
+  retention_period: 168h
   reject_old_samples: true
   reject_old_samples_max_age: 168h
+  unordered_writes: true
   max_cache_freshness_per_query: 10m
   split_queries_by_interval: 15m
-  unordered_writes: true # Allow out-of-order writes (default true in recent versions, but explicit is safe)
-
-analytics:
-  reporting_enabled: false

@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../conf
 from global_config import CONFIG, RESOURCES
 
 def get_materials():
-    url = f"{CONFIG['Aws']['LocalStackUrl']}/restapis/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/_user_request_/api/v1/materials"
+    url = f"{CONFIG['Aws']['LocalStackUrl']}/_aws/execute-api/{CONFIG['ApiGateway']['Id']}/{CONFIG['ApiGateway']['Stage']}/api/v1/materials"
     print(f"Requesting: {url}")
     
     try:

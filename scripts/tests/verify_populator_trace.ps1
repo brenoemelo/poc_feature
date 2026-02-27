@@ -1,3 +1,15 @@
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$EndpointUrl = $Global:Config.Aws.LocalStackUrl
+$AccountId = $Global:Config.Aws.AccountId
+$Region = $Global:Config.Aws.Region
+
 $TraceId = "0af7651916cd43dd8448eb211c80319c"
 $SpanId = "b7ad6b7169203331"
 $TraceParent = "00-$TraceId-$SpanId-01"
@@ -9,8 +21,8 @@ $MessageAttributes = "traceparent={DataType=String,StringValue=$TraceParent}"
 $MessageBody = '{\"target\":\"materials\",\"batch_size\":1}'
 
 aws sns publish `
-    --endpoint-url http://localhost:4566 `
-    --topic-arn arn:aws:sns:us-east-1:000000000000:population-requests `
+    --endpoint-url $EndpointUrl `
+    --topic-arn arn:aws:sns:$Region:$AccountId:population-requests `
     --message $MessageBody `
     --message-attributes $MessageAttributes
 
@@ -21,7 +33,7 @@ Write-Host "Checking logs for TraceId: $TraceId"
 # Get the latest log stream
 $LogStreamName = aws logs describe-log-streams `
     --log-group-name /aws/lambda/PoC-Populator-Worker `
-    --endpoint-url http://localhost:4566 `
+    --endpoint-url $EndpointUrl `
     --order-by LastEventTime `
     --descending `
     --limit 1 `
@@ -39,5 +51,5 @@ Write-Host "Latest Log Stream: $LogStreamName"
 aws logs get-log-events `
     --log-group-name /aws/lambda/PoC-Populator-Worker `
     --log-stream-name $LogStreamName `
-    --endpoint-url http://localhost:4566 `
+    --endpoint-url $EndpointUrl `
     --output text

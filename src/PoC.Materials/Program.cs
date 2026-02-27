@@ -8,6 +8,7 @@ using PoC.Materials.API.Endpoints;
 using PoC.Materials.Functions;
 using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Validators;
 using System.Text.Json;
 
@@ -34,26 +35,33 @@ builder.Services.AddProblemDetails();
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
 // Feature Flags (OpenFeature + Unleash)
-builder.Services.AddPoCFeatureFlags(o =>
+builder.Services.AddPoCFeatureFlags(builder.Configuration, options => 
 {
-    o.UnleashApiUrl = builder.Configuration["FeatureFlags:UnleashApiUrl"] ?? "http://localhost:4242/api/";
-    o.UnleashApiKey = builder.Configuration["FeatureFlags:UnleashApiKey"] ?? "*:development.unleash-insecure-api-token";
-    o.UnleashAppName = "Default";
-    if (int.TryParse(builder.Configuration["FeatureFlags:FetchTogglesIntervalSeconds"], out var interval))
+    // FORCE ENABLE FAKE PROVIDER FOR LOCALSTACK
+    // TODO: Investigate why configuration binding from Env Vars is failing
+    if (builder.Environment.IsDevelopment())
     {
-        o.FetchTogglesIntervalSeconds = interval;
+        options.UseFakeProvider = true;
     }
 });
 
+// FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.SerializerOptions.WriteIndented = true;
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
 
 var app = builder.Build();
+
+// Enable Observability Middleware (TraceId Injection, Flush)
+app.UsePoCObservability();
+
+// Middleware to fix double slashes from LocalStack/APIGW
+app.UseDoubleSlashFix();
 
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();

@@ -15,9 +15,22 @@ A microservices-based proof-of-concept for managing material formulations, built
 docker compose up -d
 ```
 
-### 3. Deploy Services (LocalStack)
+### 3. Deploy Services (LocalStack via Terraform)
+The project uses a Python orchestrator wrapped around Terraform to ensure reproducible and isolated infrastructure deployments.
+
+**Full Deployment (Builds clean .NET packages and deploys all services):**
 ```bash
-./deployment/localstack/deploy-all.ps1
+python deployment/localstack/deploy_all_terraform.py
+```
+
+**Selective Deployment (Deploy only a specific service like Costing):**
+```bash
+python deployment/localstack/deploy_all_terraform.py --service costing
+```
+
+**Fast Iteration (Skip .NET build, only apply Terraform terraform states):**
+```bash
+python deployment/localstack/deploy_all_terraform.py --skip-build
 ```
 
 ### 4. Verify APIs

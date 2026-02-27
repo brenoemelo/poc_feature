@@ -6,9 +6,12 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Moq;
+using Microsoft.Extensions.Configuration;
 using PoC.FeatureFlags.Extensions;
 using Unleash;
+using OpenFeature;
+using OpenFeature.Model;
+using Moq;
 using Xunit;
 
 namespace PoC.Shared.Tests;
@@ -22,8 +25,10 @@ public class FeatureFlagTests
         var services = new ServiceCollection();
         services.AddLogging();
 
+        var config = new ConfigurationBuilder().Build();
+
         // Act
-        services.AddPoCFeatureFlags(options =>
+        services.AddPoCFeatureFlags(config, options =>
         {
             options.UnleashApiUrl = "http://fake-unleash/api/";
             options.UnleashApiKey = "some-key";
@@ -42,8 +47,8 @@ public class FeatureFlagTests
     public async Task FeatureGate_ShouldBlock_WhenFlagIsDisabledAsync()
     {
         // Arrange
-        var mockUnleash = new Mock<IUnleash>();
-        mockUnleash.Setup(u => u.IsEnabled("test-flag")).Returns(false);
+        var mockFeatureClient = new Mock<IFeatureClient>();
+        mockFeatureClient.Setup(c => c.GetBooleanValueAsync("test-flag", false, It.IsAny<EvaluationContext>(), It.IsAny<FlagEvaluationOptions>(), It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(false);
 
         using var host = await new HostBuilder()
             .ConfigureWebHost(webBuilder =>
@@ -52,7 +57,7 @@ public class FeatureFlagTests
                     .UseTestServer()
                     .ConfigureServices(services =>
                     {
-                        services.AddSingleton(mockUnleash.Object);
+                        services.AddSingleton(mockFeatureClient.Object);
                         services.AddRouting();
                         services.AddLogging();
                     })
@@ -81,8 +86,8 @@ public class FeatureFlagTests
     public async Task FeatureGate_ShouldAllow_WhenFlagIsEnabledAsync()
     {
         // Arrange
-        var mockUnleash = new Mock<IUnleash>();
-        mockUnleash.Setup(u => u.IsEnabled("test-flag")).Returns(true);
+        var mockFeatureClient = new Mock<IFeatureClient>();
+        mockFeatureClient.Setup(c => c.GetBooleanValueAsync("test-flag", false, It.IsAny<EvaluationContext>(), It.IsAny<FlagEvaluationOptions>(), It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(true);
 
         using var host = await new HostBuilder()
             .ConfigureWebHost(webBuilder =>
@@ -91,7 +96,7 @@ public class FeatureFlagTests
                     .UseTestServer()
                     .ConfigureServices(services =>
                     {
-                        services.AddSingleton(mockUnleash.Object);
+                        services.AddSingleton(mockFeatureClient.Object);
                         services.AddRouting();
                         services.AddLogging();
                     })

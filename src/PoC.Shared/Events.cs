@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using PoC.Shared.Models;
 
 namespace PoC.Shared.Events;
@@ -10,7 +9,7 @@ public interface IEvent
 }
 
 public sealed record MaterialCreatedEvent(
-    [property: JsonPropertyName("material")] MaterialFormulation Material
+    MaterialFormulation Material
 ) : IEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();

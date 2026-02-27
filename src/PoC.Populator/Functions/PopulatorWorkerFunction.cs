@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Amazon.SimpleNotificationService;
@@ -7,30 +8,48 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
+using PoC.Observability.Extensions;
+using PoC.Populator.Configuration;
+using PoC.Populator.Domain.Models;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
-using PoC.Observability.Extensions;
+using PoC.Shared.Common;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
-using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 #nullable enable
 
 namespace PoC.Populator.Functions;
 
-public partial class PopulatorWorkerFunction
+public partial class PopulatorWorkerFunction : IAsyncDisposable
 {
+    private const string ActivitySourceName = "PoC.Populator.Worker";
+    public IServiceProvider Services => _hostLazy.Value.Services;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hostLazy.IsValueCreated)
+        {
+            if (_hostLazy.Value is IAsyncDisposable asyncDisposable)
+                await asyncDisposable.DisposeAsync();
+            else
+                _hostLazy.Value.Dispose();
+        }
+    }
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Received null event or records")]
     private partial void LogNullEvent();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Received empty SQS Message Body.")]
     private partial void LogEmptyBody();
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Received SQS Message Body: {body}")]
     private partial void LogReceivedBody(string body);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Unwrapped SNS Notification. Inner Body: {body}")]
     private partial void LogUnwrappedBody(string body);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to deserialize message body.")]
@@ -39,22 +58,22 @@ public partial class PopulatorWorkerFunction
     [LoggerMessage(Level = LogLevel.Warning, Message = "Deserialized job is null")]
     private partial void LogNullJob();
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {Body}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Received message is not a valid PopulationJob (Target is missing). Body: {body}")]
     private partial void LogInvalidJob(string body);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {BatchSize} records for {Target} (Min: {Min}, Max: {Max})")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing job: Create {batchSize} records for {target} (Min: {min}, Max: {max})")]
     private partial void LogProcessingJob(int batchSize, string target, int? min, int? max);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {Strategy} generated {Count} items.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Strategy {strategy} generated {count} items.")]
     private partial void LogStrategyGenerated(string strategy, int count);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {ItemType}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown item type generated: {itemType}")]
     private partial void LogUnknownItemType(string itemType);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {PublishedCount} events for target {Target}.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully processed job. Generated and published {publishedCount} events for target {target}.")]
     private partial void LogJobSuccess(int publishedCount, string target);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "{Message}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "{message}")]
     private partial void LogGenericInfo(string message);
 
     // Phase 2: Static Host Initialization
@@ -66,7 +85,7 @@ public partial class PopulatorWorkerFunction
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
-            builder.AddPoCObservability("PoC.Populator.Worker", "1.0.0");
+            builder.AddPoCObservability(ActivitySourceName, "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
@@ -75,18 +94,16 @@ public partial class PopulatorWorkerFunction
             builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 
             // 3. HTTP Client with Resilience
-#pragma warning disable S1075 // URIs should not be hardcoded
-            var materialsUrl = Environment.GetEnvironmentVariable("MATERIALS_API_URL") 
-                               ?? "http://localhost:4566/restapis/material-api/prod/_user_request_";
-            
-            if (!materialsUrl.EndsWith('/'))
+            builder.Services.AddHttpClient("MaterialsClient", (sp, client) =>
             {
-                materialsUrl += "/";
-            }
-#pragma warning restore S1075 // URIs should not be hardcoded
-            
-            builder.Services.AddHttpClient("MaterialsClient", client =>
-            {
+                var opts = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
+                var materialsUrl = opts.MaterialsApiUrl;
+                
+                if (!materialsUrl.EndsWith('/'))
+                {
+                    materialsUrl += "/";
+                }
+                
                 client.BaseAddress = new Uri(materialsUrl);
             })
             .AddStandardResilienceHandler(); // Policies for Retries/CircuitBreaker
@@ -98,11 +115,15 @@ public partial class PopulatorWorkerFunction
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     // Phase 3: Activity Source for Manual Tracing
-    private static readonly ActivitySource _activitySource = new("PoC-Populator-Worker");
+    private static readonly ActivitySource _activitySource = new(ActivitySourceName);
 
     private static IHost HostInstance => _hostLazy.Value;
 
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<PopulatorWorkerFunction> _logger;
+    private readonly IAmazonSimpleNotificationService _snsClient;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _topicArn;
 
     public PopulatorWorkerFunction()
     {
@@ -110,11 +131,10 @@ public partial class PopulatorWorkerFunction
         _logger = host.Services.GetRequiredService<ILogger<PopulatorWorkerFunction>>();
         _snsClient = host.Services.GetRequiredService<IAmazonSimpleNotificationService>();
         _httpClientFactory = host.Services.GetRequiredService<IHttpClientFactory>();
-        _options = host.Services.GetRequiredService<IOptions<PopulatorOptions>>();
         _serviceProvider = host.Services;
         
-        _topicArn = Environment.GetEnvironmentVariable("SNS_TOPIC_ARN") 
-                    ?? "arn:aws:sns:us-east-1:000000000000:material-events";
+        var awsOptions = host.Services.GetRequiredService<IOptions<AwsOptions>>().Value;
+        _topicArn = awsOptions.SnsTopicArn;
     }
 
     // Constructor for testing
@@ -122,56 +142,73 @@ public partial class PopulatorWorkerFunction
         IAmazonSimpleNotificationService snsClient, 
         IHttpClientFactory httpClientFactory,
         ILogger<PopulatorWorkerFunction> logger,
-        IOptions<PopulatorOptions> options,
         IServiceProvider serviceProvider,
         string topicArn)
     {
         _snsClient = snsClient;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _options = options;
         _serviceProvider = serviceProvider;
         _topicArn = topicArn;
     }
 
 #pragma warning disable VSTHRD200
     public async Task FunctionHandler(SQSEvent ev, ILambdaContext context)
-#pragma warning restore VSTHRD200
     {
-        if (_logger == null)
-        {
-            Console.WriteLine("CRITICAL: Logger is not initialized!");
-            return;
-        }
-
-        if (ev == null || ev.Records == null)
-        {
-            LogNullEvent();
-            return;
-        }
-
-        // Parallel processing of SQS messages
-        // We use Task.WhenAll to process all messages concurrently
-        var processingTasks = ev.Records.Select(ProcessMessageAsync);
+        // We use manual activity creation per message in ProcessMessageAsync
+        // to handle SQS Batch propagation correctly.
+        // A top-level span for the batch can be added here if needed, 
+        // but AWSLambdaWrapper is not compatible with typed SQSEvent.
         
-        try
+        using var activity = _activitySource.StartActivity("ProcessBatch", ActivityKind.Server);
+        activity?.SetTag("faas.execution", context.AwsRequestId);
+        
+        await ProcessEvent();
+
+        async Task ProcessEvent()
         {
-            await Task.WhenAll(processingTasks);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing one or more messages in the batch.");
-            throw; // Re-throw to let Lambda know (partial batch failure handling might be needed in real prod)
+            if (_logger == null)
+            {
+                Console.WriteLine("CRITICAL: Logger is not initialized!");
+                return;
+            }
+
+            if (ev == null || ev.Records == null)
+            {
+                LogNullEvent();
+                return;
+            }
+
+            // Parallel processing of SQS messages
+            // We use Task.WhenAll to process all messages concurrently
+            var processingTasks = ev.Records.Select(ProcessMessageAsync);
+            
+            try
+            {
+                await Task.WhenAll(processingTasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing one or more messages in the batch.");
+                throw; // Re-throw to let Lambda know (partial batch failure handling might be needed in real prod)
+            }
         }
     }
 
     private async Task ProcessMessageAsync(SQSEvent.SQSMessage message)
     {
         // Phase 3: Extract Parent Trace Context
-        var parentContext = ExtractParentContext(message);
+        var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, message.MessageAttributes, (attributes, key) =>
+        {
+            if (attributes.TryGetValue(key, out var value))
+            {
+                return new[] { value.StringValue };
+            }
+            return Enumerable.Empty<string>();
+        });
 
         // Start a new Activity linked to the parent context
-        using var activity = _activitySource.StartActivity("ProcessSQSMessage", ActivityKind.Consumer, parentContext);
+        using var activity = _activitySource.StartActivity("ProcessSQSMessage", ActivityKind.Consumer, parentContext.ActivityContext);
 
         // Add tags to the activity
         activity?.SetTag("messaging.system", "aws.sqs");
@@ -220,7 +257,7 @@ public partial class PopulatorWorkerFunction
             PopulationJob? job = null;
             try
             {
-                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, _jsonOptions);
+                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, SerializationDefaults.Options);
             }
             catch (JsonException ex)
             {
@@ -274,7 +311,7 @@ public partial class PopulatorWorkerFunction
                     if (item is MaterialFormulation material)
                     {
                         var evt = new MaterialCreatedEvent(material);
-                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                        messageBody = JsonSerializer.Serialize(evt, SerializationDefaults.Options);
                         eventType = "MaterialCreated";
                     }
                     else if (item is ComponentPriceRequest price)
@@ -282,9 +319,10 @@ public partial class PopulatorWorkerFunction
                         var evt = new PriceUpdatedEvent(
                             price.ComponentName,
                             price.UnitPrice,
+                            price.Unit,
                             price.Currency,
-                            price.EffectiveDate);
-                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                            DateTime.UtcNow);
+                        messageBody = JsonSerializer.Serialize(evt, SerializationDefaults.Options);
                         eventType = "PriceUpdated";
                     }
                     else
@@ -312,17 +350,28 @@ public partial class PopulatorWorkerFunction
                         PublishBatchRequestEntries = entries
                     }).ContinueWith(t => 
                     {
-                        if (t.IsCompletedSuccessfully)
+                        try
                         {
-                            Interlocked.Add(ref publishedCount, t.Result.Successful.Count);
-                            if (t.Result.Failed.Count > 0)
+                            if (t.IsCompletedSuccessfully && t.Result != null)
                             {
-                                _logger.LogError("Failed to publish {FailedCount} messages in a batch.", t.Result.Failed.Count);
+                                if (t.Result.Successful != null)
+                                {
+                                    Interlocked.Add(ref publishedCount, t.Result.Successful.Count);
+                                }
+                                
+                                if (t.Result.Failed != null && t.Result.Failed.Count > 0)
+                                {
+                                    _logger.LogError("Failed to publish {FailedCount} messages in a batch.", t.Result.Failed.Count);
+                                }
+                            }
+                            else if (t.IsFaulted)
+                            {
+                                _logger.LogError(t.Exception, "Error publishing batch.");
                             }
                         }
-                        else if (t.IsFaulted)
+                        catch (Exception ex)
                         {
-                            _logger.LogError(t.Exception, "Error publishing batch.");
+                            _logger.LogError(ex, "Error handling publish batch result.");
                         }
                     }));
                 }
@@ -338,19 +387,6 @@ public partial class PopulatorWorkerFunction
             activity?.SetStatus(ActivityStatusCode.Error, exc.Message);
             throw; 
         }
-    }
-
-    private static ActivityContext ExtractParentContext(SQSEvent.SQSMessage msg)
-    {
-        if (msg.MessageAttributes != null && 
-            msg.MessageAttributes.TryGetValue("traceparent", out var traceParentAttr) &&
-            !string.IsNullOrEmpty(traceParentAttr.StringValue) &&
-            ActivityContext.TryParse(traceParentAttr.StringValue, null, out var context))
-        {
-            return context;
-        }
-
-        return default;
     }
 
     private IPopulationStrategy GetStrategy(string target)

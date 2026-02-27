@@ -53,9 +53,6 @@ public class FeatureFlagManager
         Console.WriteLine($"[FeatureFlagManager] Setting flag '{flagKey}' to '{targetState}'...");
 
         var request = new RestRequest($"admin/projects/default/features/{flagKey}/environments/development/{targetState}", Method.Post);
-        // Unleash API expects a JSON body. The init script sends { "enabled": true } for 'on'.
-        // For 'off', it likely expects { "enabled": false } or just empty object, but let's be consistent.
-        request.AddJsonBody(new { enabled = isEnabled });
 
         var response = await _unleashClient.ExecuteAsync(request);
 

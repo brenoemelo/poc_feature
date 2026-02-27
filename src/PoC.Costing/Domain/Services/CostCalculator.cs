@@ -5,13 +5,6 @@ namespace PoC.Costing.Domain.Services;
 
 public sealed class CostCalculator : ICostCalculator
 {
-    private readonly PoC.Costing.Infrastructure.BusinessMetrics _metrics;
-
-    public CostCalculator(PoC.Costing.Infrastructure.BusinessMetrics metrics)
-    {
-        _metrics = metrics;
-    }
-
     public Result<CostCalculationResponse> Calculate(
         string materialId,
         List<FormulationInput> formulation,
@@ -81,8 +74,6 @@ public sealed class CostCalculator : ICostCalculator
             Currency: currency,
             Breakdown: breakdown,
             Margin: marginAnalysis);
-
-        _metrics.RecordCalculation((double)totalCost);
 
         return Result.Success(response);
     }

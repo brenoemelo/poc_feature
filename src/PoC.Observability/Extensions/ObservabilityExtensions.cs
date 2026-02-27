@@ -4,7 +4,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Extensions.AWS.Trace;
+using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -16,6 +18,7 @@ namespace PoC.Observability.Extensions;
 
 public static class ObservabilityExtensions
 {
+    private static int _propagatorsInitialized;
     /// <summary>
     /// Flushes the OpenTelemetry providers (Tracer, Meter, and Logger).
     /// </summary>
@@ -25,14 +28,10 @@ public static class ObservabilityExtensions
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("OpenTelemetryFlusher");
         try
         {
-            var tracerProvider = services.GetService<TracerProvider>();
-            tracerProvider?.ForceFlush();
-
-            var meterProvider = services.GetService<MeterProvider>();
-            meterProvider?.ForceFlush();
-
-            var loggerProvider = services.GetService<LoggerProvider>();
-            loggerProvider?.ForceFlush();
+            const int timeoutMs = 3000;
+            services.GetService<TracerProvider>()?.ForceFlush(timeoutMs);
+            services.GetService<MeterProvider>()?.ForceFlush(timeoutMs);
+            services.GetService<LoggerProvider>()?.ForceFlush(timeoutMs);
         }
         catch (Exception ex)
         {
@@ -59,9 +58,6 @@ public static class ObservabilityExtensions
         {
             options.ServiceName = serviceName;
             options.ServiceVersion = serviceVersion;
-            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-            options.Environment = builder.Environment.EnvironmentName;
-            options.ExportToConsole = builder.Environment.IsDevelopment();
         });
     }
 
@@ -72,10 +68,15 @@ public static class ObservabilityExtensions
         this WebApplicationBuilder builder,
         Action<ObservabilityOptions> configureOptions)
     {
-        // ServiceName is required, so we initialize with a placeholder that must be overwritten or we check it later.
-        // However, since we are creating the object here, the caller must set it via the Action.
-        // To satisfy the 'required' modifier, we provide a default which the caller should override.
-        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        var options = new ObservabilityOptions 
+        { 
+            Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e1) ? e1 : false,
+            ServiceName = "UnknownService",
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            Environment = builder.Environment.EnvironmentName,
+            ExportToConsole = builder.Environment.IsDevelopment()
+        };
         configureOptions(options);
 
         ConfigureObservability(builder.Services, builder.Logging, options);
@@ -94,9 +95,6 @@ public static class ObservabilityExtensions
         {
             options.ServiceName = serviceName;
             options.ServiceVersion = serviceVersion;
-            options.OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-            options.Environment = builder.Environment.EnvironmentName;
-            options.ExportToConsole = builder.Environment.IsDevelopment();
         });
     }
 
@@ -107,7 +105,15 @@ public static class ObservabilityExtensions
         this HostApplicationBuilder builder,
         Action<ObservabilityOptions> configureOptions)
     {
-        var options = new ObservabilityOptions { ServiceName = "UnknownService" };
+        var options = new ObservabilityOptions 
+        { 
+            Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e2) ? e2 : false,
+            ServiceName = "UnknownService",
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            Environment = builder.Environment.EnvironmentName,
+            ExportToConsole = builder.Environment.IsDevelopment()
+        };
         configureOptions(options);
 
         ConfigureObservability(builder.Services, builder.Logging, options);
@@ -119,10 +125,25 @@ public static class ObservabilityExtensions
         ILoggingBuilder loggingBuilder,
         ObservabilityOptions options)
     {
-        // 0. Add Startup Metrics
+        // 0. Configure Base Logging (always available)
+        loggingBuilder.AddJsonConsole(json =>
+        {
+            json.IncludeScopes = true;
+            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
+        });
+
+        if (!options.Enabled)
+        {
+            return;
+        }
+
+        options.Validate();
+
+        // 1. Add Startup Metrics
         services.AddStartUpMetrics();
 
-        // 1. Define Resource Builder
+        // 2. Define Resource Builder
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion)
             .AddAttributes(new Dictionary<string, object>
@@ -143,48 +164,27 @@ public static class ObservabilityExtensions
 
             if (!string.IsNullOrEmpty(options.OtlpEndpoint))
             {
-                logging.AddOtlpExporter(otlp =>
-                {
-                    otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                    otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                });
-            }
-
-            if (options.ExportToConsole)
-            {
-                // We don't add ConsoleExporter to OTel logging because we will use the native JsonConsole below
-                // logging.AddConsoleExporter(); 
+                logging.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
             }
         });
 
-        // Configure JsonConsole as the standard output format
-        loggingBuilder.AddJsonConsole(json =>
-        {
-            json.IncludeScopes = true;
-            json.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-            json.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = false };
-        });
+        // JSON console was already added initially
 
         // 3. Configure OpenTelemetry (Tracing & Metrics)
         services.AddOpenTelemetry()
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddXRayTraceId() // Requires OpenTelemetry.Extensions.AWS
+                    .AddXRayTraceId()
                     .SetResourceBuilder(resourceBuilder)
                     .AddSource(options.ServiceName)
                     .AddAspNetCoreInstrumentation(o => o.RecordException = true)
                     .AddHttpClientInstrumentation()
-                    .AddAWSInstrumentation() // Requires OpenTelemetry.Instrumentation.AWS
-                    .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true);
+                    .AddAWSInstrumentation();
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {
-                    tracing.AddOtlpExporter(otlp =>
-                    {
-                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                    });
+                    tracing.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
                 }
 
                 if (options.ExportToConsole)
@@ -197,6 +197,7 @@ public static class ObservabilityExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddMeter(options.ServiceName)
+                    .AddMeter("app.startup")
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
@@ -205,11 +206,7 @@ public static class ObservabilityExtensions
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {
-                    metrics.AddOtlpExporter(otlp =>
-                    {
-                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                    });
+                    metrics.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
                 }
 
                 if (options.ExportToConsole)
@@ -218,12 +215,23 @@ public static class ObservabilityExtensions
                 }
             });
 
-        // 4. Configure Propagators (W3C + X-Ray + Baggage)
-        Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(new TextMapPropagator[]
+        // 4. Configure Propagators (W3C + X-Ray + Baggage) — once per process
+        if (Interlocked.Exchange(ref _propagatorsInitialized, 1) == 0)
         {
-            new TraceContextPropagator(), // W3C Standard
-            new AWSXRayPropagator(),       // AWS X-Ray Specific
-            new BaggagePropagator()       // Arbitrary Metadata
-        }));
+            Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(
+            [
+                new TraceContextPropagator(),
+                new AWSXRayPropagator(),
+                new BaggagePropagator()
+            ]));
+        }
+    }
+
+    private static void ConfigureOtlpExporter(OtlpExporterOptions otlp, ObservabilityOptions options)
+    {
+        otlp.Endpoint = new Uri(options.OtlpEndpoint!);
+        otlp.Protocol = string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase)
+            ? OtlpExportProtocol.HttpProtobuf
+            : OtlpExportProtocol.Grpc;
     }
 }

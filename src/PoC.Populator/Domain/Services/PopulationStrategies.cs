@@ -1,7 +1,9 @@
 using Bogus;
 using Microsoft.Extensions.Options;
+using PoC.Populator.Configuration;
 using PoC.Populator.Infrastructure;
 using PoC.Shared.Common;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -85,7 +87,7 @@ public sealed class PricePopulationStrategy(IOptions<PopulatorOptions> options) 
 public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> options) : IPopulationStrategy
 {
     public string TargetTable => options.Value.PricesTableName;
-    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+    // private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }; // Replaced by SerializationDefaults.Options
 
     public async Task<IEnumerable<object>> GenerateAsync(int count, PopulationContext context, int? minComponents = null, int? maxComponents = null)
     {
@@ -107,7 +109,7 @@ public sealed class EnsurePricesPopulationStrategy(IOptions<PopulatorOptions> op
                 }
 
                 context.LogInformation?.Invoke($"Fetching components page {pageCount}...");
-                var response = await context.HttpClient.GetFromJsonAsync<PagedResponse<string>>(url, _jsonOptions);
+                var response = await context.HttpClient.GetFromJsonAsync<PagedResponse<string>>(url, SerializationDefaults.Options);
                 
                 if (response?.Data != null)
                 {

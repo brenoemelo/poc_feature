@@ -142,15 +142,16 @@ Documentation is treated as code.
 * **Cleanup:** Auxiliary files used during development **MUST be deleted** before merging.
 
 ## 13. Deployment & Automation Scripts
-Scripts used to provision AWS resources (local or remote) must be robust, idempotent, and self-documenting.
+Scripts used to provision AWS resources (local or remote) must use **Terraform** to ensure they are robust, idempotent, and self-documenting.
 
 ### 13.1. Safety & Pre-flight Checks
-* **Fail Fast:** The script must immediately stop if any command fails (`set -euo pipefail`).
-* **Connection Check:** Verify AWS connectivity before execution.
+* **Fail Fast:** The deployment pipeline (`deploy_all_terraform.py`) must immediately stop if any validation or build command fails.
+* **Connection Check:** Verify LocalStack/AWS connectivity before execution.
+* **Tooling:** NEVER USE TERRAFORM.EXE DIRECTLY, ALWAYS USE `d:\Projetos\poc_feature\deployment\localstack\deploy_all_terraform.py`.
 
-### 13.2. Idempotency & Cleanup
-* **Clean Slate Strategy:** Check if resource exists -> Delete (if testing) -> Create.
-* **Retry Pattern:** Wrap AWS CLI commands in a retry loop to handle eventual consistency.
+### 13.2. Idempotency & Cleanup (Terraform)
+* **Declarative Configuration:** Use Terraform (`terraform plan / apply`) instead of imperative CLI commands to ensure idempotent deployments.
+* **State Isolation:** Each service owns its own Terraform `tfstate` and resources, decoupling deployment boundaries.
 
 ## 14. REST API Design Guidelines
 We follow **Pragmatic REST** standards (Richardson Maturity Model).

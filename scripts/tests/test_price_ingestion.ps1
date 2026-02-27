@@ -2,9 +2,19 @@
 $ErrorActionPreference = "Stop"
 Start-Transcript -Path "test_price_ingestion.log" -Append
 
-$EndpointUrl = "http://localhost:4566"
-$Region = "us-east-1"
-$TopicArn = "arn:aws:sns:us-east-1:000000000000:material-events"
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$EndpointUrl = $Global:Config.Aws.LocalStackUrl
+$AccountId = $Global:Config.Aws.AccountId
+$Region = $Global:Config.Aws.Region
+
+$TopicArn = "arn:aws:sns:$Region:$AccountId:material-events"
 $TableName = "costing-prices-table"
 
 # 1. Generate Test Data

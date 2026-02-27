@@ -1,50 +1,59 @@
+using System.Diagnostics;
+using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
-using System.Text.Json;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PoC.Costing.Functions;
 
-public sealed partial class PriceIngestionFunction
+public sealed partial class PriceIngestionFunction : IAsyncDisposable
 {
+    private static readonly ActivitySource _activitySource = new("PoC.Costing.PriceIngestion");
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private readonly IHost _host;
+    public IServiceProvider Services => _host.Services;
+
     private readonly ICostingRepository _repository;
     private readonly ILogger<PriceIngestionFunction> _logger;
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Processing {Count} SQS messages")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Processing {count} SQS messages")]
     private partial void LogProcessingBatch(int count);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "[PriceIngestion] Failed to process record {MessageId}")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "[PriceIngestion] Failed to process record {messageId}")]
     private partial void LogProcessingError(Exception ex, string messageId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Batch complete. Processed: {Processed}, Failed: {Failed}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Batch complete. Processed: {processed}, Failed: {failed}")]
     private partial void LogBatchComplete(int processed, int failed);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type: {EventType}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type: {eventType}")]
     private partial void LogIgnoringEventType(string eventType);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type (from body): {EventType}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ignoring event type (from body): {eventType}")]
     private partial void LogIgnoringEventTypeFromBody(string eventType);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has no 'Message' property")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has no 'Message' property")]
     private partial void LogRecordNoMessageProperty(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has empty message")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has empty message")]
     private partial void LogRecordEmptyMessage(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {MessageId} has invalid price event")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "[PriceIngestion] Record {messageId} has invalid price event")]
     private partial void LogRecordInvalidPriceEvent(string messageId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ingesting price for {ComponentName}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Ingesting price for {componentName}")]
     private partial void LogIngestingPrice(string componentName);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Successfully ingested price for {ComponentName}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "[PriceIngestion] Successfully ingested price for {componentName}")]
     private partial void LogSuccessfullyIngestedPrice(string componentName);
 
     public PriceIngestionFunction()
@@ -55,47 +64,82 @@ public sealed partial class PriceIngestionFunction
 
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
-        var host = builder.Build();
+        _host = builder.Build();
+        _host.Start();
 
-        _repository = host.Services.GetRequiredService<ICostingRepository>();
-        _logger = host.Services.GetRequiredService<ILogger<PriceIngestionFunction>>();
+        _repository = _host.Services.GetRequiredService<ICostingRepository>();
+        _logger = _host.Services.GetRequiredService<ILogger<PriceIngestionFunction>>();
     }
 
     public PriceIngestionFunction(ICostingRepository repository, ILogger<PriceIngestionFunction> logger)
     {
         _repository = repository;
         _logger = logger;
+        _host = null!; // Mocking constructor
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_host is IAsyncDisposable asyncDisposable)
+        {
+            await asyncDisposable.DisposeAsync();
+        }
+        else
+        {
+            _host?.Dispose();
+        }
     }
 
 #pragma warning disable VSTHRD200
     public async Task<SQSBatchResponse> FunctionHandler(SQSEvent sqsEvent, ILambdaContext context)
 #pragma warning restore VSTHRD200
     {
-        var batchResponse = new SQSBatchResponse();
+        using var activity = _activitySource.StartActivity("ProcessBatch", ActivityKind.Server);
+        activity?.SetTag("faas.execution", context.AwsRequestId);
+        activity?.SetTag("messaging.batch.message_count", sqsEvent.Records.Count);
 
-        LogProcessingBatch(sqsEvent.Records.Count);
+        return await ProcessEvent();
 
-        foreach (var record in sqsEvent.Records)
+    async Task<SQSBatchResponse> ProcessEvent()
         {
-            try
+            var batchResponse = new SQSBatchResponse();
+
+            _logger.LogInformation("Processing {Count} records...", sqsEvent.Records.Count);
+
+            foreach (var record in sqsEvent.Records)
             {
-                await ProcessSqsRecordAsync(record);
-            }
-            catch (Exception ex)
-            {
-                LogProcessingError(ex, record.MessageId);
-                batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                // Extract parent context from SQS message attributes
+                var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, record.MessageAttributes, (attributes, key) =>
                 {
-                    ItemIdentifier = record.MessageId
+                    if (attributes.TryGetValue(key, out var value))
+                    {
+                        return new[] { value.StringValue };
+                    }
+                    return Enumerable.Empty<string>();
                 });
+
+                // Start a new activity for processing this message, linked to the parent
+                using var messageActivity = _activitySource.StartActivity("ProcessMessage", ActivityKind.Consumer, parentContext.ActivityContext);
+                messageActivity?.SetTag("messaging.system", "sqs");
+                messageActivity?.SetTag("messaging.message_id", record.MessageId);
+
+                try
+                {
+                    await ProcessSqsRecordAsync(record);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing SQS record {MessageId}", record.MessageId);
+                    batchResponse.BatchItemFailures.Add(new SQSBatchResponse.BatchItemFailure
+                    {
+                        ItemIdentifier = record.MessageId
+                    });
+                    messageActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                }
             }
+
+            return batchResponse;
         }
-
-        LogBatchComplete(
-            sqsEvent.Records.Count - batchResponse.BatchItemFailures.Count,
-            batchResponse.BatchItemFailures.Count);
-
-        return batchResponse;
     }
 
     private async Task ProcessSqsRecordAsync(SQSEvent.SQSMessage record)
@@ -118,28 +162,35 @@ public sealed partial class PriceIngestionFunction
 
         using var doc = JsonDocument.Parse(record.Body);
         var root = doc.RootElement;
+        string? messageJson;
 
-        // Try to get MessageAttributes from the SNS body if not present in SQS record attributes
-        // Standard SNS to SQS JSON format: "MessageAttributes": { "Key": { "Type": "String", "Value": "..." } }
-        if (root.TryGetProperty("MessageAttributes", out var msgAttrs) && 
-            msgAttrs.TryGetProperty("EventType", out var eventTypeProp) &&
-            eventTypeProp.TryGetProperty("Value", out var eventTypeValue))
+        // Check if it is an SNS Envelope (RawMessageDelivery = false)
+        if (root.ValueKind == JsonValueKind.Object && 
+            root.TryGetProperty("Type", out var typeProp) && 
+            typeProp.GetString() == "Notification" &&
+            root.TryGetProperty("Message", out var messageProp))
         {
-             var eventType = eventTypeValue.GetString();
-             if (string.IsNullOrEmpty(eventType) || !string.Equals(eventType, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
-             {
-                 LogIgnoringEventTypeFromBody(eventType ?? "null");
-                 return;
-             }
+            messageJson = messageProp.GetString();
+
+            // Try to get MessageAttributes from the SNS body if not present in SQS record attributes
+            if (root.TryGetProperty("MessageAttributes", out var msgAttrs) && 
+                msgAttrs.TryGetProperty("EventType", out var eventTypeProp) &&
+                eventTypeProp.TryGetProperty("Value", out var eventTypeValue))
+            {
+                 var eventType = eventTypeValue.GetString();
+                 if (string.IsNullOrEmpty(eventType) || !string.Equals(eventType, "PriceUpdated", StringComparison.OrdinalIgnoreCase))
+                 {
+                     LogIgnoringEventTypeFromBody(eventType ?? "null");
+                     return;
+                 }
+            }
+        }
+        else
+        {
+            // Assume Raw Message (RawMessageDelivery = true)
+            messageJson = record.Body;
         }
 
-        if (!root.TryGetProperty("Message", out var messageProperty))
-        {
-            LogRecordNoMessageProperty(record.MessageId);
-            return;
-        }
-
-        var messageJson = messageProperty.GetString();
         if (string.IsNullOrEmpty(messageJson))
         {
             LogRecordEmptyMessage(record.MessageId);
@@ -148,7 +199,7 @@ public sealed partial class PriceIngestionFunction
 
         var priceEvent = JsonSerializer.Deserialize<PriceUpdatedEvent>(
             messageJson,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _jsonOptions);
 
         if (priceEvent == null || string.IsNullOrEmpty(priceEvent.ComponentName))
         {
@@ -159,10 +210,10 @@ public sealed partial class PriceIngestionFunction
         LogIngestingPrice(priceEvent.ComponentName);
 
         var request = new ComponentPriceRequest(
-            priceEvent.ComponentName,
-            priceEvent.UnitPrice,
-            "kg",
-            priceEvent.Currency);
+                    priceEvent.ComponentName,
+                    priceEvent.UnitPrice,
+                    priceEvent.Unit,
+                    priceEvent.Currency);
 
         var result = await _repository.UpsertPriceAsync(request);
 

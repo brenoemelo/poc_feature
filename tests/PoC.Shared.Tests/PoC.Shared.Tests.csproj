@@ -7,12 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="8.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
-    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.9.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -22,9 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PoC.Shared\PoC.Shared.csproj" />
-    <ProjectReference Include="..\..\src\PoC.Shared.Infrastructure\PoC.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PoC.FeatureFlags\PoC.FeatureFlags.csproj" />
-    <ProjectReference Include="..\..\src\PoC.Observability\PoC.Observability.csproj" />
   </ItemGroup>
 
 </Project>

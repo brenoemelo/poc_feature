@@ -1,6 +1,16 @@
 $ErrorActionPreference = "Stop"
-$EndpointUrl = "http://localhost:4566"
-$Region = "us-east-1"
+
+# Load Global Config
+$GlobalConfigFile = "$PSScriptRoot/../config/global.env.ps1"
+if (Test-Path $GlobalConfigFile) { . $GlobalConfigFile }
+
+if (-not $Global:Config) {
+    throw "Global Configuration not loaded. Please ensure global.env.ps1 is available."
+}
+
+$EndpointUrl = $Global:Config.Aws.LocalStackUrl
+$Region = $Global:Config.Aws.Region
+
 $FunctionName = "PoC-Costing-PriceIngestion"
 $PayloadPath = "..\..\config\payloads\invoke_payload.json"
 $OutputPath = "..\..\scratchpad\response.json"

@@ -10,10 +10,8 @@ def test():
     aws_helpers.write_log("STEP 5: Smoke Tests", "INFO")
     
     api_id = SERVICE_CONFIG['CustomApiId']
-    # Use LocalStack URL format for custom IDs if possible, or just the standard localhost:4566
-    # LocalStack maps http://localhost:4566/restapis/{id}/{stage}/_user_request_/{path}
-    
-    url = f"{SERVICE_CONFIG['EndpointUrl']}/restapis/{api_id}/{SERVICE_CONFIG['Stage']}/_user_request_/api/v1/materials"
+    # Use configured API URL from global config
+    url = f"{SERVICE_CONFIG['ApiUrl']}api/v1/materials"
     
     aws_helpers.write_log(f"Testing API Endpoint: {url}", "INFO")
     

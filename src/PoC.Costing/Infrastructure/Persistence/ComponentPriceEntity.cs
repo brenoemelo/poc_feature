@@ -1,24 +1,27 @@
-using Amazon.DynamoDBv2.DataModel;
+using System.Text.Json.Serialization;
 
 namespace PoC.Costing.Infrastructure.Persistence;
 
 public class ComponentPriceEntity
 {
-    [DynamoDBHashKey]
+    [JsonPropertyName("ComponentName")]
     public string ComponentName { get; set; } = string.Empty;
 
-    [DynamoDBProperty]
+    [JsonPropertyName("UnitPrice")]
     public decimal UnitPrice { get; set; }
 
-    [DynamoDBProperty]
+    [JsonPropertyName("Unit")]
     public string Unit { get; set; } = string.Empty;
 
-    [DynamoDBProperty]
+    [JsonPropertyName("Currency")]
     public string Currency { get; set; } = string.Empty;
 
-    [DynamoDBProperty]
+    [JsonPropertyName("UpdatedAt")]
     public DateTime UpdatedAt { get; set; }
 
-    [DynamoDBVersion]
+    [JsonPropertyName("Version")]
     public int? Version { get; set; }
+
+    [JsonPropertyName("record_type")]
+    public string RecordType { get; set; } = "COMPONENT_PRICE";
 }

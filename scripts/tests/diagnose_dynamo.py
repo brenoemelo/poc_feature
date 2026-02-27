@@ -1,13 +1,15 @@
 import boto3
 import json
 import sys
+import os
 
-AWS_ENDPOINT = "http://localhost:4566"
-REGION = "us-east-1"
+# Add utils to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../utils')))
+import aws_helpers
 
 def diagnose():
     try:
-        dynamodb = boto3.client('dynamodb', endpoint_url=AWS_ENDPOINT, region_name=REGION)
+        dynamodb = aws_helpers.get_boto3_client('dynamodb')
         print("Listing tables...")
         tables = dynamodb.list_tables()
         print(json.dumps(tables, indent=2, default=str))

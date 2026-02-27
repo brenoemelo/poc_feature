@@ -1,27 +1,37 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Options;
+using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Interfaces;
 using PoC.Shared.Common;
+using PoC.Populator.Domain.Models;
 using PoC.Shared.Models;
 using System.Text.Json;
 
 namespace PoC.Populator.Infrastructure.Services;
 
-public sealed class PopulationService(
+public sealed partial class PopulationService(
     IAmazonSQS sqsClient,
-    IOptions<PopulatorOptions> options,
+    IOptions<AwsOptions> awsOptions,
     ILogger<PopulationService> logger) : IPopulationService
 {
+    private readonly ILogger<PopulationService> _logger = logger;
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Splitting {Count} records into {TotalBatches} batches.")]
+    private partial void LogSplittingRecords(int count, int totalBatches);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create population job")]
+    private partial void LogJobCreationFailure(Exception ex);
+
     public async Task<Result<PopulationJobResponse>> CreateJobAsync(PopulationRequest request)
     {
         try
         {
             int batchSize = 250;
             int totalBatches = (int)Math.Ceiling((double)request.Count / batchSize);
-            logger.LogInformation("Splitting {Count} records into {TotalBatches} batches.", request.Count, totalBatches);
+            LogSplittingRecords(request.Count, totalBatches);
 
-            var queueUrl = options.Value.QueueUrl;
+            var queueUrl = awsOptions.Value.SqsQueueUrl;
 
             var sendTasks = new List<Task>();
 
@@ -38,7 +48,7 @@ public sealed class PopulationService(
                 var message = new SendMessageRequest
                 {
                     QueueUrl = queueUrl,
-                    MessageBody = JsonSerializer.Serialize(job)
+                    MessageBody = JsonSerializer.Serialize(job, SerializationDefaults.Options)
                 };
 
                 sendTasks.Add(sqsClient.SendMessageAsync(message));
@@ -53,7 +63,7 @@ public sealed class PopulationService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to create population job");
+            LogJobCreationFailure(ex);
             return Result.Failure<PopulationJobResponse>(new Error("Populator.Error", ex.Message));
         }
     }
