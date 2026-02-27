@@ -9,6 +9,7 @@ using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using PoC.Costing.Domain.Interfaces;
 using PoC.Costing.Infrastructure;
+using PoC.Observability.Extensions;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
