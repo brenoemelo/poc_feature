@@ -8,7 +8,7 @@ The **good news**: your application code is already vendor-agnostic. `PoC.Observ
 
 ## Current Observability Stack Inventory
 
-````carousel
+
 ### Current Architecture
 ```mermaid
 graph LR
@@ -56,7 +56,6 @@ graph LR
     style EXT fill:#632CA6,color:#fff
     style DC fill:#632CA6,color:#fff
 ```
-````
 
 ### Docker-Compose Containers (Current)
 
