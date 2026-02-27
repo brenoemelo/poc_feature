@@ -47,7 +47,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
 
             items.AddRange(dynamoItems
                 .Select(item => Document.FromAttributeMap(item).ToJson())
-                .Select(json => JsonSerializer.Deserialize<MaterialEntity>(json))
+                .Select(json => JsonSerializer.Deserialize<MaterialEntity>(json, SerializationDefaults.Options))
                 .Where(entity => entity is not null)
                 .Select(entity => MapToDomain(entity!)));
 
@@ -83,7 +83,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
             }
 
             var itemDocument = Document.FromAttributeMap(response.Item);
-            var entity = JsonSerializer.Deserialize<MaterialEntity>(itemDocument.ToJson());
+            var entity = JsonSerializer.Deserialize<MaterialEntity>(itemDocument.ToJson(), SerializationDefaults.Options);
 
             return entity is null
                 ? Result.Failure<MaterialFormulation>(Error.NotFound)
@@ -134,7 +134,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
         }
     }
 
-    public async Task<Result<PagedResult<string>>> GetUniqueComponentsAsync(int limit, string? cursor)
+    public async Task<Result<PagedResult<string>>> ScanComponentsAsync(int materialLimit, string? cursor)
     {
         try
         {
@@ -148,7 +148,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
                 {
                     { ":v_type", new AttributeValue { S = "MATERIAL" } }
                 },
-                Limit = limit
+                Limit = materialLimit
             };
 
             var cursorResult = ParseCursor(cursor);
@@ -166,7 +166,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
             foreach (var item in dynamoItems)
             {
                 var doc = Document.FromAttributeMap(item);
-                var entity = JsonSerializer.Deserialize<MaterialEntity>(doc.ToJson());
+                var entity = JsonSerializer.Deserialize<MaterialEntity>(doc.ToJson(), SerializationDefaults.Options);
                 
                 if (entity?.Formulation != null)
                 {
@@ -179,7 +179,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
             
             var nextCursor = GetNextCursor(response.LastEvaluatedKey);
 
-            LogUniqueComponents(uniqueComponents.Count);
+            LogScannedComponents(uniqueComponents.Count);
             return Result.Success(new PagedResult<string>(uniqueComponents, nextCursor));
         }
         catch (Exception ex)
@@ -194,7 +194,7 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
         {
             LogSavingMaterial(material.MaterialId);
             var entity = MapToEntity(material);
-            var json = JsonSerializer.Serialize(entity);
+            var json = JsonSerializer.Serialize(entity, SerializationDefaults.Options);
             var itemDocument = Document.FromJson(json);
 
             var request = new PutItemRequest
@@ -304,17 +304,17 @@ public sealed partial class DynamoDbMaterialRepository(IAmazonDynamoDB client, I
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[GetAllAsync] Listing materials (Limit: {limit}, Cursor: {cursor})")]
-    private partial void LogListingMaterials(int limit, string? cursor);
+    partial void LogListingMaterials(int limit, string? cursor);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "[GetAllAsync] Failed to list materials: {error}")]
-    private partial void LogListingMaterialsError(string error);
+    partial void LogListingMaterialsError(string error);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[GetCountAsync] Count: {count}")]
-    private partial void LogCount(int count);
+    partial void LogCount(int count);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[GetUniqueComponentsAsync] Found {count} unique components")]
-    private partial void LogUniqueComponents(int count);
+    [LoggerMessage(Level = LogLevel.Information, Message = "[ScanComponentsAsync] Scanned {count} unique components from materials")]
+    partial void LogScannedComponents(int count);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "[SaveAsync] Saving material {materialId}")]
-    private partial void LogSavingMaterial(string materialId);
+    partial void LogSavingMaterial(string materialId);
 }

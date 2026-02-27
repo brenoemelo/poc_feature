@@ -1,6 +1,4 @@
 $ErrorActionPreference = "Continue"
-Write-Warning "E2E Tests Disabled by user request."
-exit 0
 
 # 0. Initialize Logging (Modular Framework)
 try {
@@ -70,7 +68,7 @@ if (-not $BaseUrl) {
     # Simple check if LocalStack is up (not necessarily the API)
     try {
         $LocalStackHealthUrl = if ($Global:Config) { $Global:Config.Aws.LocalStackUrl + "/_localstack/health" } else { throw "Global Config not loaded" }
-        $test = Invoke-WebRequest -Uri $LocalStackHealthUrl -Method GET -ErrorAction SilentlyContinue
+        $test = Invoke-WebRequest -Uri $LocalStackHealthUrl -Method GET -UseBasicParsing -ErrorAction SilentlyContinue
         if ($test.StatusCode -eq 200) {
              $BaseUrl = $LocalStackUrl
              Write-Host " LocalStack is UP (Assuming API is deployed)" -ForegroundColor Green

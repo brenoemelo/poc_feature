@@ -21,4 +21,7 @@ public class ComponentPriceEntity
 
     [JsonPropertyName("Version")]
     public int? Version { get; set; }
+
+    [JsonPropertyName("record_type")]
+    public string RecordType { get; set; } = "COMPONENT_PRICE";
 }

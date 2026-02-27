@@ -8,4 +8,6 @@ public class FeatureFlagOptions
     public string UnleashAppName { get; set; } = "default-app";
     public string UnleashInstanceId { get; set; } = "default-instance";
     public int FetchTogglesIntervalSeconds { get; set; } = 15;
+
+    public bool UseFakeProvider { get; set; }
 }

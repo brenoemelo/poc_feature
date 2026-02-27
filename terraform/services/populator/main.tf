@@ -21,6 +21,7 @@ locals {
     AWS__ServiceUrl             = "http://localstack:4566"
     FeatureFlags__UnleashApiUrl = "http://host.docker.internal:4242/api/" # Use host.docker.internal for stable access
     FeatureFlags__FetchTogglesIntervalSeconds = "1"
+    FeatureFlags__UseFakeProvider = "true"
   }
   zip_path = "${path.module}/../../../dist/PoC-Populator/PoC-Populator.zip"
 }

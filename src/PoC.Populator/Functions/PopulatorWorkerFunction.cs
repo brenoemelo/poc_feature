@@ -16,6 +16,7 @@ using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Models;
 using PoC.Populator.Domain.Services;
 using PoC.Populator.Infrastructure;
+using PoC.Shared.Common;
 using PoC.Shared.Events;
 using PoC.Shared.Models;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -256,7 +257,7 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
             PopulationJob? job = null;
             try
             {
-                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, _jsonOptions);
+                job = JsonSerializer.Deserialize<PopulationJob>(incomingMessageBody, SerializationDefaults.Options);
             }
             catch (JsonException ex)
             {
@@ -310,7 +311,7 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
                     if (item is MaterialFormulation material)
                     {
                         var evt = new MaterialCreatedEvent(material);
-                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                        messageBody = JsonSerializer.Serialize(evt, SerializationDefaults.Options);
                         eventType = "MaterialCreated";
                     }
                     else if (item is ComponentPriceRequest price)
@@ -318,9 +319,10 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
                         var evt = new PriceUpdatedEvent(
                             price.ComponentName,
                             price.UnitPrice,
+                            price.Unit,
                             price.Currency,
                             DateTime.UtcNow);
-                        messageBody = JsonSerializer.Serialize(evt, _jsonOptions);
+                        messageBody = JsonSerializer.Serialize(evt, SerializationDefaults.Options);
                         eventType = "PriceUpdated";
                     }
                     else

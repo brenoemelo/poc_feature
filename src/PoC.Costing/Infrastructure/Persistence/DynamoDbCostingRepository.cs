@@ -31,25 +31,36 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
         try
         {
             var tableName = _options.TableName;
+
+            // Optimistic Locking: Use ConditionExpression to ensure version match
+            // If the item doesn't exist, ensure ComponentName doesn't exist.
+            // If it exists, ensure Version matches.
+
             var getRequest = new GetItemRequest
             {
                 TableName = tableName,
                 Key = new Dictionary<string, AttributeValue>
                 {
                     { "ComponentName", new AttributeValue { S = request.ComponentName } }
-                }
+                },
+                ConsistentRead = true // Important for OCC
             };
 
             var getResponse = await client.GetItemAsync(getRequest);
             ComponentPriceEntity? existing = null;
-            
+
             if (getResponse.Item != null && getResponse.Item.Count > 0)
             {
                 var doc = Document.FromAttributeMap(getResponse.Item);
                 existing = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson());
             }
 
-            var entity = existing ?? new ComponentPriceEntity { ComponentName = request.ComponentName };
+            var entity = existing ?? new ComponentPriceEntity 
+            { 
+                ComponentName = request.ComponentName,
+                RecordType = "COMPONENT_PRICE",
+                Version = 0
+            };
 
             LogUpsertPriceProcessing(request.ComponentName, existing != null, existing?.Version);
 
@@ -58,27 +69,34 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
             entity.Currency = request.Currency;
             entity.UpdatedAt = DateTime.UtcNow;
 
-            // Manual version increment for optimistic locking simulation
-            if (entity.Version.HasValue)
-            {
-                entity.Version++;
-            }
-            else
-            {
-                entity.Version = 1;
-            }
+            // Increment version
+            var oldVersion = entity.Version;
+            entity.Version = (entity.Version ?? 0) + 1;
 
-            var json = JsonSerializer.Serialize(entity);
-            var itemDocument = Document.FromJson(json);
-            
+            var itemJson = JsonSerializer.Serialize(entity);
+            var itemDoc = Document.FromJson(itemJson);
+            var itemAttributes = itemDoc.ToAttributeMap();
+
             var putRequest = new PutItemRequest
             {
                 TableName = tableName,
-                Item = itemDocument.ToAttributeMap()
+                Item = itemAttributes,
+                ConditionExpression = existing == null 
+                    ? "attribute_not_exists(ComponentName)" 
+                    : "Version = :expectedVersion",
+                ExpressionAttributeValues = existing == null ? null : new Dictionary<string, AttributeValue>
+                {
+                    { ":expectedVersion", new AttributeValue { N = oldVersion.ToString() } }
+                }
             };
 
             await client.PutItemAsync(putRequest);
+            
             return Result.Success();
+        }
+        catch (ConditionalCheckFailedException)
+        {
+            return Result.Failure(new Error("Concurrency.Conflict", $"Price for {request.ComponentName} was modified by another transaction. Please retry."));
         }
         catch (Exception ex)
         {
@@ -131,7 +149,7 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
                 foreach (var item in items)
                 {
                     var doc = Document.FromAttributeMap(item);
-                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson());
+                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson(), SerializationDefaults.Options);
                     if (entity != null)
                     {
                         results[entity.ComponentName] = (entity.UnitPrice, entity.Currency);
@@ -154,9 +172,15 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
         try
         {
             var tableName = _options.TableName;
-            var request = new ScanRequest
+            var request = new QueryRequest
             {
-                TableName = tableName
+                TableName = tableName,
+                IndexName = "IX_Prices_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    { ":v_type", new AttributeValue { S = "COMPONENT_PRICE" } }
+                }
             };
 
             var items = new List<ComponentPriceEntity>();
@@ -165,12 +189,12 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
             do
             {
                 request.ExclusiveStartKey = lastKey;
-                var response = await client.ScanAsync(request);
+                var response = await client.QueryAsync(request);
                 
                 foreach (var item in response.Items)
                 {
                     var doc = Document.FromAttributeMap(item);
-                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson());
+                    var entity = JsonSerializer.Deserialize<ComponentPriceEntity>(doc.ToJson(), SerializationDefaults.Options);
                     if (entity != null)
                     {
                         items.Add(entity);
@@ -203,27 +227,33 @@ public sealed partial class DynamoDbCostingRepository(IAmazonDynamoDB client, IL
         try
         {
             var tableName = _options.TableName;
-            var request = new ScanRequest
+            var request = new QueryRequest
             {
                 TableName = tableName,
+                IndexName = "IX_Prices_By_Type",
+                KeyConditionExpression = "record_type = :v_type",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    { ":v_type", new AttributeValue { S = "COMPONENT_PRICE" } }
+                },
                 Select = Select.COUNT
             };
 
-            long totalCount = 0;
+            var totalCount = 0;
             Dictionary<string, AttributeValue>? lastKey = null;
 
             do
             {
                 request.ExclusiveStartKey = lastKey;
-                var response = await client.ScanAsync(request);
+                var response = await client.QueryAsync(request);
                 totalCount += response.Count ?? 0;
                 lastKey = response.LastEvaluatedKey;
             }
             while (lastKey != null && lastKey.Count > 0);
+
+            LogGetPricesCount(totalCount);
             
-            LogGetPricesCount((int)totalCount);
-            
-            return Result.Success((int)totalCount);
+            return Result.Success(totalCount);
         }
         catch (Exception ex)
         {

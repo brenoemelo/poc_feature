@@ -14,6 +14,7 @@ using PoC.Costing.Infrastructure;
 using PoC.Costing.Infrastructure.ExternalServices;
 using PoC.FeatureFlags.Extensions;
 using PoC.Observability.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Validators;
 
 [assembly: LambdaSerializer(typeof(DefaultLambdaJsonSerializer))]
@@ -42,12 +43,21 @@ public class Program
         builder.AddPoCObservability("PoC.Costing", "1.0.0");
 
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+        builder.Services.AddProblemDetails();
 
         // Dependency Injection
         builder.Services.AddCostingInfrastructure(builder.Configuration);
 
         // Feature Flags (OpenFeature + Unleash)
-        builder.Services.AddPoCFeatureFlags(builder.Configuration);
+        builder.Services.AddPoCFeatureFlags(builder.Configuration, options => 
+        {
+            // FORCE ENABLE FAKE PROVIDER FOR LOCALSTACK
+            // TODO: Investigate why configuration binding from Env Vars is failing
+            if (builder.Environment.IsDevelopment())
+            {
+                options.UseFakeProvider = true;
+            }
+        });
 
         builder.Services.AddSingleton<PoC.Costing.Infrastructure.BusinessMetrics>();
         builder.Services.AddSingleton<ICostCalculator, CostCalculator>();
@@ -73,6 +83,8 @@ public class Program
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+            options.SerializerOptions.WriteIndented = true;
+            options.SerializerOptions.PropertyNameCaseInsensitive = true;
         });
 
         var app = builder.Build();
@@ -81,14 +93,7 @@ public class Program
         app.UsePoCObservability();
 
         // Middleware to fix double slashes from LocalStack/APIGW
-        app.Use(async (context, next) =>
-        {
-            if (context.Request.Path.Value?.Contains("//") == true)
-            {
-                context.Request.Path = context.Request.Path.Value.Replace("//", "/");
-            }
-            await next(context);
-        });
+        app.UseDoubleSlashFix();
 
         app.MapGroup("/api/v1/costing")
            .MapCostingEndpoints();

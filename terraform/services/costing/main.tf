@@ -32,6 +32,18 @@ resource "aws_dynamodb_table" "costing" {
     name = "ComponentName"
     type = "S"
   }
+
+  attribute {
+    name = "record_type"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "IX_Prices_By_Type"
+    hash_key        = "record_type"
+    range_key       = "ComponentName"
+    projection_type = "ALL"
+  }
 }
 
 # API Lambda

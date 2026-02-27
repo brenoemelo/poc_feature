@@ -5,6 +5,7 @@ using Amazon.Lambda.Serialization.SystemTextJson;
 using Amazon.Lambda.SQSEvents;
 using PoC.FeatureFlags.Extensions;
 using PoC.Observability.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Populator.API.Endpoints;
 using PoC.Populator.Functions;
 using PoC.Populator.Infrastructure;
@@ -19,16 +20,6 @@ public class Program
 
     public static async Task Main()
     {
-        // Lê a versão injetada no build
-        // var assembly = Assembly.GetExecutingAssembly();
-        // var versionInfo = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-
-        // Imprime no log da AWS/LocalStack
-        // Console.WriteLine($"===================================================");
-        // Console.WriteLine($"[STARTUP] Executando PoC.Populator");
-        // Console.WriteLine($"[STARTUP] Versão do Build: {versionInfo}");
-        // Console.WriteLine($"===================================================");
-
         var handler = Environment.GetEnvironmentVariable("_HANDLER");
         if (!string.IsNullOrEmpty(handler) && handler.Contains("PopulatorWorkerFunction"))
         {
@@ -46,17 +37,28 @@ public class Program
 
         // Observability (Native OTel + ILogger)
         builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+        builder.Services.AddProblemDetails();
 
         // Dependency Injection
         builder.Services.AddPopulatorInfrastructure(builder.Configuration);
 
         // Feature Flags (OpenFeature + Unleash)
-        builder.Services.AddPoCFeatureFlags(builder.Configuration);
+        builder.Services.AddPoCFeatureFlags(builder.Configuration, options => 
+        {
+            // FORCE ENABLE FAKE PROVIDER FOR LOCALSTACK
+            // TODO: Investigate why configuration binding from Env Vars is failing
+            if (builder.Environment.IsDevelopment())
+            {
+                options.UseFakeProvider = true;
+            }
+        });
 
         // JSON Configuration
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+            options.SerializerOptions.WriteIndented = true;
+            options.SerializerOptions.PropertyNameCaseInsensitive = true;
         });
 
         var app = builder.Build();
@@ -65,14 +67,7 @@ public class Program
         app.UsePoCObservability();
 
         // Middleware to fix double slashes from LocalStack/APIGW
-        app.Use(async (context, next) =>
-        {
-            if (context.Request.Path.Value?.Contains("//") == true)
-            {
-                context.Request.Path = context.Request.Path.Value.Replace("//", "/");
-            }
-            await next(context);
-        });
+        app.UseDoubleSlashFix();
 
         app.MapGroup("/api/v1/populator")
            .MapPopulatorEndpoints();

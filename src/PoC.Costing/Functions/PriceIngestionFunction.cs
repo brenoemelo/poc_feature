@@ -19,6 +19,7 @@ namespace PoC.Costing.Functions;
 public sealed partial class PriceIngestionFunction : IAsyncDisposable
 {
     private static readonly ActivitySource _activitySource = new("PoC.Costing.PriceIngestion");
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private readonly IHost _host;
     public IServiceProvider Services => _host.Services;
@@ -199,7 +200,7 @@ public sealed partial class PriceIngestionFunction : IAsyncDisposable
 
         var priceEvent = JsonSerializer.Deserialize<PriceUpdatedEvent>(
             messageJson,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _jsonOptions);
 
         if (priceEvent == null || string.IsNullOrEmpty(priceEvent.ComponentName))
         {
@@ -210,10 +211,10 @@ public sealed partial class PriceIngestionFunction : IAsyncDisposable
         LogIngestingPrice(priceEvent.ComponentName);
 
         var request = new ComponentPriceRequest(
-            priceEvent.ComponentName,
-            priceEvent.UnitPrice,
-            "kg",
-            priceEvent.Currency);
+                    priceEvent.ComponentName,
+                    priceEvent.UnitPrice,
+                    priceEvent.Unit,
+                    priceEvent.Currency);
 
         var result = await _repository.UpsertPriceAsync(request);
 

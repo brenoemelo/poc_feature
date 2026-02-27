@@ -12,16 +12,16 @@ namespace PoC.Populator.API.Endpoints;
 
 public static partial class PopulatorEndpoints
 {
-    [LoggerMessage(Level = LogLevel.Information, Message = "Processing population request for {Count} items.")]
-    private static partial void LogProcessingRequest(ILogger logger, int count);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing population request for {Count} items. Min: {Min}, Max: {Max}")]
+    private static partial void LogProcessingRequest(ILogger logger, int count, int? min, int? max);
 
     public static RouteGroupBuilder MapPopulatorEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/jobs", HandlePopulationRequestAsync)
-             .WithName("CreatePopulationJob")
-             .WithFeatureGate("population-jobs");
+                 .WithName("CreatePopulationJob")
+                 .WithFeatureGate("population-jobs");
 
-        return group;
+            return group;
     }
 
     private static async Task<IResult> HandlePopulationRequestAsync(
@@ -32,13 +32,15 @@ public static partial class PopulatorEndpoints
         LinkGenerator linkGenerator,
         [FromServices] ILogger<Program> logger)
     {
+        Console.WriteLine($"[PopulatorEndpoints] Processing request: Count={request.Count}, Min={request.MinComponents}, Max={request.MaxComponents}");
+        LogProcessingRequest(logger, request.Count, request.MinComponents, request.MaxComponents);
+
         var validationResult = await validator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
+            logger.LogWarning("Validation failed: {Errors}", string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
             return Results.ValidationProblem(validationResult.ToDictionary());
         }
-
-        LogProcessingRequest(logger, request.Count);
 
         var result = await populationService.CreateJobAsync(request);
 

@@ -33,7 +33,8 @@ public class MaterialEntity
     public Dictionary<string, string> Properties { get; set; } = new();
 
     [DynamoDBVersion]
-    [JsonPropertyName("Version")] // DynamoDBVersion usually maps to the attribute name defined or default. The attribute name isn't specified here, so it defaults to "Version".
+    [DynamoDBProperty("version")]
+    [JsonPropertyName("version")]
     public int? Version { get; set; }
 }
 

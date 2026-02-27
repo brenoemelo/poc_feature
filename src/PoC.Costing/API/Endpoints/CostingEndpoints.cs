@@ -188,10 +188,11 @@ public static partial class CostingEndpoints
     {
         LogStartingBulkCalculation(logger);
         
-        IEnumerable<MaterialFormulation> materials;
+        List<MaterialFormulation> materials;
         try
         {
-            materials = await materialsClient.GetAllMaterialsAsync();
+            var materialsEnumerable = await materialsClient.GetAllMaterialsAsync();
+            materials = materialsEnumerable.ToList();
         }
         catch (Exception ex)
         {
@@ -201,7 +202,7 @@ public static partial class CostingEndpoints
 
         var selfUrl = linkGenerator.GetUriByName(httpContext, "CalculateAllCosts") ?? "/api/v1/costing/estimations/batch";
 
-        if (!materials.Any())
+        if (materials.Count == 0)
         {
             var emptyResponse = new ApiResponse<IReadOnlyList<CostCalculationResponse>>(
                 [],

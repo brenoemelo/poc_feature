@@ -172,7 +172,7 @@ public static class ObservabilityExtensions
                 logging.AddOtlpExporter(otlp =>
                 {
                     otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                    if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                    if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
                     {
                         otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
                     }
@@ -209,7 +209,7 @@ public static class ObservabilityExtensions
                     tracing.AddOtlpExporter(otlp =>
                     {
                         otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                        if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
                         {
                             otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
                         }
@@ -241,7 +241,7 @@ public static class ObservabilityExtensions
                     metrics.AddOtlpExporter(otlp =>
                     {
                         otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        if (options.OtlpProtocol?.ToLower() == "http/protobuf")
+                        if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
                         {
                             otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
                         }

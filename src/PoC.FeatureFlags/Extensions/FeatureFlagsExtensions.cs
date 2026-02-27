@@ -21,6 +21,28 @@ public static class FeatureFlagsExtensions
         // 1. Bind from Configuration (appsettings.json + Environment Variables)
         configuration.GetSection("FeatureFlags").Bind(options);
 
+        // DEBUG: Log configuration values
+        // Note: We need a logger here before we can use it in the singleton factory, 
+        // but we can't easily get one. 
+        // We will rely on the logger inside the factory, but we capture the options value now.
+        var useFake = options.UseFakeProvider;
+        var unleashUrl = options.UnleashApiUrl;
+
+        // DEBUG: Force manual override if environment variable is present but bind failed
+        var rawUseFake = configuration.GetSection("FeatureFlags")["UseFakeProvider"];
+        if (!string.IsNullOrEmpty(rawUseFake) && bool.TryParse(rawUseFake, out var parsedUseFake))
+        {
+            options.UseFakeProvider = parsedUseFake;
+        }
+        else if (!string.IsNullOrEmpty(configuration["FeatureFlags:UseFakeProvider"]) && bool.TryParse(configuration["FeatureFlags:UseFakeProvider"], out var parsedUseFake2))
+        {
+             options.UseFakeProvider = parsedUseFake2;
+        }
+        else if (!string.IsNullOrEmpty(configuration["FeatureFlags__UseFakeProvider"]) && bool.TryParse(configuration["FeatureFlags__UseFakeProvider"], out var parsedUseFake3))
+        {
+             options.UseFakeProvider = parsedUseFake3;
+        }
+
         // 2. Allow manual overrides
         configureOptions?.Invoke(options);
 
@@ -36,23 +58,21 @@ public static class FeatureFlagsExtensions
             var logger = sp.GetRequiredService<ILogger<IUnleash>>();
             logger.LogInformation("Initializing Unleash Provider. URL: {Url}. Interval: {Interval}s", options.UnleashApiUrl, options.FetchTogglesIntervalSeconds);
 
-            if (options.UnleashApiUrl?.Contains("fake", StringComparison.OrdinalIgnoreCase) == true)
+            // Check for FakeUnleash
+            if (options.UseFakeProvider)
             {
-                logger.LogWarning("Using FakeUnleash provider.");
-                return new FakeUnleash();
+                logger.LogWarning("Using FakeUnleash provider as configured.");
+                var fake = new FakeUnleash();
+                Api.Instance.SetProviderAsync(new UnleashFeatureProvider(fake)).Wait();
+                return fake;
             }
-            logger.LogInformation("Using Real Unleash provider.");
 
             var settings = new UnleashSettings
             {
                 AppName = options.UnleashAppName,
+                UnleashApi = new Uri(options.UnleashApiUrl),
                 InstanceTag = options.UnleashInstanceId,
-                UnleashApi = new Uri(options.UnleashApiUrl ?? "http://localhost:4242/api/"),
-                FetchTogglesInterval = TimeSpan.FromSeconds(options.FetchTogglesIntervalSeconds),
-                CustomHttpHeaders = new Dictionary<string, string>
-                {
-                    { "Authorization", options.UnleashApiKey }
-                }
+                FetchTogglesInterval = TimeSpan.FromSeconds(options.FetchTogglesIntervalSeconds)
             };
 
             var factory = new UnleashClientFactory();

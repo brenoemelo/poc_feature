@@ -26,8 +26,8 @@ public static partial class MaterialsEndpoints
              .WithFeatureGate("materials-crud")
              .Produces<ApiResponse<object>>();
 
-        group.MapGet("/components", GetUniqueComponentsAsync)
-             .WithName("GetUniqueComponents")
+        group.MapGet("/components", ScanComponentsAsync)
+             .WithName("ScanComponents")
              .WithFeatureGate("view-all-components")
              .Produces<PagedResponse<string>>();
 
@@ -53,40 +53,40 @@ public static partial class MaterialsEndpoints
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Listing materials (Limit: {limit}, Cursor: {cursor})")]
-    private static partial void LogListingMaterials(ILogger logger, int limit, string? cursor);
+    static partial void LogListingMaterials(ILogger logger, int limit, string? cursor);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialQuery] Failed to list materials: {error} - {detail}")]
-    private static partial void LogListingMaterialsFailed(ILogger logger, string error, string detail);
+    static partial void LogListingMaterialsFailed(ILogger logger, string error, string detail);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Counting materials")]
-    private static partial void LogCountingMaterials(ILogger logger);
+    static partial void LogCountingMaterials(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Retrieving unique components (Limit: {limit}, Cursor: {cursor})")]
-    private static partial void LogRetrievingComponents(ILogger logger, int limit, string? cursor);
+    [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Scanning materials for components (Limit: {limit}, Cursor: {cursor})")]
+    static partial void LogScanningComponents(ILogger logger, int limit, string? cursor);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialQuery] Failed to retrieve components: {error} - {detail}")]
-    private static partial void LogRetrievingComponentsFailed(ILogger logger, string error, string detail);
+    [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialQuery] Failed to scan components: {error} - {detail}")]
+    static partial void LogScanningComponentsFailed(ILogger logger, string error, string detail);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialQuery] Getting material {materialId}")]
-    private static partial void LogGettingMaterial(ILogger logger, string materialId);
+    static partial void LogGettingMaterial(ILogger logger, string materialId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialQuery] Failed to get material {materialId}: {error} - {detail}")]
-    private static partial void LogGettingMaterialFailed(ILogger logger, string materialId, string error, string detail);
+    static partial void LogGettingMaterialFailed(ILogger logger, string materialId, string error, string detail);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialCreation] Processing material: {name} ({materialId})")]
-    private static partial void LogProcessingMaterial(ILogger logger, string name, string materialId);
+    static partial void LogProcessingMaterial(ILogger logger, string name, string materialId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialCreation] Validation failed for {materialId}")]
-    private static partial void LogValidationFailed(ILogger logger, string materialId);
+    static partial void LogValidationFailed(ILogger logger, string materialId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialCreation] Successfully saved material {materialId}")]
-    private static partial void LogMaterialSaved(ILogger logger, string materialId);
+    static partial void LogMaterialSaved(ILogger logger, string materialId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialDeletion] Deletion requested for {materialId}")]
-    private static partial void LogDeletionRequested(ILogger logger, string materialId);
+    static partial void LogDeletionRequested(ILogger logger, string materialId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialDeletion] Material {materialId} not found")]
-    private static partial void LogMaterialNotFound(ILogger logger, string materialId);
+    static partial void LogMaterialNotFound(ILogger logger, string materialId);
 
     private static async Task<IResult> GetAllMaterialsAsync(
         IMaterialRepository repository,
@@ -133,7 +133,7 @@ public static partial class MaterialsEndpoints
         return Results.Ok(response);
     }
 
-    private static async Task<IResult> GetUniqueComponentsAsync(
+    private static async Task<IResult> ScanComponentsAsync(
         IMaterialRepository repository,
         HttpContext httpContext,
         LinkGenerator linkGenerator,
@@ -141,16 +141,16 @@ public static partial class MaterialsEndpoints
         int limit = 10,
         string? cursor = null)
     {
-        LogRetrievingComponents(logger, limit, cursor);
-        var result = await repository.GetUniqueComponentsAsync(limit, cursor);
+        LogScanningComponents(logger, limit, cursor);
+        var result = await repository.ScanComponentsAsync(limit, cursor);
 
         if (result.IsFailure)
         {
-            LogRetrievingComponentsFailed(logger, result.Error.Code, result.Error.Description);
+            LogScanningComponentsFailed(logger, result.Error.Code, result.Error.Description);
             return result.ToProblem();
         }
 
-        var response = result.Value.ToPagedResponse(httpContext, linkGenerator, "GetUniqueComponents", limit, cursor);
+        var response = result.Value.ToPagedResponse(httpContext, linkGenerator, "ScanComponents", limit, cursor);
         return Results.Ok(response);
     }
 

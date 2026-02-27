@@ -48,7 +48,7 @@ public sealed partial class PopulationService(
                 var message = new SendMessageRequest
                 {
                     QueueUrl = queueUrl,
-                    MessageBody = JsonSerializer.Serialize(job)
+                    MessageBody = JsonSerializer.Serialize(job, SerializationDefaults.Options)
                 };
 
                 sendTasks.Add(sqsClient.SendMessageAsync(message));

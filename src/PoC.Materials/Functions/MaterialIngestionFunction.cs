@@ -21,6 +21,7 @@ public sealed partial class MaterialIngestionFunction
     private readonly ILogger<MaterialIngestionFunction> _logger;
     private readonly MaterialsMetrics _metrics;
     private static readonly ActivitySource _activitySource = new("PoC.Materials.Ingestion");
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public MaterialIngestionFunction()
     {
@@ -122,7 +123,7 @@ public sealed partial class MaterialIngestionFunction
 
         var materialEvent = JsonSerializer.Deserialize<MaterialCreatedEvent>(
             messageJson,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _jsonOptions);
 
         if (materialEvent?.Material is null)
         {
@@ -156,35 +157,35 @@ public sealed partial class MaterialIngestionFunction
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Processing {count} SQS messages")]
-    private partial void LogProcessingBatch(int count);
+    partial void LogProcessingBatch(int count);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "[MaterialIngestion] Failed to process record {messageId}")]
-    private partial void LogProcessingError(Exception ex, string messageId);
+    partial void LogProcessingError(Exception ex, string messageId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Batch complete. Processed: {processed}, Failed: {failed}")]
-    private partial void LogBatchComplete(int processed, int failed);
+    partial void LogBatchComplete(int processed, int failed);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {messageId} has no 'Message' property")]
-    private partial void LogMissingMessageProperty(string messageId);
+    partial void LogMissingMessageProperty(string messageId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {messageId} has empty message")]
-    private partial void LogEmptyMessage(string messageId);
+    partial void LogEmptyMessage(string messageId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Successfully ingested material {materialId} ({name})")]
-    private partial void LogMaterialIngested(string materialId, string name);
+    partial void LogMaterialIngested(string materialId, string name);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Validation failed for material {materialId}")]
-    private partial void LogValidationFailed(string materialId);
+    partial void LogValidationFailed(string materialId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Record {messageId} has null material")]
-    private partial void LogNullMaterial(string messageId);
+    partial void LogNullMaterial(string messageId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Ingesting material {materialName} ({materialId})")]
-    private partial void LogIngestingMaterial(string materialName, string materialId);
+    partial void LogIngestingMaterial(string materialName, string materialId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "[MaterialIngestion] Material {materialId} skipped due to Optimistic Locking conflict (idempotent)")]
-    private partial void LogMaterialSkippedIdempotent(string materialId);
+    partial void LogMaterialSkippedIdempotent(string materialId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "[MaterialIngestion] Successfully ingested material {materialId}")]
-    private partial void LogSuccessfullyIngested(string materialId);
+    partial void LogSuccessfullyIngested(string materialId);
 }

@@ -51,9 +51,10 @@ exporters:
     endpoint: "0.0.0.0:8889"
     resource_to_telemetry_conversion: { enabled: true }
 
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    default_labels_enabled: { exporter: true, job: true }
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
 
 service:
   pipelines:
@@ -68,4 +69,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [resourcedetection, memory_limiter, batch]
-      exporters: [loki]
+      exporters: [otlphttp/loki]

@@ -8,6 +8,7 @@ using PoC.Materials.API.Endpoints;
 using PoC.Materials.Functions;
 using PoC.Materials.Infrastructure;
 using PoC.Observability.Extensions;
+using PoC.Shared.Extensions;
 using PoC.Shared.Validators;
 using System.Text.Json;
 
@@ -34,7 +35,15 @@ builder.Services.AddProblemDetails();
 builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
 // Feature Flags (OpenFeature + Unleash)
-builder.Services.AddPoCFeatureFlags(builder.Configuration);
+builder.Services.AddPoCFeatureFlags(builder.Configuration, options => 
+{
+    // FORCE ENABLE FAKE PROVIDER FOR LOCALSTACK
+    // TODO: Investigate why configuration binding from Env Vars is failing
+    if (builder.Environment.IsDevelopment())
+    {
+        options.UseFakeProvider = true;
+    }
+});
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<MaterialFormulationValidator>();
@@ -52,28 +61,7 @@ var app = builder.Build();
 app.UsePoCObservability();
 
 // Middleware to fix double slashes from LocalStack/APIGW
-app.Use(async (context, next) =>
-{
-    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-    logger.LogDebug("[Middleware] Processing request: {Method} {Path}", context.Request.Method, context.Request.Path);
-    
-    if (context.Request.Path.Value?.Contains("//") == true)
-    {
-        context.Request.Path = context.Request.Path.Value.Replace("//", "/");
-        logger.LogDebug("[Middleware] Fixed Path: {Path}", context.Request.Path);
-    }
-    
-    try 
-    {
-        await next(context);
-        logger.LogDebug("[Middleware] Request processed successfully: {StatusCode}", context.Response.StatusCode);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "[Middleware] Request failed with exception");
-        throw;
-    }
-});
+app.UseDoubleSlashFix();
 
 app.MapGroup("/api/v1/materials")
    .MapMaterialsEndpoints();
