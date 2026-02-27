@@ -86,6 +86,37 @@ def _wait_for_lambda_ready(lambda_client, name, max_wait_seconds=30):
         time.sleep(1)
     write_log(f"Timeout waiting for Lambda {name} to be ready", "WARN")
 
+def _retry_with_backoff(func, max_attempts=5, base_delay_seconds=0.5, operation_name="operation"):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return func()
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code")
+            if code == "ResourceConflictException" and attempt < max_attempts:
+                delay = base_delay_seconds * attempt
+                write_log(
+                    f"{operation_name} hit ResourceConflictException. Retrying in {delay:.1f}s (attempt {attempt}/{max_attempts})",
+                    "WARN",
+                )
+                time.sleep(delay)
+                continue
+            raise
+
+def _wait_for_lambda_ready(lambda_client, name, max_wait_seconds=30):
+    deadline = time.time() + max_wait_seconds
+    while time.time() < deadline:
+        try:
+            config = lambda_client.get_function_configuration(FunctionName=name)
+            status = config.get("LastUpdateStatus")
+            if not status or status != "InProgress":
+                return
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code")
+            if code not in ("ResourceNotFoundException", "ResourceConflictException"):
+                raise
+        time.sleep(1)
+    write_log(f"Timeout waiting for Lambda {name} to be ready", "WARN")
+
 # -----------------------------------------------------------------------------
 # High-Level Resource Management Functions (Idempotent)
 # -----------------------------------------------------------------------------
