@@ -30,5 +30,6 @@ public class InstrumentationSource : IHostedService, IDisposable
     public void Dispose()
     {
         _meter.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

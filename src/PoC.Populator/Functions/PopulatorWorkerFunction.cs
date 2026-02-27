@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
-using PoC.Observability;
 using PoC.Observability.Extensions;
 using PoC.Populator.Configuration;
 using PoC.Populator.Domain.Models;
@@ -27,6 +26,7 @@ namespace PoC.Populator.Functions;
 
 public partial class PopulatorWorkerFunction : IAsyncDisposable
 {
+    private const string ActivitySourceName = "PoC.Populator.Worker";
     public IServiceProvider Services => _hostLazy.Value.Services;
 
     public async ValueTask DisposeAsync()
@@ -85,7 +85,7 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
             var builder = Host.CreateApplicationBuilder();
 
             // 1. Observability (Logs, Metrics, Tracing)
-            builder.AddPoCObservability(ObservabilityConstants.PopulatorWorkerActivitySourceName, "1.0.0");
+            builder.AddPoCObservability(ActivitySourceName, "1.0.0");
 
             // 2. AWS Services
             builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
@@ -115,7 +115,7 @@ public partial class PopulatorWorkerFunction : IAsyncDisposable
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     // Phase 3: Activity Source for Manual Tracing
-    private static readonly ActivitySource _activitySource = new(ObservabilityConstants.PopulatorWorkerActivitySourceName);
+    private static readonly ActivitySource _activitySource = new(ActivitySourceName);
 
     private static IHost HostInstance => _hostLazy.Value;
 

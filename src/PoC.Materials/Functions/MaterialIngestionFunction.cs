@@ -31,6 +31,7 @@ public sealed partial class MaterialIngestionFunction
         builder.Services.AddMaterialsInfrastructure(builder.Configuration);
 
         var host = builder.Build();
+        host.Start();
 
         _repository = host.Services.GetRequiredService<IMaterialRepository>();
         _logger = host.Services.GetRequiredService<ILogger<MaterialIngestionFunction>>();

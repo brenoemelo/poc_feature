@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Extensions.AWS.Trace;
 using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
@@ -17,6 +18,7 @@ namespace PoC.Observability.Extensions;
 
 public static class ObservabilityExtensions
 {
+    private static int _propagatorsInitialized;
     /// <summary>
     /// Flushes the OpenTelemetry providers (Tracer, Meter, and Logger).
     /// </summary>
@@ -26,19 +28,10 @@ public static class ObservabilityExtensions
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("OpenTelemetryFlusher");
         try
         {
-            var tracerProvider = services.GetService<TracerProvider>();
-            var meterProvider = services.GetService<MeterProvider>();
-            var loggerProvider = services.GetService<LoggerProvider>();
-
-            var flushTasks = new List<Task>();
-            if (tracerProvider != null) flushTasks.Add(Task.Run(() => tracerProvider.ForceFlush()));
-            if (meterProvider != null) flushTasks.Add(Task.Run(() => meterProvider.ForceFlush()));
-            if (loggerProvider != null) flushTasks.Add(Task.Run(() => loggerProvider.ForceFlush()));
-
-            if (flushTasks.Any())
-            {
-                Task.WaitAll([.. flushTasks], TimeSpan.FromSeconds(3));
-            }
+            const int timeoutMs = 3000;
+            services.GetService<TracerProvider>()?.ForceFlush(timeoutMs);
+            services.GetService<MeterProvider>()?.ForceFlush(timeoutMs);
+            services.GetService<LoggerProvider>()?.ForceFlush(timeoutMs);
         }
         catch (Exception ex)
         {
@@ -145,6 +138,8 @@ public static class ObservabilityExtensions
             return;
         }
 
+        options.Validate();
+
         // 1. Add Startup Metrics
         services.AddStartUpMetrics();
 
@@ -169,24 +164,7 @@ public static class ObservabilityExtensions
 
             if (!string.IsNullOrEmpty(options.OtlpEndpoint))
             {
-                logging.AddOtlpExporter(otlp =>
-                {
-                    otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                    if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
-                    {
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-                    }
-                    else
-                    {
-                        otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                    }
-                });
-            }
-
-            if (options.ExportToConsole)
-            {
-                // We don't add ConsoleExporter to OTel logging because we will use the native JsonConsole below
-                // logging.AddConsoleExporter(); 
+                logging.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
             }
         });
 
@@ -197,27 +175,16 @@ public static class ObservabilityExtensions
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddXRayTraceId() // Requires OpenTelemetry.Extensions.AWS
+                    .AddXRayTraceId()
                     .SetResourceBuilder(resourceBuilder)
                     .AddSource(options.ServiceName)
                     .AddAspNetCoreInstrumentation(o => o.RecordException = true)
                     .AddHttpClientInstrumentation()
-                    .AddAWSInstrumentation(); // Requires OpenTelemetry.Instrumentation.AWS
+                    .AddAWSInstrumentation();
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {
-                    tracing.AddOtlpExporter(otlp =>
-                    {
-                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
-                        {
-                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-                        }
-                        else
-                        {
-                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                        }
-                    });
+                    tracing.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
                 }
 
                 if (options.ExportToConsole)
@@ -230,6 +197,7 @@ public static class ObservabilityExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddMeter(options.ServiceName)
+                    .AddMeter("app.startup")
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
@@ -238,18 +206,7 @@ public static class ObservabilityExtensions
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {
-                    metrics.AddOtlpExporter(otlp =>
-                    {
-                        otlp.Endpoint = new Uri(options.OtlpEndpoint);
-                        if (string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase))
-                        {
-                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-                        }
-                        else
-                        {
-                            otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
-                        }
-                    });
+                    metrics.AddOtlpExporter(otlp => ConfigureOtlpExporter(otlp, options));
                 }
 
                 if (options.ExportToConsole)
@@ -258,12 +215,23 @@ public static class ObservabilityExtensions
                 }
             });
 
-        // 4. Configure Propagators (W3C + X-Ray + Baggage)
-        Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(new TextMapPropagator[]
+        // 4. Configure Propagators (W3C + X-Ray + Baggage) — once per process
+        if (Interlocked.Exchange(ref _propagatorsInitialized, 1) == 0)
         {
-            new TraceContextPropagator(), // W3C Standard
-            new AWSXRayPropagator(),       // AWS X-Ray Specific
-            new BaggagePropagator()       // Arbitrary Metadata
-        }));
+            Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(
+            [
+                new TraceContextPropagator(),
+                new AWSXRayPropagator(),
+                new BaggagePropagator()
+            ]));
+        }
+    }
+
+    private static void ConfigureOtlpExporter(OtlpExporterOptions otlp, ObservabilityOptions options)
+    {
+        otlp.Endpoint = new Uri(options.OtlpEndpoint!);
+        otlp.Protocol = string.Equals(options.OtlpProtocol, "http/protobuf", StringComparison.OrdinalIgnoreCase)
+            ? OtlpExportProtocol.HttpProtobuf
+            : OtlpExportProtocol.Grpc;
     }
 }
