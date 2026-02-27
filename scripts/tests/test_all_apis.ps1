@@ -94,8 +94,28 @@ $Tests = @(
         Method = "POST"
         Path = "/api/v1/materials"
         Body = @{
+            material_id = "test-material-$(Get-Date -Format 'yyyyMMddHHmmss')"
             name = "Test Material $(Get-Date -Format 'yyyyMMddHHmmss')"
-            cost = 10.5
+            density = @{
+                value = 1.2
+                unit = "g/cm3"
+            }
+            formulation = @(
+                @{
+                    component = "Component A"
+                    percentage = 50.0
+                    type = "Resin"
+                },
+                @{
+                    component = "Component B"
+                    percentage = 50.0
+                    type = "Hardener"
+                }
+            )
+            properties = @{
+                "color" = "red"
+            }
+            version = 1
         }
         ExpectedStatus = 201
     },

@@ -6,7 +6,6 @@ using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Extensions.AWS.Trace;
-using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -197,12 +196,14 @@ public static class ObservabilityExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddMeter(options.ServiceName)
+                    .AddMeter("PoC.FeatureFlags") // Legacy/Custom Meter
+                    .AddMeter("OpenFeature*")     // Standard OpenFeature Meter
                     .AddMeter("app.startup")
+                    .AddMeter("System.Net.Http")
+                    .AddMeter("OpenTelemetry.Instrumentation.Http")
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddMeter("System.Net.Http")
-                    .AddMeter("OpenTelemetry.Instrumentation.Http");
+                    .AddHttpClientInstrumentation();
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {

@@ -38,8 +38,8 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum by (feature_flag_key) (rate(feature_flag_evaluation_requests_total{service_name=~\"$service\"}[1m]))",
-                    "legendFormat": "{{feature_flag_key}}",
+                    "expr": "sum by (key) (rate(feature_flag_evaluation_requests_total{service_name=~\"$service\"}[1m]))",
+                    "legendFormat": "{{key}}",
                     "refId": "A"
                 }
             ],
@@ -82,8 +82,8 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum by (feature_flag_variant) (rate(feature_flag_evaluation_requests_total{service_name=~\"$service\"}[5m]))",
-                    "legendFormat": "{{feature_flag_variant}}",
+                    "expr": "sum by (variant) (rate(feature_flag_evaluation_success_total{service_name=~\"$service\"}[5m]))",
+                    "legendFormat": "{{variant}}",
                     "refId": "A"
                 }
             ],
@@ -120,7 +120,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum(rate(feature_flag_evaluation_requests_total{reason=\"ERROR\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(feature_flag_evaluation_error_total{service_name=~\"$service\"}[1m]))",
                     "legendFormat": "Errors",
                     "refId": "A"
                 }
@@ -150,7 +150,7 @@
                         "type": "loki",
                         "uid": "loki"
                     },
-                    "expr": "{service_name=~\"$service\"} |= `feature_flag`",
+                    "expr": "{service_name=~\"$service\"} |= \"FeatureFlag\"",
                     "refId": "A"
                 }
             ],

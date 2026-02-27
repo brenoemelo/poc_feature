@@ -48,7 +48,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "topk(50, sum by (client, server) (rate(traces_service_graph_request_total[5m])))",
+                    "expr": "topk(50, sum by (client, server) (rate(service_graph_request_total[5m])))",
                     "format": "table",
                     "instant": true,
                     "legendFormat": "__auto",
@@ -61,7 +61,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "topk(50, sum by (client, server) (rate(traces_service_graph_request_failed_total[5m])))",
+                    "expr": "sum by (client, server) (rate(service_graph_request_total{failed=\"true\"}[5m])) / sum by (client, server) (rate(service_graph_request_total[5m]))",
                     "format": "table",
                     "instant": true,
                     "legendFormat": "__auto",
@@ -155,7 +155,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\"}[1m])))",
+                    "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\"}[1m])))",
                     "legendFormat": "{{service_name}} P95",
                     "refId": "A"
                 }

@@ -2,8 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenFeature;
-using OpenFeature.Model;
 using PoC.FeatureFlags.Configuration;
+using PoC.FeatureFlags.Hooks;
 using Unleash;
 using Unleash.ClientFactory;
 
@@ -56,6 +56,11 @@ public static class FeatureFlagsExtensions
         services.AddSingleton<IUnleash>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<IUnleash>>();
+
+            // Register Telemetry Hook (Metrics + Logs)
+            var hookLogger = sp.GetRequiredService<ILogger<OpenFeatureTelemetryHook>>();
+            Api.Instance.AddHooks(new OpenFeatureTelemetryHook(hookLogger));
+
             logger.LogInformation("Initializing Unleash Provider. URL: {Url}. Interval: {Interval}s", options.UnleashApiUrl, options.FetchTogglesIntervalSeconds);
 
             // Check for FakeUnleash
