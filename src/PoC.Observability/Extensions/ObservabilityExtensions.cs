@@ -71,8 +71,8 @@ public static class ObservabilityExtensions
         { 
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e1) ? e1 : false,
             ServiceName = "UnknownService",
-            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
-            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? builder.Configuration["Otel:Endpoint"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"] ?? builder.Configuration["Otel:Protocol"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };
@@ -108,8 +108,8 @@ public static class ObservabilityExtensions
         { 
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e2) ? e2 : false,
             ServiceName = "UnknownService",
-            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
-            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? builder.Configuration["Otel:Endpoint"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"] ?? builder.Configuration["Otel:Protocol"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };

@@ -55,22 +55,6 @@ def get_common_env_vars():
     write_log(f"DEBUG: Common Env Vars: {env_vars}", "INFO")
     return env_vars
 
-def _retry_with_backoff(func, max_attempts=5, base_delay_seconds=0.5, operation_name="operation"):
-    for attempt in range(1, max_attempts + 1):
-        try:
-            return func()
-        except ClientError as e:
-            code = e.response.get("Error", {}).get("Code")
-            if code == "ResourceConflictException" and attempt < max_attempts:
-                delay = base_delay_seconds * attempt
-                write_log(
-                    f"{operation_name} hit ResourceConflictException. Retrying in {delay:.1f}s (attempt {attempt}/{max_attempts})",
-                    "WARN",
-                )
-                time.sleep(delay)
-                continue
-            raise
-
 def _wait_for_lambda_ready(lambda_client, name, max_wait_seconds=30):
     deadline = time.time() + max_wait_seconds
     while time.time() < deadline:
@@ -148,30 +132,26 @@ def ensure_lambda_function(name, handler, role_arn, zip_path, runtime="dotnet8",
         write_log(f"Updating existing Lambda function: {name}", "INFO")
         lambda_client.update_function_code(FunctionName=name, ZipFile=zip_content)
         _wait_for_lambda_ready(lambda_client, name)
-        def _update_config():
-            lambda_client.update_function_configuration(
+        lambda_client.update_function_configuration(
+            FunctionName=name,
+            Handler=handler,
+            Timeout=int(timeout),
+            MemorySize=int(memory_size),
+            Environment={'Variables': env_vars} if env_vars else {}
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            write_log(f"Creating new Lambda function: {name}", "INFO")
+            lambda_client.create_function(
                 FunctionName=name,
+                Runtime=runtime,
+                Role=role_arn,
                 Handler=handler,
+                Code={'ZipFile': zip_content},
                 Timeout=int(timeout),
                 MemorySize=int(memory_size),
                 Environment={'Variables': env_vars} if env_vars else {}
             )
-        _retry_with_backoff(_update_config, operation_name=f"Update Lambda {name}")
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            write_log(f"Creating new Lambda function: {name}", "INFO")
-            def _create():
-                lambda_client.create_function(
-                    FunctionName=name,
-                    Runtime=runtime,
-                    Role=role_arn,
-                    Handler=handler,
-                    Code={'ZipFile': zip_content},
-                    Timeout=int(timeout),
-                    MemorySize=int(memory_size),
-                    Environment={'Variables': env_vars} if env_vars else {}
-                )
-            _retry_with_backoff(_create, operation_name=f"Create Lambda {name}")
         else:
             raise e
 

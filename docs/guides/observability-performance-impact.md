@@ -22,9 +22,9 @@ Adding observability libraries (OTel) increases the deployment package size and 
 
 We use **CloudWatch Logs Insights** and a **Load Test** script to compare "Baseline" (No OTel) vs "Implementation" (With OTel).
 
-### 1. The Experiment Script (PowerShell/Bash)
+### 1. The Experiment Script (Bash/Python)
 
-Create a script `scripts/measure-cold-start.ps1` that:
+Create a script `scripts/measure_cold_start.sh` that:
 
 1.  **Deploy Baseline:** Deploy the Lambda with `OTEL_SDK_DISABLED=true` (or remove the `AddPoCObservability` call via pre-processor directive `#if !NO_OTEL`).
 2.  **Force Cold Starts:**

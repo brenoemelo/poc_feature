@@ -73,6 +73,11 @@ Due to DynamoDB's architecture, we avoid "Offset/Limit" (Skip/Take) pagination. 
 
 ## 5. Versioning
 
+All public APIs are versioned in the URI path and aligned with Terraform service deployment modules.
+*   Pattern: `/api/v{major}/{resource}`
+*   Example: `/api/v1/materials`
+*   Terraform Alignment: API versioning is reflected in `terraform/services/{service}/main.tf` for API Gateway configuration.
+
 All public APIs are versioned in the URI path.
 *   Pattern: `/api/v{major}/{resource}`
 *   Example: `/api/v1/materials`

@@ -150,7 +150,7 @@
                         "type": "loki",
                         "uid": "loki"
                     },
-                    "expr": "{service_name=~\"$service\"} |= \"FeatureFlag\"",
+                    "expr": "{job=~\"$service\"} |= \"FeatureFlag\"",
                     "refId": "A"
                 }
             ],

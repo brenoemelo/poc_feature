@@ -47,7 +47,7 @@ We track key metrics to ensure system health.
 - **`http.server.request.duration`**: Latency of API requests.
 - **`business.costing.value`**: Custom metric tracking calculated costs.
 - **`process.runtime.dotnet.*`**: .NET Runtime metrics (GC, CPU, ThreadPool).
-- **`traces_service_graph_*`**: Service dependency metrics (APM Map).
+- **`service_graph_request_total`**: Service dependency metrics (APM Map).
 
 ## 5. Troubleshooting Missing Telemetry
 
