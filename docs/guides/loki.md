@@ -64,16 +64,14 @@ limits_config:
 ```
 
 ### 4. Compactor
-The Compactor is responsible for enforcing retention policies.
+The Compactor is responsible for enforcing retention policies. In this PoC, retention is configured but **disabled by default** to preserve logs during testing.
 
 ```yaml
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
-  retention_enabled: true
+  retention_enabled: false # Set to true to enable deletion of old logs
   retention_delete_delay: 2h
-  retention_delete_worker_count: 150
-  delete_request_store: filesystem
 ```
 
 ## LogQL (Log Query Language)
@@ -82,24 +80,24 @@ LogQL is Prometheus-inspired query language for Loki.
 
 ### Basic Queries (Label Matchers)
 Select log streams using labels:
-- **By Job/Service:** `{job="PoC-Materials"}`
+- **By Job/Service:** `{job="PoC.Materials"}`
 - **By Level:** `{level="error"}`
 
 ### Line Filters
 Filter the content of log lines:
-- **Contains string:** `{job="PoC-Materials"} |= "error"`
-- **Does not contain:** `{job="PoC-Materials"} != "debug"`
-- **Regex match:** `{job="PoC-Materials"} |~ "error|critical"`
+- **Contains string:** `{job="PoC.Materials"} |= "error"`
+- **Does not contain:** `{job="PoC.Materials"} != "debug"`
+- **Regex match:** `{job="PoC.Materials"} |~ "error|critical"`
 
 ### Parsers & Formatting
 Extract structured data from logs:
-- **JSON Parser:** `{job="PoC-Materials"} | json`
-  - Allows filtering by extracted fields: `{job="PoC-Materials"} | json | latency > 100`
-- **Logfmt Parser:** `{job="PoC-Materials"} | logfmt`
+- **JSON Parser:** `{job="PoC.Materials"} | json`
+  - Allows filtering by extracted fields: `{job="PoC.Materials"} | json | latency > 100`
+- **Logfmt Parser:** `{job="PoC.Materials"} | logfmt`
 
 ### Metric Queries
 Generate metrics from logs (e.g., rate of error logs):
-`rate({job="PoC-Materials"} |= "error" [1m])`
+`rate({job="PoC.Materials"} |= "error" [1m])`
 
 ## Integration with OpenTelemetry
 

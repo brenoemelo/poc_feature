@@ -10,15 +10,15 @@ By adopting this standard, your project gains:
 
 ---
 
-## 🛠️ Step 1: The Shared Library
+## 🛠️ Step 1: The Observability Library
 
-The core logic resides in `PoC.Shared.Infrastructure`. You have two options:
+The core logic resides in `src/PoC.Observability`. You have two options:
 
-### Option A: NuGet Package (Recommended)
-Publish `PoC.Shared.Infrastructure` as a NuGet package to your private feed (Azure Artifacts / NuGet.org) and install it.
+### Option A: Project Reference (Recommended)
+Add a reference to the `PoC.Observability` project in your solution.
 
 ### Option B: Copy & Paste (Quick Start)
-If you cannot publish packages yet, verify you have these dependencies in your project's `.csproj`:
+If you cannot reference the project directly, ensure you have these dependencies in your project's `.csproj`:
 
 ```xml
 <ItemGroup>
@@ -28,14 +28,14 @@ If you cannot publish packages yet, verify you have these dependencies in your p
   <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.11.0" />
   <PackageReference Include="OpenTelemetry.Instrumentation.AWS" Version="1.11.0" />
   <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.11.1" />
+  <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.11.0" />
 </ItemGroup>
 ```
 
-Then, migrate the following files to your project's `Shared` or `Infrastructure` layer:
-1. `src/PoC.Shared.Infrastructure/Configuration/OtelOptions.cs`
-2. `src/PoC.Shared.Infrastructure/Extensions/ServiceCollectionExtensions.cs` (The `AddPoCObservability` method)
-3. `src/PoC.Shared.Infrastructure/Extensions/WebApplicationExtensions.cs` (The `UsePoCDefaults` middleware)
-4. `src/PoC.Shared.Infrastructure/Extensions/TraceIdResponseMiddleware.cs`
+Then, copy the `src/PoC.Observability` content to your project, ensuring you keep the configuration logic for:
+1. `ServiceCollectionExtensions.cs` (The `AddPoCObservability` method)
+2. `WebApplicationExtensions.cs` (The `UsePoCDefaults` middleware)
+3. `TraceIdResponseMiddleware.cs`
 
 ---
 
@@ -130,8 +130,8 @@ resource "aws_lambda_function" "my_service" {
 
 ## ✅ Migration Checklist
 
-- [ ] **Dependencies:** Installed `Serilog` and `OpenTelemetry` packages.
-- [ ] **Shared Code:** Copied `Extensions` and `Configuration` (or installed NuGet).
+- [ ] **Dependencies:** Installed `OpenTelemetry` packages.
+- [ ] **Shared Code:** Referenced `PoC.Observability` (or copied code).
 - [ ] **Startup:** Called `AddPoCObservability` and `UsePoCDefaults`.
 - [ ] **Config:** Added `Otel` section to `appsettings.json`.
 - [ ] **IaC:** Updated deployment scripts to ingest `OTEL__*` env vars.

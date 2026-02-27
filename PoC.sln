@@ -33,8 +33,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoC.Observability.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoC.Observability.Tests", "src\PoC.Observability.Tests\PoC.Observability.Tests.csproj", "{99CA03E7-4B4C-42BE-8FB2-0681B4FDD92B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoC.Observability.Tests2", "src\PoC.Observability.Tests2\PoC.Observability.Tests2.csproj", "{070D0804-FDAD-4910-923B-5AF4F15C2B3B}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -201,18 +199,6 @@ Global
 		{99CA03E7-4B4C-42BE-8FB2-0681B4FDD92B}.Release|x64.Build.0 = Release|Any CPU
 		{99CA03E7-4B4C-42BE-8FB2-0681B4FDD92B}.Release|x86.ActiveCfg = Release|Any CPU
 		{99CA03E7-4B4C-42BE-8FB2-0681B4FDD92B}.Release|x86.Build.0 = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|x64.Build.0 = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Debug|x86.Build.0 = Debug|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|x64.ActiveCfg = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|x64.Build.0 = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|x86.ActiveCfg = Release|Any CPU
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -231,6 +217,5 @@ Global
 		{EE0F96CB-8412-4DAE-904F-66369A3BD67F} = {8224FBE4-9D0E-4FB0-AE36-5F69BDCC0E0C}
 		{700C8226-81C6-4A95-8615-872595EA35AB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{99CA03E7-4B4C-42BE-8FB2-0681B4FDD92B} = {8224FBE4-9D0E-4FB0-AE36-5F69BDCC0E0C}
-		{070D0804-FDAD-4910-923B-5AF4F15C2B3B} = {8224FBE4-9D0E-4FB0-AE36-5F69BDCC0E0C}
 	EndGlobalSection
 EndGlobal

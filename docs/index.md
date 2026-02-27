@@ -6,18 +6,6 @@ Welcome to the **Material Formulation System** documentation. This project is a 
 
 ### Architecture Decision Records (ADR)
 
-- [ADR 001: Event-Driven Population Architecture](decisions/001-event-driven-population.md)
-- [ADR 002: Costing Engine Architecture](decisions/002-costing-engine-architecture.md)
-- [ADR 0001: Use DynamoDB](decisions/0001-use-dynamodb.md)
-- [ADR 0002: Use Clean Architecture](decisions/0002-use-clean-architecture.md)
-- [ADR 003: Shared Observability Library](decisions/003-shared-observability-library.md)
-- [ADR 004: Modular Shared Libraries](decisions/004-modular-shared-libs.md)
-
-### Concepts
-
-- [Gravity Field](architecture/concepts/GravityField.md)
-- [Anti-Matter Unit](architecture/concepts/AntiMatterUnit.md)
-
 ### Guides
 
 - [Setup Local Environment](guides/getting-started.md)
@@ -69,5 +57,5 @@ docker-compose up -d
 
 ## 🔗 Related Resources
 
-- [ANTIGRAVITY_RULES.md](../ANTIGRAVITY_RULES.md) - Project coding standards and architectural guidelines.
+- [POC_RULES.md](../POC_RULES.md) - Project coding standards and architectural guidelines.
 - **[WALKTHROUGH.md](../../.gemini/antigravity/brain/a2b7b68f-f412-4760-bb1d-4552b7600b71/walkthrough.md)** - Project refactoring walkthrough.

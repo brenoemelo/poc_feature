@@ -8,7 +8,8 @@ A microservices-based proof-of-concept for managing material formulations, built
 ### 1. Prerequisites
 - Docker Desktop
 - **.NET 10 SDK** (specified in `global.json`)
-- PowerShell Core (pwsh)
+- Python 3.x (for Deployment)
+- PowerShell Core (pwsh) (for Testing scripts)
 
 ### 2. Start Infrastructure
 ```bash
@@ -35,7 +36,7 @@ python deployment/localstack/deploy_all_terraform.py --skip-build
 
 ### 4. Verify APIs
 Run the automated test suite to ensure all services are healthy:
-```bash
+```powershell
 ./scripts/tests/test_all_apis.ps1
 ```
 
@@ -52,7 +53,6 @@ The project has been refactored into modular libraries to ensure granular depend
   /PoC.Observability    # Centralized OTel configuration (Traces, Metrics, Logs)
   /PoC.FeatureFlags     # Feature Flags via OpenFeature + Unleash
   /PoC.Shared           # Lightweight domain-agnostic contracts & Result patterns
-  /PoC.Shared.Infrastructure # Shared Kernel extension & composition root
   
 /docker                 # Infrastructure (OTel, Prometheus, Grafana, Unleash)
 /deployment             # Master Orchestration Scripts (LocalStack)

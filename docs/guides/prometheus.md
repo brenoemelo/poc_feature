@@ -61,8 +61,8 @@ PromQL is the query language for Prometheus.
 ### Basic Queries (Selectors)
 Select time series using metric names and labels:
 - **By Metric Name:** `http_server_request_duration_seconds_bucket`
-- **By Job/Service:** `{job="PoC-Materials"}`
-- **Filter by Label:** `http_server_request_duration_seconds_bucket{job="PoC-Materials", status="200"}`
+- **By Job/Service:** `{job="PoC.Materials"}`
+- **Filter by Label:** `http_server_request_duration_seconds_bucket{job="PoC.Materials", status="200"}`
 
 ### Aggregators
 Aggregate over dimensions:

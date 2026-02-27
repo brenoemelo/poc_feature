@@ -13,8 +13,9 @@ graph LR
     
     subgraph "Microservice (e.g., PoC.Materials)"
         Lambda -->|Json| Endpoint[Minimal API Endpoint]
-        Endpoint -->|DTO| Domain[Domain Logic]
-        Domain -->|Entity| Infra[Infrastructure Layer]
+        Endpoint -->|DTO| App[Application Layer]
+        App -->|Entity| Domain[Domain Layer]
+        App -->|Interface| Infra[Infrastructure Layer]
         
         subgraph "Internal Components"
             Filters[Filters<br/>(Feature Flags)]
@@ -25,7 +26,7 @@ graph LR
     Infra -->|Read/Write| DDB[(Amazon DynamoDB)]
     Infra -->|Publish| SNS[Amazon SNS]
     
-    subgraph "Sidecars (Docker/ECS)"
+    subgraph "Sidecars (Docker)"
         OTEL[OTel Collector]
         UNLEASH[Unleash]
     end
@@ -42,7 +43,7 @@ Each microservice follows the **Clean Architecture** principles to separate conc
 | Layer | Responsibility | Components |
 |---|---|---|
 | **API (Presentation)** | Entry point, HTTP protocols, Serialization. | `Program.cs`, `Endpoints/`, `Filters/` |
-| **Application** | Use cases, specific business logic. | *Merged with Domain in this PoC for simplicity* |
+| **Application** | Use cases, Validators, DTOs. | `UseCases/`, `Validators/` |
 | **Domain (Core)** | Enterprise business rules, Entities, Aggregates. | `Models/`, `Interfaces/`, `ValueObjects/` |
 | **Infrastructure** | External concerns (DB, Bus). | `Repositories/`, `Services/` |
 
@@ -62,8 +63,8 @@ Services are decoupled and communicate asynchronously via **Integration Events**
 ### 2.3. Specialized Shared Libraries
 To avoid the "Kitchen Sink" anti-pattern, we use focused libraries:
 
-- **`PoC.Shared`:** Lightweight Kernel. Contains Result Pattern, Base Entities, Common DTOs.
-- **`PoC.Observability`:** **Rule:** All OTel and logging configuration resides here. No Serilog; uses Native ILogger.
+- **`PoC.Shared`:** Lightweight Kernel. Contains Result Pattern (`Result<T>`), Base Entities, Common DTOs.
+- **`PoC.Observability`:** **Rule:** All OTel and logging configuration resides here. Uses Native ILogger (No Serilog).
 - **`PoC.FeatureFlags`:** OpenFeature implementation with Unleash provider and local-safe fallback.
 
 ## 3. Observability & Telemetry

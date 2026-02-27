@@ -6,7 +6,6 @@ using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Extensions.AWS.Trace;
-using OpenTelemetry.Instrumentation.AWSLambda;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -72,8 +71,8 @@ public static class ObservabilityExtensions
         { 
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e1) ? e1 : false,
             ServiceName = "UnknownService",
-            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
-            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? builder.Configuration["Otel:Endpoint"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"] ?? builder.Configuration["Otel:Protocol"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };
@@ -109,8 +108,8 @@ public static class ObservabilityExtensions
         { 
             Enabled = bool.TryParse(builder.Configuration["Observability:Enabled"], out var e2) ? e2 : false,
             ServiceName = "UnknownService",
-            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"],
-            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"],
+            OtlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? builder.Configuration["Otel:Endpoint"],
+            OtlpProtocol = builder.Configuration["OTEL_EXPORTER_OTLP_PROTOCOL"] ?? builder.Configuration["Otel:Protocol"],
             Environment = builder.Environment.EnvironmentName,
             ExportToConsole = builder.Environment.IsDevelopment()
         };
@@ -197,12 +196,14 @@ public static class ObservabilityExtensions
                 metrics
                     .SetResourceBuilder(resourceBuilder)
                     .AddMeter(options.ServiceName)
+                    .AddMeter("PoC.FeatureFlags") // Legacy/Custom Meter
+                    .AddMeter("OpenFeature*")     // Standard OpenFeature Meter
                     .AddMeter("app.startup")
+                    .AddMeter("System.Net.Http")
+                    .AddMeter("OpenTelemetry.Instrumentation.Http")
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddMeter("System.Net.Http")
-                    .AddMeter("OpenTelemetry.Instrumentation.Http");
+                    .AddHttpClientInstrumentation();
 
                 if (!string.IsNullOrEmpty(options.OtlpEndpoint))
                 {

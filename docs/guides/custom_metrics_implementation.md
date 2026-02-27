@@ -68,16 +68,28 @@ builder.Services.AddSingleton<BusinessMetrics>();
 
 ## 3. Enable the Meter in OpenTelemetry
 
-You MUST tell OpenTelemetry to listen to this new Meter (`PoC.Business`).
+The `AddPoCObservability` method automatically registers a meter with the name matching your `ServiceName`.
+
+**Option A: Use the Service Name (Recommended)**
+Ensure your `MeterName` matches the service name passed to `AddPoCObservability` in `Program.cs`.
 
 ```csharp
-builder.Services.AddOpenTelemetry()
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddRuntimeInstrumentation()
-        // ... other instrumentations
-        .AddMeter("PoC.Business") // <--- IMPORTANT: Add your custom meter name here
-        .AddOtlpExporter());
+// In BusinessMetrics.cs
+public const string MeterName = "PoC.Costing"; // Must match ServiceName
+
+// In Program.cs
+builder.AddPoCObservability("PoC.Costing", "1.0.0");
+```
+
+**Option B: Modify Observability Extensions**
+If you need a distinct meter name (e.g., "PoC.Business"), you must update `src/PoC.Observability/Extensions/ObservabilityExtensions.cs` to include it:
+
+```csharp
+// In ObservabilityExtensions.cs
+.WithMetrics(metrics => metrics
+    .AddMeter(options.ServiceName)
+    .AddMeter("PoC.Business") // Add this line
+    // ...
 ```
 
 ## 4. Usage in Domain Service
