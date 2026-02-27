@@ -53,7 +53,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "sum(rate(db_client_operation_duration_seconds_count{error_code=~\"ThrottlingException|ProvisionedThroughputExceededException\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(traces_span_metrics_calls_total{exception_type=~\"Amazon.DynamoDBv2.Model.ThrottlingException|.*ProvisionedThroughputExceededException.*\", rpc_service=\"DynamoDB\", service_name=~\"$service\"}[1m]))",
                     "legendFormat": "Throttling Events",
                     "range": true,
                     "refId": "A"
@@ -94,13 +94,13 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "sum(rate(db_client_retries_total{service_name=~\"$service\"}[1m]))",
-                    "legendFormat": "Retries",
+                    "expr": "sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", rpc_service=\"DynamoDB\", service_name=~\"$service\"}[1m]))",
+                    "legendFormat": "Failed Requests",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Retry Count",
+            "title": "Failed Requests (Errors)",
             "type": "stat"
         },
         {
@@ -121,8 +121,8 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "histogram_quantile(0.99, sum by (db_operation, le) (rate(db_client_operation_duration_seconds_bucket{service_name=~\"$service\"}[1m])))",
-                    "legendFormat": "{{db_operation}} P99",
+                    "expr": "histogram_quantile(0.99, sum by (rpc_method, le) (rate(traces_span_metrics_duration_milliseconds_bucket{rpc_service=\"DynamoDB\", service_name=~\"$service\"}[1m])))",
+                    "legendFormat": "{{rpc_method}} P99 (ms)",
                     "refId": "A"
                 }
             ],
@@ -151,7 +151,7 @@
                         "uid": "tempo"
                     },
                     "limit": 20,
-                    "query": "{ db.operation = \"Scan\" }",
+                    "query": "{ rpc.method = \"Scan\" }",
                     "queryType": "traceql",
                     "refId": "A"
                 }
@@ -177,7 +177,7 @@
                         "type": "prometheus",
                         "uid": "prometheus"
                     },
-                    "expr": "sum(rate(db_client_operation_duration_seconds_count{error_code=\"ConditionalCheckFailedException\", service_name=~\"$service\"}[1m]))",
+                    "expr": "sum(rate(traces_span_metrics_calls_total{exception_type=~\"Amazon.DynamoDBv2.Model.ConditionalCheckFailedException\", rpc_service=\"DynamoDB\", service_name=~\"$service\"}[1m]))",
                     "legendFormat": "Conditional Failures",
                     "refId": "A"
                 }

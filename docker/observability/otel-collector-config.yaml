@@ -28,15 +28,23 @@ connectors:
       - name: http.method
       - name: http.status_code
       - name: http.route
+      - name: db.system
+      - name: db.name
+      - name: db.operation
+      - name: aws.service
+      - name: rpc.method
+      - name: rpc.service
+      - name: exception.type
     histogram:
       explicit:
         buckets: [10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s]
 
   servicegraph:
+    latency_histogram_buckets: [10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s]
     dimensions: [http.method, http.status_code]
     store:
       max_items: 10000
-      ttl: 2s 
+      ttl: 10s 
 
 exporters:
   otlp/tempo:

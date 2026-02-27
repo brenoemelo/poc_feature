@@ -9,10 +9,10 @@ Use these steps to verify if the LocalStack environment is healthy.
 ### 1. API Gateway & Functions
 ```bash
 # List APIs
-docker exec poc_feature-localstack-1 awslocal apigateway get-rest-apis
+docker compose exec localstack awslocal apigateway get-rest-apis
 
 # List Functions
-docker exec poc_feature-localstack-1 awslocal lambda list-functions
+docker compose exec localstack awslocal lambda list-functions
 ```
 
 ### 2. Verify Connectivity
@@ -24,7 +24,7 @@ curl http://localhost:4566/_aws/execute-api/material-api/prod/api/v1/materials
 ### 3. Queue Depth
 Check if messages are stuck in queues (consumers down/failing).
 ```bash
-docker exec poc_feature-localstack-1 awslocal sqs list-queues
+docker compose exec localstack awslocal sqs list-queues
 ```
 > **Tip:** Use `sqs get-queue-attributes` to see `ApproximateNumberOfMessages`.
 

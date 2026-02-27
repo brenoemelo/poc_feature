@@ -8,47 +8,7 @@ The PoC project implements a **vendor-agnostic Feature Flags system** using the 
 
 ### Why OpenFeature?
 
-OpenFeature is a **CNCF (Cloud Native Computing Foundation)** project that provides a vendor-agnostic, community-driven API for feature flagging. By coding against the OpenFeature SDK rather than a vendor-specific API, we can swap providers (LaunchDarkly, Flagsmith, Split, etc.) without changing application code.
-
-### Why Unleash?
-
-Unleash is a powerful, enterprise-ready feature management solution that:
-- Runs as a **Docker container** (with PostgreSQL backend).
-- Provides a **rich UI** for managing feature toggles, strategies, and user segments.
-- Supports **Gradual Rollouts**, **User Targeting**, and **A/B Testing**.
-- Has a robust **.NET SDK** (`Unleash.Client`) which we wrap with OpenFeature.
-
-### Accessing the Dashboard
-
-The Unleash dashboard is available at **[http://localhost:4242](http://localhost:4242)**.
-
-**Credentials:**
-- **User:** `admin2` (or `admin`)
-- **Password:** `password`
-
-> **Note:** The project includes an initialization script (`scripts/init-unleash.ps1`) that automatically configures the default strategies and creates necessary flags on startup. If you cannot login with `admin`, try `admin2` which is created as a backup administrator.
-
-### Request Flow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API as .NET API
-    participant Filter as FeatureGateFilter
-    participant SDK as OpenFeature SDK
-    participant Unleash as Unleash Container
-    participant DB as PostgreSQL
-
-    Client->>API: POST /api/v1/costing/prices
-    API->>Filter: .WithFeatureGate("price-ingestion")
-    Filter->>SDK: GetBooleanValueAsync("price-ingestion", false)
-    SDK->>Unleash: In-Process Evaluation (cached config)
-    Unleash->>DB: Read flag definition (async sync)
-    DB-->>Unleash: variation: disabled → false
-    Unleash-->>SDK: false
-    SDK-->>Filter: false
-    Filter-->>Client: 404 Not Found (Feature Hidden)
-```
+OpenFeature is a **CNCF** project that provides a vendor-agnostic API for feature flagging. It allows us to swap providers (e.g., Unleash to LaunchDarkly) without changing application code.
 
 ### Component Map
 
@@ -61,69 +21,73 @@ graph TD
     end
 
     subgraph DotNet[".NET Microservice"]
-        EXT["ServiceCollectionExtensions<br/>AddPoCFeatureFlags()"]
-        FILTER["FeatureGateFilter<br/>IEndpointFilter"]
+        EXT["AddPoCFeatureFlags()"]
+        FILTER["FeatureGateFilter<br/>(Endpoint Filter)"]
         SDK["OpenFeature SDK<br/>FeatureClient"]
-        PROVIDER["UnleashProvider<br/>(Custom OpenFeature Provider)"]
+        PROVIDER["UnleashFeatureProvider"]
     end
 
     EXT -->|registers| SDK
     EXT -->|initializes| PROVIDER
-    FILTER -->|resolves from DI| SDK
+    FILTER -->|uses| SDK
     SDK -->|delegates to| PROVIDER
     PROVIDER -->|syncs config from| Unleash
 ```
+
+### Accessing the Dashboard
+
+*   **URL:** [http://localhost:4242](http://localhost:4242)
+*   **User:** `admin` (or `admin2`)
+*   **Password:** `password`
 
 ---
 
 ## 🔧 Implementation Details
 
-### Declarative Approach (Primary) — `.WithFeatureGate()`
+### Library Structure
+Feature flagging logic is centralized in the **`PoC.FeatureFlags`** library.
 
-The primary method follows an **Aspect-Oriented Programming (AOP)** pattern. Feature gate logic is completely separated from business logic using an `IEndpointFilter`:
+*   **Namespace:** `PoC.FeatureFlags`
+*   **Provider:** `PoC.FeatureFlags.Extensions.UnleashFeatureProvider`
+*   **Extensions:** `PoC.FeatureFlags.Extensions.FeatureGateExtensions`
+
+### Declarative Usage (`.WithFeatureGate()`)
+
+We use Minimal API Endpoint Filters to secure endpoints declaratively.
 
 ```csharp
-// CostingEndpoints.cs — Business logic stays clean
-group.MapPost("/prices", UpsertPriceAsync)
-     .WithName("UpsertPrice")
-     .WithFeatureGate("price-ingestion");    // ← One line, zero pollution
-
-group.MapPost("/estimations", CalculateCostAsync)
-     .WithName("CalculateCost")
-     .WithFeatureGate("price-calculation");  // ← Same pattern
+// MaterialsEndpoints.cs
+group.MapPost("/", CreateMaterial)
+     .WithName("CreateMaterial")
+     .WithFeatureGate("materials-create"); // ← Blocks request if flag is disabled
 ```
 
-> **Note:** This project uses **Minimal APIs**, not MVC Controllers. The `.WithFeatureGate()` extension method is the Minimal API equivalent of an `[ActionFilter]` attribute. It attaches a `FeatureGateFilter` (`IEndpointFilter`) to the endpoint pipeline.
+### How it Works
+1.  The `.WithFeatureGate("key")` extension adds an **Endpoint Filter**.
+2.  The filter resolves `IFeatureClient` (OpenFeature SDK) from DI.
+3.  It evaluates the flag asynchronously (`GetBooleanValueAsync`).
+4.  If `false`: Returns `404 Not Found` (hiding the feature).
+5.  If `true`: Executes the endpoint handler.
 
-**Key files:**
-- `PoC.Shared.Infrastructure/Filters/FeatureGateFilter.cs` — The filter logic.
-- `PoC.Shared.Infrastructure/Extensions/FeatureGateExtensions.cs` — The `.WithFeatureGate()` extension.
-- `PoC.Shared.Infrastructure/FeatureFlag/UnleashProvider.cs` — The custom OpenFeature provider for Unleash.
+### Imperative Usage (Manual Check)
 
-### Imperative Approach (Advanced) — Direct SDK Usage
-
-For complex scenarios where a flag controls logic *inside* a service (not an entire endpoint), inject `FeatureClient` directly:
+For logic *inside* a service:
 
 ```csharp
-public class SomeService
+public class MyService(IFeatureClient featureClient)
 {
-    private readonly FeatureClient _featureClient;
-
-    public SomeService(FeatureClient featureClient)
+    public async Task DoWork()
     {
-        _featureClient = featureClient;
-    }
-
-    public async Task DoSomething()
-    {
-        if (await _featureClient.GetBooleanValueAsync("new-algo", false))
+        if (await featureClient.GetBooleanValueAsync("my-flag", false))
         {
-            // Use new algorithm
+            // Do new behavior
         }
     }
 }
 ```
 
-## 🚀 Initialization
+## 7. Troubleshooting
 
-The `init-unleash.sh` script (run automatically via Docker Compose) initializes the Unleash instance with default flags and strategies, ensuring a ready-to-use environment for development.
+*   **Flag not updating?** Check `FetchTogglesIntervalSeconds` (default 15-30s).
+*   **Connection Refused?** Ensure `unleash` container is running.
+*   **"Feature Disabled" log?** This is expected behavior when a gate blocks a request.

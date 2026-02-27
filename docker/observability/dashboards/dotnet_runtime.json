@@ -77,7 +77,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "poc_app_startup_duration_ms{service_name=~\"$service\", deployment_environment=~\"$env\"}",
+                    "expr": "app_startup_duration_ms{service_name=~\"$service\", deployment_environment=~\"$env\"}",
                     "legendFormat": "{{service_name}}",
                     "range": true,
                     "refId": "A"
@@ -262,7 +262,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "increase(poc_process_runtime_dotnet_gc_collections_count_total{service_name=~\"$service\", deployment_environment=~\"$env\"}[1m])",
+                    "expr": "increase(process_runtime_dotnet_gc_collections_count_total{service_name=~\"$service\", deployment_environment=~\"$env\"}[1m])",
                     "legendFormat": "{{service_name}} - Gen {{generation}}",
                     "range": true,
                     "refId": "A"
@@ -354,7 +354,7 @@
                         "uid": "prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "poc_process_runtime_dotnet_thread_pool_queue_length{service_name=~\"$service\", deployment_environment=~\"$env\"}",
+                    "expr": "process_runtime_dotnet_thread_pool_queue_length{service_name=~\"$service\", deployment_environment=~\"$env\"}",
                     "legendFormat": "{{service_name}}",
                     "range": true,
                     "refId": "A"

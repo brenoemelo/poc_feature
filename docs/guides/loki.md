@@ -64,16 +64,14 @@ limits_config:
 ```
 
 ### 4. Compactor
-The Compactor is responsible for enforcing retention policies.
+The Compactor is responsible for enforcing retention policies. In this PoC, retention is configured but **disabled by default** to preserve logs during testing.
 
 ```yaml
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
-  retention_enabled: true
+  retention_enabled: false # Set to true to enable deletion of old logs
   retention_delete_delay: 2h
-  retention_delete_worker_count: 150
-  delete_request_store: filesystem
 ```
 
 ## LogQL (Log Query Language)

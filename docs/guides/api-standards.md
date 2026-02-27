@@ -2,7 +2,7 @@
 
 We follow **Pragmatic REST** principles with strict adherence to **RFC 7807** for errors and **HATEOAS** for navigability.
 
-## 1. Response Envelope context
+## 1. Response Envelope
 
 All API responses (success or failure) follow a predictable structure.
 
@@ -35,7 +35,15 @@ All API responses (success or failure) follow a predictable structure.
 }
 ```
 
-## 2. Error Handling (RFC 7807)
+## 2. Internal Control Flow (Result Pattern)
+
+While the API returns standard JSON, the internal application uses the **Result Pattern** (`PoC.Shared.Common.Result<T>`) to handle logic flow without Exceptions.
+
+*   **Success:** `Result.Success(value)` -> Mapped to `200 OK` (with Envelope).
+*   **Failure:** `Result.Failure(Error.NotFound)` -> Mapped to `404 Not Found` (ProblemDetails).
+*   **Validation:** `Result.Failure(Error.Validation)` -> Mapped to `400 Bad Request`.
+
+## 3. Error Handling (RFC 7807)
 
 We do **NOT** return `200 OK` for errors. We use the standard `ProblemDetails` format.
 
@@ -54,37 +62,23 @@ We do **NOT** return `200 OK` for errors. We use the standard `ProblemDetails` f
 }
 ```
 
-**Common Status Codes:**
-- `200 OK`: Success (Synchronous).
-- `201 Created`: Resource created.
-- `202 Accepted`: Request accepted for background processing (Async).
-- `400 Bad Request`: Validation or syntax error.
-- `404 Not Found`: Resource does not exist.
-- `422 Unprocessable Entity`: Business rule violation.
-- `500 Internal Server Error`: Unhandled exception (Bug).
+## 4. Pagination Strategy (Cursor-Based)
 
-## 3. Pagination Strategy (Cursor-Based)
-
-Due to DynamoDB's architecture, we avoid "Offset/Limit" (Skip/Take) pagination as it performs poorly at scale. Instead, we use **Cursor-Based Pagination**.
+Due to DynamoDB's architecture, we avoid "Offset/Limit" (Skip/Take) pagination. We use **Cursor-Based Pagination**.
 
 ### How it works
 1. **Client** requests the first page: `GET /items?limit=10`
-2. **Server** returns items + `meta.nextCursor`.
-   - The cursor is the Base64-encoded `LastEvaluatedKey` from DynamoDB.
+2. **Server** returns items + `meta.nextCursor` (Base64-encoded `LastEvaluatedKey`).
 3. **Client** requests the next page: `GET /items?limit=10&cursor=VGhpcy...`
 
-> **Note:** This implies **Forward-Only** navigation.
-
-## 4. versioning
+## 5. Versioning
 
 All public APIs are versioned in the URI path.
-- Pattern: `/api/v{major}/{resource}`
-- Example: `/api/v1/materials`
+*   Pattern: `/api/v{major}/{resource}`
+*   Example: `/api/v1/materials`
 
-Any breaking change requires incrementing the version (e.g., `v2`).
-
-## 5. HATEOAS (Hypermedia)
+## 6. HATEOAS (Hypermedia)
 
 We implement **Level 3** of the Richardson Maturity Model where possible.
-- **Links Array:** Every resource should provide links to related actions.
-- **Discovery:** Clients should ideally rely on `links` rather than hardcoding URL construction logic, although pragmatic coupling is accepted for internal microservices.
+*   **Links Array:** Every resource should provide links to related actions.
+*   **Discovery:** Clients should ideally rely on `links` rather than hardcoding URL construction logic.

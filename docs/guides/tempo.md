@@ -113,11 +113,11 @@ You can select specific attributes to display in the results table:
 ## Operational Commands
 
 - **Start Tempo:**
-  ```powershell
-  docker compose -f docker-compose.yml up -d tempo
+  ```bash
+  docker compose up -d tempo
   ```
 - **Check Logs:**
-  ```powershell
-  docker logs poc_feature-tempo-1
+  ```bash
+  docker compose logs -f tempo
   ```
 - **Configuration File:** [`docker/observability/tempo.yaml`](file:///d:/Projetos/poc_feature/docker/observability/tempo.yaml)

@@ -1,130 +1,90 @@
 # Automation Framework Guide
 
-> **⚠️ DEPRECATED:** This guide describes the legacy PowerShell-based deployment framework. The current supported deployment method uses the Python + Terraform pipeline. Please refer to [Terraform Deployment Pipeline](deployment-pipeline.md) for up-to-date instructions.
-
 **Role:** DevOps & SRE Documentation
 **Status:** Active
-**Scope:** LocalStack & AWS Deployment
+**Scope:** LocalStack & AWS Deployment (Terraform)
 
 ## 1. Overview
 
-The project uses a **Service-Isolated Automation Framework** to manage the lifecycle of microservices. This framework treats infrastructure scripts as production software, enforcing DRY principles, robust error handling, and strict isolation.
+The project uses a **Python + Terraform** based automation framework to manage the lifecycle of microservices. This framework ensures robust, idempotent, and observable deployments to both LocalStack (Dev) and AWS (Prod - future).
+
+> **Note:** The legacy PowerShell scripts (`deploy-all.ps1`) are **DEPRECATED** and should not be used.
 
 ### Key Features
-*   **PowerShell Core (`pwsh`):** Cross-platform compatibility (Windows/Linux/Mac).
-*   **Service Isolation:** Each service has its own `pipeline.ps1` and lifecycle scripts.
-*   **Master Orchestration:** `deployment/localstack/deploy-all.ps1` orchestrates services in isolated processes.
-*   **Fail-Fast Logging:** Centralized logging with `Start-Transcript` and 7-day auto-rotation.
-*   **Idempotency:** `Remove-AwsResource` helper ensures clean deployments by handling "Resource Not Found" errors gracefully.
+*   **Terraform-First:** All infrastructure (Lambda, DynamoDB, API Gateway, IAM) is defined as code (`.tf`).
+*   **Python Orchestration:** A single master script (`deploy_all_terraform.py`) handles the build -> plan -> apply workflow.
+*   **LocalStack Native:** Optimized for local development with "Delete-then-Create" strategies for clean state.
+*   **Service Isolation:** Each service has its own Terraform state and module, preventing "blast radius" issues.
 
 ## 2. Folder Structure
 
-The structure enforces separation of concerns.
-
 ```text
-scripts/
-├── config/
-│   └── global.env.ps1          # Global constants (AWS Account ID, Region, LocalStack URL)
-├── utils/
-│   ├── logger.ps1              # Centralized logging (Transcript based) & Rotation
-│   ├── common.ps1              # Shared helper functions (Fail-fast)
-│   ├── aws_helpers.ps1         # AWS CLI wrappers (Auth, Idempotent Cleanup)
-│   └── docker_helpers.ps1      # Docker wrappers
-├── logs/                       # Auto-generated logs (GitIgnored)
-│   └── .gitkeep
-└── services/
-    ├── materials/              # Service: PoC.Materials
-    │   ├── config.local.ps1    # Service-specific variables
-    │   ├── 01-validate.ps1     # Pre-flight checks
-    │   ├── 02-cleanup.ps1      # Idempotency (Teardown)
-    │   ├── 03-build.ps1        # Compilation & Artifacts (Optional)
-    │   ├── 04-deploy.ps1       # Infrastructure & Code Deployment
-    │   ├── 05-test.ps1         # Smoke/E2E Tests
-    │   └── pipeline.ps1        # Service Orchestrator
-    ├── costing/                # Service: PoC.Costing
-    │   └── ...
-    ├── populator/              # Service: PoC.Populator
-    │   └── ...
-    └── gateway/                # Service: PoC-Gateway
-        └── ...
+deployment/
+└── localstack/
+    ├── deploy_all_terraform.py   # MASTER ORCHESTRATOR
+    └── ...
+terraform/
+├── modules/                      # Reusable Terraform Modules
+│   ├── lambda-function/
+│   ├── dynamodb-table/
+│   └── ...
+├── services/                     # Service-Specific Configurations
+│   ├── materials/
+│   │   ├── main.tf
+│   │   └── variables.tf
+│   ├── costing/
+│   └── populator/
+└── shared/                       # Shared Infra (Networking, SSM)
+    ├── main.tf
+    └── variables.tf
 ```
 
-## 3. Core Components
+## 3. The Master Orchestrator (`deploy_all_terraform.py`)
 
-### 3.1 Master Orchestrator (`deploy-all.ps1`)
-Located in `deployment/localstack/deploy-all.ps1`.
-*   **Function:** Iterates through defined services and executes their `pipeline.ps1`.
-*   **Isolation:** Runs each pipeline in a separate PowerShell process (`Start-Process` / `powershell -File`) to prevent variable pollution.
-*   **Parallelism:** Currently sequential to ensure dependency order (Materials -> Costing -> Gateway).
+Located in `deployment/localstack/deploy_all_terraform.py`.
 
-### 3.2 Service Pipeline (`pipeline.ps1`)
-Each service has a `pipeline.ps1` that acts as the entry point.
-*   **Phases:** Validate -> Cleanup -> Build (Optional) -> Deploy -> Test.
-*   **Logging:** Initializes a unique log file for the run.
-*   **Error Handling:** Traps errors and logs them before exiting.
+### 3.1 Capabilities
+*   **Builds .NET Projects:** Runs `dotnet publish` with optimization flags.
+*   **Manages LocalStack:** Checks connectivity and cleans up resources if requested.
+*   **Runs Terraform:** Executes `terraform init` and `terraform apply` for each service.
+*   **Verifies Deployment:** Uses `boto3` to confirm resources (Lambdas, Tables) are actually active.
 
-### 3.3 Idempotency (`Remove-AwsResource`)
-Located in `scripts/utils/aws_helpers.ps1`.
-Prevents "ResourceNotFound" errors from breaking the teardown phase.
+### 3.2 Usage
 
-```powershell
-function Remove-AwsResource {
-    param([string]$Description, [scriptblock]$Action)
-    try {
-        & $Action 2>&1 | Out-Null
-        $LASTEXITCODE = 0
-    } catch {
-        Write-Log "Cleanup Warning for ${Description}: $_" -Level WARN
-    }
-}
+**Deploy Everything (Standard Dev Loop):**
+```bash
+python deployment/localstack/deploy_all_terraform.py
 ```
 
-### 3.4 Logging Strategy
-Located in `scripts/utils/logger.ps1`.
-*   **Transcripts:** Uses `Start-Transcript` to capture ALL console output (stdout/stderr).
-*   **Rotation:** Automatically deletes logs older than 7 days.
-*   **Location:** `scripts/logs/`.
-
-## 4. Usage Instructions
-
-### Deploy All Services (LocalStack)
-This is the standard command to deploy the entire environment.
-
-```powershell
-cd deployment/localstack
-.\deploy-all.ps1
+**Deploy Specific Service:**
+```bash
+python deployment/localstack/deploy_all_terraform.py --service materials
 ```
 
-**Options:**
-- `-SkipBuild`: Skips the `dotnet publish` step. Use this if you have already built the artifacts and just want to redeploy infrastructure/code.
-  ```powershell
-  .\deploy-all.ps1 -SkipBuild
-  ```
-
-### Deploy a Single Service
-Useful for iterating on a specific service without redeploying everything.
-
-```powershell
-cd scripts/services/materials
-.\pipeline.ps1
+**Clean Slate (Nuke & Deploy):**
+```bash
+python deployment/localstack/deploy_all_terraform.py --clean
 ```
 
-**Options:**
-- `-SkipBuild`: Same as above.
-
-### Run E2E Tests
-Runs the comprehensive API test suite against the deployed environment.
-
-```powershell
-.\scripts\tests\test_all_apis.ps1
+**Skip Build (Infra Changes Only):**
+```bash
+python deployment/localstack/deploy_all_terraform.py --skip-build
 ```
 
-## 5. Adding a New Service
+## 4. Terraform Strategy
 
-To add a new service (e.g., `PoC.NewService`):
+### 4.1 Modules
+We use local modules in `terraform/modules/` to standardize resource creation.
+*   **`lambda-function`**: Configures runtime, memory, timeout, environment variables, and IAM roles.
+*   **`dynamodb-table`**: Configures Single Table Design, GSIs, and Billing Mode.
 
-1.  Create `scripts/services/newservice/`.
-2.  Copy the structure from `materials/` or another existing service.
-3.  Update `config.local.ps1` with the new service name, ports, and resource names.
-4.  Customize `04-deploy.ps1` for specific AWS resources (DynamoDB tables, SNS topics, etc.).
-5.  Add the new service to the `$Services` list in `deployment/localstack/deploy-all.ps1`.
+### 4.2 State Management
+*   **Local:** State is stored in local `.tfstate` files within each service folder in `terraform/services/`.
+*   **Isolation:** `materials` state is separate from `costing` state.
+
+## 5. CI/CD Integration (Future)
+
+This framework is designed to be ported to GitHub Actions/GitLab CI.
+1.  **Build:** `dotnet publish` (Artifact generation).
+2.  **Infrastructure:** `terraform plan` -> `terraform apply`.
+3.  **Test:** `dotnet test` (Unit) -> `scripts/tests/test_all_apis.ps1` (E2E).

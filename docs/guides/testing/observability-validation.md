@@ -1,14 +1,16 @@
-Para validar exclusivamente o Grafana Tempo em um ambiente real onde os middlewares já estão rodando, a abordagem mais concisa é focar na API HTTP do Tempo (geralmente porta 3200).
+# Observability Validation Guide
 
-Esta classe utiliza polling para lidar com o atraso natural de batching do OpenTelemetry Collector e a persistência no storage do Tempo.
+To validate Grafana Tempo exclusively in a real environment where middlewares are already running, the most concise approach is to focus on Tempo's HTTP API (usually port 3200).
 
-### Dependências Necessárias
+This class uses polling to handle the natural batching delay of the OpenTelemetry Collector and persistence in Tempo storage.
+
+### Required Dependencies
 ```bash
 dotnet add package FluentAssertions
 dotnet add package Microsoft.Extensions.Http
 ```
 
-### Implementação da Classe de Validação
+### Validation Class Implementation
 ```csharp
 using System.Diagnostics;
 using System.Net;
@@ -22,65 +24,65 @@ public class TempoMiddlewareTests
 {
     private readonly HttpClient _tempoClient;
     private readonly HttpClient _apiClient;
-    // URL do Tempo exposta no docker-compose.yml
+    // Tempo URL exposed in docker-compose.yml
     private const string TempoBaseUrl = "http://localhost:3200"; 
-    // URL do API Gateway no LocalStack (pode variar, verificar com `awslocal apigateway get-rest-apis`)
-    // Exemplo: http://localhost:4566/_aws/execute-api/<api_id>/prod/
-    // ID da API atual: material-api
-    // IMPORTANTE: Manter a barra no final para que o BaseAddress funcione corretamente com URIs relativas
+    // API Gateway URL in LocalStack (can vary, verify with `awslocal apigateway get-rest-apis`)
+    // Example: http://localhost:4566/_aws/execute-api/<api_id>/prod/
+    // Current API ID: material-api
+    // IMPORTANT: Keep the trailing slash for BaseAddress to work correctly with relative URIs
     private const string AppBaseUrl = "http://localhost:4566/_aws/execute-api/material-api/prod/";
 
     public TempoMiddlewareTests()
     {
-        // Timeout configurado para evitar travamentos em testes de integração
+        // Timeout configured to avoid hangs in integration tests
         _tempoClient = new HttpClient { BaseAddress = new Uri(TempoBaseUrl), Timeout = TimeSpan.FromSeconds(3) };
         _apiClient = new HttpClient { BaseAddress = new Uri(AppBaseUrl) };
     }
 
     [Fact]
-    public async Task Trace_DeveEstarDisponivelNoTempo_ComAtributosCorretos()
+    public async Task Trace_ShouldBeAvailableInTempo_WithCorrectAttributes()
     {
         try 
         {
-            Console.WriteLine("Trace_DeveEstarDisponivelNoTempo_ComAtributosCorretos: Starting");
-            // 1. Arrange: Gerar contexto W3C e disparar fluxo
+            Console.WriteLine("Trace_ShouldBeAvailableInTempo_WithCorrectAttributes: Starting");
+            // 1. Arrange: Generate W3C context and trigger flow
             var traceId = ActivityTraceId.CreateRandom();
             var spanId = ActivitySpanId.CreateRandom();
             var traceParent = $"00-{traceId}-{spanId}-01"; // [1]
 
             Console.WriteLine($"Generated TraceId: {traceId}");
 
-            // Endpoint real do projeto (Materials API)
-            // IMPORTANTE: Não usar barra inicial para usar BaseAddress corretamente
+            // Real project endpoint (Materials API)
+            // IMPORTANT: Do not use leading slash to use BaseAddress correctly
             var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/materials?limit=1");
             request.Headers.Add("traceparent", traceParent);
             
-            // 2. Act: Acionar a aplicação para gerar a telemetria
+            // 2. Act: Trigger the application to generate telemetry
             Console.WriteLine($"Sending request to {AppBaseUrl}...");
             var apiResponse = await _apiClient.SendAsync(request);
             Console.WriteLine($"Response Status: {apiResponse.StatusCode}");
             
-            // Aceita 200 OK ou 404 Not Found (se banco estiver vazio), o importante é o trace
+            // Accept 200 OK or 404 Not Found (if database is empty), the trace is what matters
             apiResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
 
-            // 3. Assert: Polling na API do Tempo até o dado ser persistido
+            // 3. Assert: Poll Tempo API until data is persisted
             Console.WriteLine("Polling Tempo...");
             var traceJson = await PollUntilTraceExists(traceId.ToHexString());
             Console.WriteLine($"Polling result: {(traceJson != null ? "Found" : "Null")}");
             
-            // Validações concisas e diretas
-            traceJson.Should().NotBeNull("O rastro deve ser retornado pelo Tempo.");
-            // Nome do serviço configurado em Program.cs: builder.AddPoCObservability("PoC.Materials", ...)
-            traceJson.Should().Contain("PoC.Materials", "O rastro deve conter o nome do serviço configurado.");
+            // Concise and direct validations
+            traceJson.Should().NotBeNull("The trace should be returned by Tempo.");
+            // Service name configured in Program.cs: builder.AddPoCObservability("PoC.Materials", ...)
+            traceJson.Should().Contain("PoC.Materials", "The trace must contain the configured service name.");
             
-            // Tempo retorna TraceID em Base64 no JSON (ex: "traceId":"aA/rS+4WhGbHEi25lqQmPA==")
-            // Precisamos converter o Hex do ActivityTraceId para Base64 para validar
+            // Tempo returns TraceID in Base64 in JSON (ex: "traceId":"aA/rS+4WhGbHEi25lqQmPA==")
+            // We need to convert the Hex from ActivityTraceId to Base64 to validate
             var traceIdBytes = new byte[16];
             traceId.CopyTo(traceIdBytes);
             var traceIdBase64 = Convert.ToBase64String(traceIdBytes);
             
-            traceJson.Should().Contain(traceIdBase64, "O ID do rastro (Base64) retornado deve ser o mesmo enviado.");
-            Console.WriteLine("Trace_DeveEstarDisponivelNoTempo_ComAtributosCorretos: Finished");
+            traceJson.Should().Contain(traceIdBase64, "The returned Trace ID (Base64) must be the same as sent.");
+            Console.WriteLine("Trace_ShouldBeAvailableInTempo_WithCorrectAttributes: Finished");
         }
         catch (Exception ex)
         {
@@ -90,16 +92,16 @@ public class TempoMiddlewareTests
     }
 
     [Fact]
-    public async Task Trace_DeveCapturarErro_QuandoOcorreFalha()
+    public async Task Trace_ShouldCaptureError_WhenFailureOccurs()
     {
-        Console.WriteLine("Trace_DeveCapturarErro_QuandoOcorreFalha: Starting");
+        Console.WriteLine("Trace_ShouldCaptureError_WhenFailureOccurs: Starting");
         // Arrange
         var traceId = ActivityTraceId.CreateRandom();
         var traceIdHex = traceId.ToHexString();
         Console.WriteLine($"Generated TraceId: {traceIdHex}");
         
-        // Endpoint que não existe ou input inválido para forçar erro/404
-        // Usar um ID que claramente não existe, mas a rota é válida
+        // Endpoint that does not exist or invalid input to force error/404
+        // Use an ID that clearly does not exist, but the route is valid
         var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/materials/99999999-9999-9999-9999-999999999999");
         var spanId = ActivitySpanId.CreateRandom();
         request.Headers.Add("traceparent", $"00-{traceIdHex}-{spanId}-01");
@@ -111,19 +113,19 @@ public class TempoMiddlewareTests
         var content = await response.Content.ReadAsStringAsync();
         Console.WriteLine($"Response Content: {content}");
 
-        // Assert: Valida se o Tempo capturou o rastro mesmo em erro
+        // Assert: Validate if Tempo captured the trace even in error
         Console.WriteLine("Polling Tempo...");
         var traceJson = await PollUntilTraceExists(traceIdHex);
         Console.WriteLine($"Polling result: {(traceJson != null ? "Found" : "Null")}");
         
         traceJson.Should().NotBeNull();
-        // O status code 404 deve aparecer nos atributos ou eventos
-        // Nota: Dependendo da implementação do OTel e se é ASP.NET Core ou Lambda, o status code pode não ser capturado automaticamente como atributo no span raiz
-        // Por enquanto, validamos apenas que o rastro foi gerado e persistido, o que garante a observabilidade do fluxo.
-        // traceJson.Should().Contain("404", "O rastro deve registrar o status code de erro.");
+        // The 404 status code should appear in attributes or events
+        // Note: Depending on OTel implementation and if it's ASP.NET Core or Lambda, status code might not be automatically captured as attribute in root span
+        // For now, we only validate that the trace was generated and persisted, which guarantees flow observability.
+        // traceJson.Should().Contain("404", "The trace should register the error status code.");
         
-        traceJson.Should().Contain("PoC.Materials", "O rastro de erro deve conter o nome do serviço.");
-        Console.WriteLine("Trace_DeveCapturarErro_QuandoOcorreFalha: Finished");
+        traceJson.Should().Contain("PoC.Materials", "The error trace must contain the service name.");
+        Console.WriteLine("Trace_ShouldCaptureError_WhenFailureOccurs: Finished");
     }
 
     private async Task<string?> PollUntilTraceExists(string traceId, int maxAttempts = 15)
@@ -131,7 +133,7 @@ public class TempoMiddlewareTests
         for (int i = 0; i < maxAttempts; i++)
         {
             Console.WriteLine($"Polling attempt {i + 1}/{maxAttempts} for TraceId {traceId}...");
-            // Endpoint oficial de busca por ID: /api/traces/<id>
+            // Official ID search endpoint: /api/traces/<id>
             try 
             {
                 var response = await _tempoClient.GetAsync($"/api/traces/{traceId}");
@@ -142,10 +144,10 @@ public class TempoMiddlewareTests
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao consultar Tempo: {ex.Message}");
+                Console.WriteLine($"Error querying Tempo: {ex.Message}");
             }
 
-            // O Tempo retorna 404 enquanto o dado está em buffer/ingestão
+            // Tempo returns 404 while data is in buffer/ingestion
             await Task.Delay(2000); 
         }
         return null;
@@ -153,16 +155,17 @@ public class TempoMiddlewareTests
 }
 ```
 
-### Explicação dos Testes Criados
-1. **Validação de Ingestão e Metadados**: O primeiro teste confirma que o pipeline (App -> OTel Collector -> Tempo) está aberto. Ele valida se o `service.name` (ex: "PoC.Materials") configurado no seu ResourceBuilder chegou intacto ao backend e se o Trace ID foi indexado corretamente (validando Base64).
+### Created Tests Explanation
+1. **Ingestion and Metadata Validation**: The first test confirms that the pipeline (App -> OTel Collector -> Tempo) is open. It validates if the `service.name` (e.g., "PoC.Materials") configured in your ResourceBuilder arrived intact at the backend and if the Trace ID was indexed correctly (validating Base64).
 
-2. **Validação de Contexto W3C**: Ao injetar o `traceparent` manualmente, garantimos que a aplicação está respeitando o rastro vindo de fora e que o Tempo consegue indexar esse ID específico.
+2. **W3C Context Validation**: By manually injecting the `traceparent`, we ensure the application is respecting the trace coming from outside and that Tempo can index this specific ID.
 
-3. **Validação de Integridade de Erros**: Este teste garante que exceções ou respostas 404 geram rastros válidos no Tempo, garantindo observabilidade mesmo em falhas.
+3. **Error Integrity Validation**: This test guarantees that exceptions or 404 responses generate valid traces in Tempo, ensuring observability even in failures.
 
-### Como confirmar a coleta via Infra (Métricas)
-Se os testes acima falharem consistentemente (retornarem null no polling), o Tempo expõe métricas Prometheus para diagnóstico rápido:
+### How to confirm collection via Infra (Metrics)
+If the tests above fail consistently (return null on polling), Tempo exposes Prometheus metrics for quick diagnosis:
 
-Acesse: http://localhost:3200/metrics
+Access: http://localhost:3200/metrics
 
-**Métrica Chave**: `tempo_distributor_spans_received_total`. Se este contador não estiver subindo durante o teste, o problema está no envio do OTel Collector para o Tempo (verificar porta 4317/4318 no docker-compose.yml).
+**Key Metric**: `tempo_distributor_spans_received_total`. If this counter is not increasing during the test, the problem is in the sending from OTel Collector to Tempo (check port 4317/4318 in docker-compose.yml).
+

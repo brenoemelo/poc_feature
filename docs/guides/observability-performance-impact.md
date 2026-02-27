@@ -55,7 +55,7 @@ filter @type = "REPORT"
 
 ## 📉 Mitigating Cold Start Impact
 
-If `Init Duration` increases significantly (> 300ms added), apply these optimizations in `PoC.Shared.Infrastructure`:
+If `Init Duration` increases significantly (> 300ms added), apply these optimizations in `PoC.Observability`:
 
 ### 1. Optimization Levels
 
